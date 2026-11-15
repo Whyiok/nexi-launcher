@@ -96,7 +96,16 @@ const detail = { slug: "", contents: null, loading: false, pane: "mods",
                  request: 0 };
 let iconsKey = "";
 const lb = { label: "Fabric", builds: [], selected: -1, key: "", loading: false, busy: false };
-const logs = { key: null, pending: "", buffer: [], timer: null, stick: true };
+const logs = {
+  pending: "", buffer: [], timer: null, stick: true,
+  el: "#log-console",
+  visible: () => screen === "settings",
+};
+const gameLogs = {
+  pending: "", buffer: [], timer: null, stick: true,
+  el: "#game-log-console",
+  visible: () => screen === "profiles" && detail.pane === "logs",
+};
 
 const createLogLines = [];
 const loaderLogLines = [];
@@ -239,7 +248,7 @@ function setSeg(selector, value) {
 /* ------------------------------------------- sliding active fill for tabs */
 
 const FILL_CONTAINERS = [
-  "#tabs", "#detail-tabs", "#account-methods",
+  "#tabs", "#detail-tabs", "#account-methods", "#skin-seg",
   "#kind-seg", "#loader-seg", "#mods-seg", "#loaders-seg",
 ];
 
@@ -363,11 +372,24 @@ function initSegHover() {
 
 /* ------------------------------------------------------------- app state */
 
+const THEMES = ["mint", "orange", "indigo"];
+const THEME_NAMES = { mint: "Mint", orange: "Soft orange", indigo: "Indigo" };
+let activeTheme = "";
+
+function applyTheme(theme) {
+  const next = THEMES.includes(theme) ? theme : "mint";
+  if (next === activeTheme) return;
+  activeTheme = next;
+  document.documentElement.dataset.theme = next;
+  startOrb();
+}
+
 function applyState(next) {
   if (!next || !next.instances) return;
   const previous = S.instance ? S.instance.slug : null;
   saveBrowserState();
   S = next;
+  applyTheme(S.theme);
   if (editSlug && (!S.instance || S.instance.slug !== editSlug)) {
     resetCreateMode();
   }
@@ -375,6 +397,7 @@ function applyState(next) {
   renderTabs();
   updateScreenHeads();
   fillSettings();
+  if (screen === "skin") loadSkin();
   if (previous !== (S.instance ? S.instance.slug : null)) resetDeleteConfirm();
   syncBusy();
   ensureScreenData();
@@ -390,7 +413,7 @@ async function refreshState() {
 }
 
 function ensureScreenData() {
-  if (!S.instance && ["mods", "loaders", "logs"].includes(screen)
+  if (!S.instance && ["mods", "loaders"].includes(screen)
       && !(screen === "mods" && mods.kind === "modpack")) {
     setScreen("profiles");
     return;
@@ -401,8 +424,6 @@ function ensureScreenData() {
   } else if (screen === "loaders") {
     initLoaders();
     if (lb.key !== instanceKey()) loadLoaderBuilds();
-  } else if (screen === "logs") {
-    if (logs.key !== S.instance.slug) openLogs();
   }
 }
 
@@ -410,7 +431,7 @@ function ensureScreenData() {
 
 function setScreen(name) {
   const modpackBrowser = name === "mods" && mods.kind === "modpack";
-  if (["mods", "loaders", "logs"].includes(name) && !S.instance
+  if (["mods", "loaders"].includes(name) && !S.instance
       && !modpackBrowser) {
     setStatus("Create or select a profile first.");
     name = "profiles";
@@ -420,7 +441,9 @@ function setScreen(name) {
     section.classList.toggle("active", section.id === `screen-${name}`);
   });
   renderTabs();
-  if (name !== "logs") stopLogsTimer();
+  if (name !== "settings") stopLogsTimer();
+  if (name !== "profiles") stopGameLogsTimer();
+  if (name !== "skin") stopSkinView();
 
   if (name === "profiles") {
     renderProfiles();
@@ -432,10 +455,11 @@ function setScreen(name) {
   } else if (name === "loaders") {
     initLoaders();
     if (lb.key !== instanceKey()) loadLoaderBuilds();
-  } else if (name === "logs") {
-    openLogs();
   } else if (name === "settings") {
     fillSettings();
+    openLogs();
+  } else if (name === "skin") {
+    loadSkin();
   }
   requestAnimationFrame(() => {
     updateAllSegFills();
@@ -447,7 +471,7 @@ function renderTabs() {
   $$("#tabs .tab").forEach((tab) => {
     const name = tab.dataset.screen;
     tab.classList.toggle("active", name === screen);
-    const locked = ["loaders", "logs"].includes(name) && !S.instance;
+    const locked = ["loaders"].includes(name) && !S.instance;
     tab.disabled = locked;
   });
   updateSegFill($("#tabs"));
@@ -460,7 +484,6 @@ function updateScreenHeads() {
       ? "Modrinth · modpacks · installs as a new profile"
       : `Select a profile to manage its ${meta.plural}.`;
     $("#loaders-sub").textContent = "Select a profile to install a loader.";
-    $("#logs-sub").textContent = "Select a profile to read its logs.";
     return;
   }
   const inst = S.instance;
@@ -474,9 +497,6 @@ function updateScreenHeads() {
     `Modrinth · ${meta.plural} · ${target}${loaderPart} · ${inst.name}`;
   $("#loaders-sub").textContent =
     `${inst.name} · Minecraft ${inst.base} · currently ${loader === "vanilla" ? inst.version : loader}`;
-  const logsSub = $("#logs-sub");
-  if (logsSub.dataset.path) logsSub.textContent = `${inst.name} · ${logsSub.dataset.path}`;
-  else logsSub.textContent = `${inst.name} · logs/latest.log`;
 }
 
 /* -------------------------------------------------------------- profiles */
@@ -526,7 +546,10 @@ function runProfileMenuAction(action) {
   switch (action) {
     case "open-folder": call("open", "game"); break;
     case "mods": openBrowser("mod"); break;
-    case "logs": setScreen("logs"); break;
+    case "logs":
+      setScreen("profiles");
+      setDetailPane("logs");
+      break;
     case "icon": setProfileIcon(); break;
     case "edit": openEditProfile(); break;
     case "duplicate": duplicateProfile(); break;
@@ -647,6 +670,8 @@ function syncDetailTabs() {
 function setDetailPane(name) {
   detail.pane = name;
   syncDetailTabs();
+  if (name === "logs") openGameLogs();
+  else stopGameLogsTimer();
   if (!detail.contents) loadProfileContents();
 }
 
@@ -956,6 +981,18 @@ function fillSettings() {
   $("#settings-instances").textContent = (S.paths && S.paths.instances) || "—";
 
   fillAccount();
+  fillTheme();
+}
+
+function fillTheme() {
+  const theme = THEMES.includes(S.theme) ? S.theme : "mint";
+  $$("#theme-grid [data-theme-option]").forEach((button) => {
+    const on = button.dataset.themeOption === theme;
+    button.classList.toggle("on", on);
+    button.setAttribute("aria-checked", on ? "true" : "false");
+  });
+  const label = $("#theme-name");
+  if (label) label.textContent = THEME_NAMES[theme];
 }
 
 function accountAvatar(account) {
@@ -1008,6 +1045,11 @@ function renderAccountList(accounts) {
   for (const account of accounts) {
     const row = document.createElement("div");
     row.className = "account-item" + (account.active ? " on" : "");
+    row.dataset.accountId = account.id;
+    const grip = document.createElement("span");
+    grip.className = "account-grip";
+    grip.setAttribute("aria-hidden", "true");
+    row.appendChild(grip);
     row.appendChild(accountAvatar(account));
     const text = document.createElement("div");
     text.className = "setting-text";
@@ -1209,6 +1251,132 @@ async function selectAccount(accountId) {
   }
   if (result.state) applyState(result.state);
   setStatus("Active account switched.");
+}
+
+const accountDrag = { row: null, startY: 0, grab: 0, shift: 0, active: false };
+
+function accountDragStart(event) {
+  if (event.button !== 0) return;
+  if (event.target.closest("button")) return;
+  const row = event.target.closest(".account-item");
+  if (!row || !row.dataset.accountId) return;
+  accountDrag.row = row;
+  accountDrag.startY = event.clientY;
+  accountDrag.grab = event.clientY - row.getBoundingClientRect().top;
+  accountDrag.shift = 0;
+  accountDrag.active = false;
+  document.addEventListener("pointermove", accountDragMove);
+  document.addEventListener("pointerup", accountDragEnd);
+  document.addEventListener("pointercancel", accountDragEnd);
+}
+
+function reorderAccountRow(list, row, before) {
+  const tops = new Map();
+  for (const el of list.querySelectorAll(".account-item")) {
+    tops.set(el, el.getBoundingClientRect().top);
+  }
+  if (before) list.insertBefore(row, before);
+  else list.appendChild(row);
+  for (const [el, top] of tops) {
+    if (el === row) continue;
+    const delta = top - el.getBoundingClientRect().top;
+    if (Math.abs(delta) < 0.5) continue;
+    el.style.transition = "none";
+    el.style.transform = `translateY(${delta}px)`;
+    requestAnimationFrame(() => {
+      el.style.transition = "";
+      el.style.transform = "";
+    });
+  }
+}
+
+function accountDragMove(event) {
+  const row = accountDrag.row;
+  if (!row || !row.isConnected) return;
+  if (!accountDrag.active) {
+    if (Math.abs(event.clientY - accountDrag.startY) < 4) return;
+    accountDrag.active = true;
+    row.classList.add("dragging");
+    document.body.classList.add("account-dragging");
+  }
+  event.preventDefault();
+  const list = $("#account-list");
+  if (!list) return;
+
+  // Keep the row's visual top under the pointer.
+  const targetTop = event.clientY - accountDrag.grab;
+  let rect = row.getBoundingClientRect();
+  accountDrag.shift += targetTop - rect.top;
+  row.style.transform = `translateY(${accountDrag.shift}px)`;
+
+  const center = targetTop + rect.height / 2;
+  const rows = $$(".account-item", list).filter((item) => item !== row);
+  const before = rows.find((item) => {
+    const box = item.getBoundingClientRect();
+    return center < box.top + box.height / 2;
+  }) || null;
+  if (before ? row.nextElementSibling !== before : row.nextElementSibling) {
+    reorderAccountRow(list, row, before);
+    // The slot changed — offset the shift so the row does not jump.
+    rect = row.getBoundingClientRect();
+    accountDrag.shift += targetTop - rect.top;
+    row.style.transform = `translateY(${accountDrag.shift}px)`;
+  }
+
+  const box = list.getBoundingClientRect();
+  if (event.clientY < box.top + 28) list.scrollTop -= 12;
+  else if (event.clientY > box.bottom - 28) list.scrollTop += 12;
+}
+
+function accountDragEnd() {
+  document.removeEventListener("pointermove", accountDragMove);
+  document.removeEventListener("pointerup", accountDragEnd);
+  document.removeEventListener("pointercancel", accountDragEnd);
+  const row = accountDrag.row;
+  const active = accountDrag.active;
+  accountDrag.row = null;
+  accountDrag.active = false;
+  accountDrag.shift = 0;
+  document.body.classList.remove("account-dragging");
+  if (!row) return;
+  row.classList.remove("dragging");
+  if (!active) return;
+  const list = $("#account-list");
+  if (!list) return;
+  const ids = $$(".account-item", list).map((item) => item.dataset.accountId);
+  row.style.transition = "transform .18s var(--ease)";
+  row.style.transform = "translateY(0)";
+  setTimeout(() => {
+    if (row.isConnected) {
+      row.style.transition = "";
+      row.style.transform = "";
+    }
+    const current = (S.accounts || []).map((account) => account.id);
+    if (ids.join("|") !== current.join("|")) reorderAccounts(ids);
+  }, 180);
+}
+
+async function reorderAccounts(ids) {
+  const result = await call("account_reorder", ids);
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not reorder accounts.",
+      true);
+    if (result && result.state) applyState(result.state);
+    return;
+  }
+  if (result.state) applyState(result.state);
+}
+
+async function changeTheme(theme) {
+  applyTheme(theme);
+  const result = await call("set_theme", theme);
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not save the theme.", true);
+    if (result && result.state) applyState(result.state);
+    return;
+  }
+  if (result.state) applyState(result.state);
+  setStatus(`Theme: ${THEME_NAMES[theme] || theme}.`);
 }
 
 async function removeAccount(accountId) {
@@ -2466,61 +2634,61 @@ function lineClass(line) {
   return "";
 }
 
-function appendText(text, cls) {
+function appendText(text, cls, state = logs) {
   if (!text) return;
-  logs.pending += text;
-  if (!logs.pending.includes("\n")) return;
-  const parts = logs.pending.split("\n");
-  logs.pending = parts.pop();
-  appendLines(parts, cls);
+  state.pending += text;
+  if (!state.pending.includes("\n")) return;
+  const parts = state.pending.split("\n");
+  state.pending = parts.pop();
+  appendLines(parts, cls, state);
 }
 
-function appendLines(lines, cls) {
+function appendLines(lines, cls, state = logs) {
   if (!lines.length) return;
-  const consoleEl = $("#log-console");
+  const consoleEl = $(state.el);
+  if (!consoleEl) return;
   const fragment = document.createDocumentFragment();
   for (const line of lines) {
     const clean = line.replace(/\r$/, "");
     const span = elem("span", "log-line " + (cls !== undefined ? cls : lineClass(clean)), clean + "\n");
-    logs.buffer.push(span);
+    state.buffer.push(span);
     fragment.appendChild(span);
   }
   consoleEl.appendChild(fragment);
-  trimBuffer(consoleEl);
-  if (screen === "logs" && logs.stick) consoleEl.scrollTop = consoleEl.scrollHeight;
+  trimBuffer(state, consoleEl);
+  if (state.visible() && state.stick) {
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
 }
 
-function trimBuffer(consoleEl) {
-  while (logs.buffer.length > 2000) {
-    const old = logs.buffer.shift();
+function trimBuffer(state, consoleEl) {
+  while (state.buffer.length > 2000) {
+    const old = state.buffer.shift();
     if (old && old.parentNode) old.parentNode.removeChild(old);
   }
 }
 
-function clearLogsView() {
-  logs.pending = "";
-  logs.buffer.length = 0;
-  $("#log-console").replaceChildren();
+function clearLogsView(state = logs) {
+  state.pending = "";
+  state.buffer.length = 0;
+  const consoleEl = $(state.el);
+  if (consoleEl) consoleEl.replaceChildren();
 }
 
 async function openLogs() {
-  if (!S.instance) return;
-  const slug = S.instance.slug;
-  logs.key = slug;
-  clearLogsView();
+  stopLogsTimer();
+  clearLogsView(logs);
   const result = await call("logs_open");
   const sub = $("#logs-sub");
-  if (result.path) {
-    sub.dataset.path = result.path;
-    sub.textContent = `${S.instance.name} · ${result.path}`;
-    sub.title = result.path;
-  }
+  sub.dataset.path = result.path || "";
+  sub.textContent = result.path || "logs\\launcher.log";
+  sub.title = result.path || "";
   if (!result.exists) {
-    appendLines(["Waiting for logs/latest.log — the file appears when the game starts."], "line-dim");
+    appendLines(["The launcher log is empty for now."], "line-dim", logs);
   } else {
-    appendText(result.text);
+    appendText(result.text, undefined, logs);
   }
-  startLogsTimer();
+  if (logs.visible()) startLogsTimer();
 }
 
 function startLogsTimer() {
@@ -2536,14 +2704,505 @@ function stopLogsTimer() {
 }
 
 async function pollLogs() {
-  if (screen !== "logs") { stopLogsTimer(); return; }
+  if (!logs.visible()) {
+    stopLogsTimer();
+    return;
+  }
   const result = await call("logs_read");
-  if (result.reset) clearLogsView();
-  if (result.text) appendText(result.text);
+  if (result.reset) clearLogsView(logs);
+  if (result.text) appendText(result.text, undefined, logs);
 }
 
-function appendGameLine(line) {
-  appendLines([line]);
+async function openGameLogs() {
+  stopGameLogsTimer();
+  clearLogsView(gameLogs);
+  const result = await call("game_logs_open");
+  const sub = $("#game-logs-sub");
+  sub.dataset.path = result.path || "";
+  sub.textContent = result.path || "logs/latest.log";
+  sub.title = result.path || "";
+  if (!result.exists) {
+    appendLines(["Waiting for logs/latest.log — the file appears when the "
+                 + "game starts."], "line-dim", gameLogs);
+  } else {
+    appendText(result.text, undefined, gameLogs);
+  }
+  if (gameLogs.visible()) startGameLogsTimer();
+}
+
+function startGameLogsTimer() {
+  stopGameLogsTimer();
+  gameLogs.timer = setInterval(pollGameLogs, 700);
+}
+
+function stopGameLogsTimer() {
+  if (gameLogs.timer) {
+    clearInterval(gameLogs.timer);
+    gameLogs.timer = null;
+  }
+}
+
+async function pollGameLogs() {
+  if (!gameLogs.visible()) {
+    stopGameLogsTimer();
+    return;
+  }
+  const result = await call("game_logs_read");
+  if (result.reset) clearLogsView(gameLogs);
+  if (result.text) appendText(result.text, undefined, gameLogs);
+}
+
+/* ------------------------------------------------------------------ skin */
+
+const skin = { data: "", variant: "classic", busy: false, seq: 0 };
+
+function setSkinVariantButtons(variant) {
+  $$("#skin-seg button").forEach((button) => {
+    button.classList.toggle("on", button.dataset.skinVariant === variant);
+  });
+  updateSegFill($("#skin-seg"));
+}
+
+const skinView = {
+  tex: null,
+  src: "",
+  token: 0,
+  variant: "classic",
+  ready: false,
+  yaw: 0,
+  pitch: 0,
+  targetYaw: 0,
+  targetPitch: 0,
+  bodyYaw: 0.16,
+  bodyPitch: 0,
+  targetBodyYaw: 0.16,
+  targetBodyPitch: 0,
+  dragging: false,
+  lastX: 0,
+  lastY: 0,
+  raf: 0,
+};
+
+function skinRotateY(x, z, angle) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [x * c + z * s, -x * s + z * c];
+}
+
+function skinRotateX(y, z, angle) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [y * c - z * s, y * s + z * c];
+}
+
+function skinPlaceVertex(point, group) {
+  let [x, y, z] = point;
+  if (group === "head") {
+    const pitch = skinRotateX(y - 24, z, skinView.pitch);
+    const yaw = skinRotateY(x, pitch[1], skinView.yaw);
+    x = yaw[0];
+    z = yaw[1];
+    y = pitch[0] + 24;
+  }
+  const tilt = skinRotateX(y - 16, z, skinView.bodyPitch);
+  y = tilt[0] + 16;
+  z = tilt[1];
+  const body = skinRotateY(x, z, skinView.bodyYaw);
+  return { x: body[0], y, z: body[1] };
+}
+
+function skinRotateNormal(normal, group) {
+  let [x, y, z] = normal;
+  if (group === "head") {
+    const pitch = skinRotateX(y, z, skinView.pitch);
+    const yaw = skinRotateY(x, pitch[1], skinView.yaw);
+    x = yaw[0];
+    z = yaw[1];
+    y = pitch[0];
+  }
+  const tilt = skinRotateX(y, z, skinView.bodyPitch);
+  y = tilt[0];
+  z = tilt[1];
+  const body = skinRotateY(x, z, skinView.bodyYaw);
+  return [body[0], y, body[1]];
+}
+
+/* Boxes in skin pixels: head 8³, torso 8×12×4, limbs 4 (or slim 3) wide. */
+function skinBoxes(variant) {
+  const armW = variant === "slim" ? 3 : 4;
+  const boxes = [];
+  const add = (group, x0, x1, y0, y1, z0, z1,
+               u, v, w, h, d, inflate = 0) => {
+    boxes.push({
+      group,
+      x0: x0 - inflate, x1: x1 + inflate,
+      y0: y0 - inflate, y1: y1 + inflate,
+      z0: z0 - inflate, z1: z1 + inflate,
+      u, v, w, h, d,
+    });
+  };
+  add("head", -4, 4, 24, 32, -4, 4, 0, 0, 8, 8, 8);
+  add("head", -4, 4, 24, 32, -4, 4, 32, 0, 8, 8, 8, 0.5);
+  add("body", -4, 4, 12, 24, -2, 2, 16, 16, 8, 12, 4);
+  add("body", -4, 4, 12, 24, -2, 2, 16, 32, 8, 12, 4, 0.5);
+  add("body", -4 - armW, -4, 12, 24, -2, 2, 40, 16, armW, 12, 4);
+  add("body", -4 - armW, -4, 12, 24, -2, 2, 40, 32, armW, 12, 4, 0.5);
+  add("body", 4, 4 + armW, 12, 24, -2, 2, 32, 48, armW, 12, 4);
+  add("body", 4, 4 + armW, 12, 24, -2, 2, 48, 48, armW, 12, 4, 0.5);
+  add("body", -4, 0, 0, 12, -2, 2, 0, 16, 4, 12, 4);
+  add("body", -4, 0, 0, 12, -2, 2, 0, 32, 4, 12, 4, 0.5);
+  add("body", 0, 4, 0, 12, -2, 2, 16, 48, 4, 12, 4);
+  add("body", 0, 4, 0, 12, -2, 2, 0, 48, 4, 12, 4, 0.5);
+  return boxes;
+}
+
+/* Six faces of a box; corners follow the skin's unwrapped texture net. */
+function skinBoxFaces(box) {
+  const { x0, x1, y0, y1, z0, z1, u, v, w, h, d } = box;
+  const faces = [];
+  const add = (src, pts, normal) => faces.push({
+    src, pts, normal, group: box.group,
+  });
+  add([u + d, v + d, w, h], [
+    [x0, y1, z1], [x1, y1, z1], [x1, y0, z1], [x0, y0, z1]], [0, 0, 1]);
+  add([u + 2 * d + w, v + d, w, h], [
+    [x1, y1, z0], [x0, y1, z0], [x0, y0, z0], [x1, y0, z0]], [0, 0, -1]);
+  add([u, v + d, d, h], [
+    [x0, y1, z0], [x0, y1, z1], [x0, y0, z1], [x0, y0, z0]], [-1, 0, 0]);
+  add([u + d + w, v + d, d, h], [
+    [x1, y1, z1], [x1, y1, z0], [x1, y0, z0], [x1, y0, z1]], [1, 0, 0]);
+  add([u + d, v, w, d], [
+    [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);
+  add([u + d + w, v, w, d], [
+    [x1, y0, z0], [x0, y0, z0], [x0, y0, z1], [x1, y0, z1]], [0, -1, 0]);
+  return faces;
+}
+
+/* Legacy 64×32 skins get the left limbs mirrored into the modern slots. */
+function prepareSkinTexture(img) {
+  const tex = document.createElement("canvas");
+  tex.width = 64;
+  tex.height = 64;
+  const ctx = tex.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  const legacy = img.naturalHeight <= 32;
+  ctx.drawImage(img, 0, 0, 64, legacy ? 32 : 64);
+  if (!legacy) return tex;
+  const mirror = (sx, sy, w, h, dx, dy) => {
+    ctx.save();
+    ctx.translate(dx + w, dy);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, sx, sy, w, h, 0, 0, w, h);
+    ctx.restore();
+  };
+  /* Left leg from the right leg. */
+  mirror(4, 16, 4, 4, 20, 48);
+  mirror(8, 16, 4, 4, 24, 48);
+  mirror(8, 20, 4, 12, 16, 52);
+  mirror(4, 20, 4, 12, 20, 52);
+  mirror(0, 20, 4, 12, 24, 52);
+  mirror(12, 20, 4, 12, 28, 52);
+  /* Left arm from the right arm. */
+  mirror(44, 16, 4, 4, 36, 48);
+  mirror(48, 16, 4, 4, 40, 48);
+  mirror(48, 20, 4, 12, 32, 52);
+  mirror(44, 20, 4, 12, 36, 52);
+  mirror(40, 20, 4, 12, 40, 52);
+  mirror(52, 20, 4, 12, 44, 52);
+  return tex;
+}
+
+function renderSkinView() {
+  const canvas = $("#skin-canvas");
+  if (!canvas || !skinView.ready || !skinView.tex) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width * dpr));
+  const height = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  ctx.imageSmoothingEnabled = false;
+
+  const scale = Math.min(width / 19, height / 35);
+  const cx = width / 2;
+  const cy = height / 2;
+  const project = (p) => [cx + p.x * scale, cy - (p.y - 16) * scale];
+
+  ctx.fillStyle = "rgba(0, 0, 0, .3)";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 16 * scale, 6.4 * scale, 1.3 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const queue = [];
+  for (const box of skinBoxes(skinView.variant)) {
+    for (const face of skinBoxFaces(box)) {
+      const normal = skinRotateNormal(face.normal, face.group);
+      if (normal[2] <= 0.02) continue;
+      const placed = face.pts.map((pt) => skinPlaceVertex(pt, face.group));
+      let depth = 0;
+      for (const p of placed) depth += p.z;
+      queue.push({
+        src: face.src,
+        pts: placed.map(project),
+        depth: depth / 4,
+      });
+    }
+  }
+  queue.sort((a, b) => a.depth - b.depth);
+
+  for (const face of queue) {
+    const pts = face.pts;
+    let mx = 0;
+    let my = 0;
+    for (const p of pts) {
+      mx += p[0];
+      my += p[1];
+    }
+    mx /= 4;
+    my /= 4;
+    /* Grow each quad by ~0.7px so neighbouring faces never leave seams. */
+    const grown = pts.map(([x, y]) => {
+      const dx = x - mx;
+      const dy = y - my;
+      const len = Math.hypot(dx, dy) || 1;
+      return [x + (dx / len) * 0.7, y + (dy / len) * 0.7];
+    });
+    const [sx, sy, sw, sh] = face.src;
+    const p0 = grown[0];
+    const p1 = grown[1];
+    const p3 = grown[3];
+    ctx.setTransform(
+      p1[0] - p0[0], p1[1] - p0[1],
+      p3[0] - p0[0], p3[1] - p0[1],
+      p0[0], p0[1]);
+    ctx.drawImage(skinView.tex, sx, sy, sw, sh, 0, 0, 1, 1);
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+function skinLoop() {
+  skinView.raf = 0;
+  if (!skinView.ready) return;
+  const ease = 0.2;
+  skinView.yaw += (skinView.targetYaw - skinView.yaw) * ease;
+  skinView.pitch += (skinView.targetPitch - skinView.pitch) * ease;
+  skinView.bodyYaw += (skinView.targetBodyYaw - skinView.bodyYaw) * ease;
+  skinView.bodyPitch += (skinView.targetBodyPitch - skinView.bodyPitch) * ease;
+  renderSkinView();
+  if (Math.abs(skinView.targetYaw - skinView.yaw) > 0.0005
+      || Math.abs(skinView.targetPitch - skinView.pitch) > 0.0005
+      || Math.abs(skinView.targetBodyYaw - skinView.bodyYaw) > 0.0005
+      || Math.abs(skinView.targetBodyPitch - skinView.bodyPitch) > 0.0005) {
+    skinView.raf = requestAnimationFrame(skinLoop);
+  }
+}
+
+function kickSkinView() {
+  if (!skinView.ready || screen !== "skin") return;
+  if (!skinView.raf) skinView.raf = requestAnimationFrame(skinLoop);
+}
+
+function stopSkinView() {
+  if (skinView.raf) cancelAnimationFrame(skinView.raf);
+  skinView.raf = 0;
+  skinView.dragging = false;
+  skinView.targetYaw = 0;
+  skinView.targetPitch = 0;
+  const canvas = $("#skin-canvas");
+  if (canvas) canvas.classList.remove("dragging");
+}
+
+/* The head follows the cursor anywhere in the window. */
+function trackSkinPointer(event) {
+  if (screen !== "skin") return;
+  const canvas = $("#skin-canvas");
+  if (!canvas || !skinView.ready) return;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const nx = (event.clientX - rect.left - rect.width / 2)
+    / Math.max(1, window.innerWidth / 2);
+  const ny = (event.clientY - rect.top - rect.height / 2)
+    / Math.max(1, window.innerHeight / 2);
+  skinView.targetYaw = Math.max(-1, Math.min(1, nx)) * 0.9;
+  skinView.targetPitch = Math.max(-1, Math.min(1, ny)) * 0.55;
+  kickSkinView();
+}
+
+function skinDragStart(event) {
+  if (!skinView.ready || event.button !== 0) return;
+  skinView.dragging = true;
+  skinView.lastX = event.clientX;
+  skinView.lastY = event.clientY;
+  event.currentTarget.classList.add("dragging");
+  if (event.currentTarget.setPointerCapture) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+}
+
+function skinDragMove(event) {
+  if (!skinView.dragging) return;
+  const dx = event.clientX - skinView.lastX;
+  const dy = event.clientY - skinView.lastY;
+  skinView.lastX = event.clientX;
+  skinView.lastY = event.clientY;
+  skinView.targetBodyYaw += dx * 0.012;
+  skinView.targetBodyPitch = Math.max(-0.7, Math.min(0.7,
+    skinView.targetBodyPitch + dy * 0.008));
+  kickSkinView();
+}
+
+function skinDragEnd(event) {
+  if (!skinView.dragging) return;
+  skinView.dragging = false;
+  event.currentTarget.classList.remove("dragging");
+  if (event.currentTarget.releasePointerCapture) {
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch (error) {
+      /* pointer capture may already be gone */
+    }
+  }
+}
+
+function drawSkinPreview(dataUrl, variant) {
+  const canvas = $("#skin-canvas");
+  if (!canvas) return;
+  skinView.variant = variant === "slim" ? "slim" : "classic";
+  if (!dataUrl) {
+    skinView.token += 1;
+    skinView.src = "";
+    skinView.tex = null;
+    skinView.ready = false;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+  if (dataUrl === skinView.src && skinView.tex) {
+    kickSkinView();
+    return;
+  }
+  const token = ++skinView.token;
+  const img = new Image();
+  img.onload = () => {
+    if (token !== skinView.token) return;
+    skinView.src = dataUrl;
+    skinView.tex = prepareSkinTexture(img);
+    skinView.ready = true;
+    kickSkinView();
+  };
+  img.src = dataUrl;
+}
+
+async function loadSkin() {
+  const seq = ++skin.seq;
+  skin.busy = true;
+  let result = null;
+  try {
+    result = await call("skin_state");
+  } finally {
+    skin.busy = false;
+  }
+  if (seq !== skin.seq) return;
+  if (!result || !result.ok) {
+    skin.data = "";
+    setSkinVariantButtons("classic");
+    drawSkinPreview("", "classic");
+    $("#skin-sub").textContent = "No account selected";
+    $("#skin-account-name").textContent = "No account";
+    $("#skin-account-hint").textContent =
+      (result && result.error) || "Add an account in Settings first.";
+    $("#skin-note").textContent = "";
+    $("#skin-path").textContent = "";
+    $("#skin-path").title = "";
+    $("#btn-skin-apply").disabled = true;
+    return;
+  }
+  skin.data = result.skin || "";
+  skin.variant = result.variant === "slim" ? "slim" : "classic";
+  setSkinVariantButtons(skin.variant);
+  drawSkinPreview(skin.data, skin.variant);
+  const type = result.type === "microsoft" ? "Microsoft"
+    : result.type === "ely" ? "Ely.by" : "Offline";
+  $("#skin-sub").textContent = result.name
+    ? `${result.name} · ${type}` : type;
+  $("#skin-account-name").textContent = result.name || "—";
+  $("#skin-account-hint").textContent = result.online
+    ? "The skin belongs to this account and shows in every profile."
+    : "Offline accounts cannot use server-side skins — you can still "
+      + "preview a file here.";
+  $("#skin-note").textContent = result.online
+    ? "A skin is a 64×64 or 64×32 PNG. It is stored by the launcher and "
+      + "only sent to the account you apply it to."
+    : "A skin is a 64×64 or 64×32 PNG. Choose a file to preview it; "
+      + "applying needs a Microsoft or Ely.by account.";
+  $("#skin-path").textContent = result.path
+    || (result.default
+      ? "Built-in default skin — choose a PNG to replace it."
+      : "No skin chosen yet");
+  $("#skin-path").title = result.path || "";
+  $("#btn-skin-apply").disabled = !result.online || !skin.data;
+}
+
+async function chooseSkin() {
+  if (skin.busy) return;
+  skin.busy = true;
+  setStatus("Choose a skin PNG…");
+  let result;
+  try {
+    result = await call("skin_pick");
+  } finally {
+    skin.busy = false;
+  }
+  if (!result) {
+    setStatus("Could not open the file picker.", true);
+    return;
+  }
+  if (!result.ok) {
+    if (result.cancelled) setStatus("Ready.");
+    else setStatus(result.error || "Could not use that image.", true);
+    return;
+  }
+  await loadSkin();
+  setStatus("Skin saved. Press “Apply to account” to send it.");
+}
+
+async function changeSkinVariant(variant) {
+  if (skin.busy) return;
+  if (variant !== "classic" && variant !== "slim") return;
+  if (variant === skin.variant) return;
+  skin.variant = variant;
+  setSkinVariantButtons(variant);
+  drawSkinPreview(skin.data, variant);
+  const result = await call("skin_variant", variant);
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not save the model.", true);
+  }
+}
+
+async function applySkin() {
+  if (skin.busy || !skin.data) return;
+  skin.busy = true;
+  $("#btn-skin-apply").disabled = true;
+  setStatus("Uploading the skin…");
+  let result;
+  try {
+    result = await call("skin_apply");
+  } finally {
+    skin.busy = false;
+  }
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Skin upload failed.", true);
+    $("#btn-skin-apply").disabled = !skin.data;
+    return;
+  }
+  setStatus(result.message || "Skin applied.");
+  await loadSkin();
 }
 
 /* --------------------------------------------------------------- events */
@@ -2571,9 +3230,6 @@ function handleEvent(ev) {
       break;
     case "refresh":
       refreshState();
-      break;
-    case "game":
-      appendGameLine(ev.line);
       break;
     case "msauth":
       if (ev.status === "code") {
@@ -2738,9 +3394,14 @@ function bind() {
     const remove = event.target.closest("button[data-account-remove]");
     if (remove) removeAccount(remove.dataset.accountRemove);
   });
+  $("#account-list").addEventListener("pointerdown", accountDragStart);
 
   $("#ram-down").addEventListener("click", () => changeRam(-1));
   $("#ram-up").addEventListener("click", () => changeRam(1));
+  $("#theme-grid").addEventListener("click", (event) => {
+    const option = event.target.closest("[data-theme-option]");
+    if (option) changeTheme(option.dataset.themeOption);
+  });
   $("#btn-play").addEventListener("click", play);
   $("#btn-stop").addEventListener("click", stopGame);
   $("#btn-restart").addEventListener("click", restartGame);
@@ -2936,12 +3597,43 @@ function bind() {
   $("#btn-clear-loader-log").addEventListener("click", clearLoaderLog);
   $("#btn-open-loader-folder").addEventListener("click", () => call("open", "game"));
 
-  $("#btn-open-logs-folder").addEventListener("click", () => call("open", "logs"));
-  $("#btn-open-log-file").addEventListener("click", () => call("open", "log"));
-  $("#btn-clear-logs").addEventListener("click", clearLogsView);
+  $("#btn-open-logs-folder").addEventListener("click", () =>
+    call("open", "launcher_logs"));
+  $("#btn-open-log-file").addEventListener("click", () =>
+    call("open", "launcher_log"));
+  $("#btn-clear-logs").addEventListener("click", () => clearLogsView(logs));
   $("#log-console").addEventListener("scroll", () => {
     const el = $("#log-console");
     logs.stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+  });
+
+  $("#btn-open-game-log-folder").addEventListener("click", () =>
+    call("open_instance", "logs"));
+  $("#btn-clear-game-logs").addEventListener("click", () =>
+    clearLogsView(gameLogs));
+  $("#game-log-console").addEventListener("scroll", () => {
+    const el = $("#game-log-console");
+    gameLogs.stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+  });
+
+  $("#btn-skin-choose").addEventListener("click", chooseSkin);
+  $("#btn-skin-apply").addEventListener("click", applySkin);
+  document.addEventListener("pointermove", trackSkinPointer);
+  const resetSkinAim = () => {
+    skinView.targetYaw = 0;
+    skinView.targetPitch = 0;
+    kickSkinView();
+  };
+  document.addEventListener("mouseleave", resetSkinAim);
+  document.addEventListener("pointerleave", resetSkinAim);
+  const skinCanvas = $("#skin-canvas");
+  skinCanvas.addEventListener("pointerdown", skinDragStart);
+  skinCanvas.addEventListener("pointermove", skinDragMove);
+  skinCanvas.addEventListener("pointerup", skinDragEnd);
+  skinCanvas.addEventListener("pointercancel", skinDragEnd);
+  $("#skin-seg").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-skin-variant]");
+    if (button) changeSkinVariant(button.dataset.skinVariant);
   });
 
   document.addEventListener("keydown", (event) => {
@@ -2968,11 +3660,17 @@ async function pollOnce() {
   }
 }
 
+let orbRaf = 0;
+
 function startOrb() {
   const canvas = document.querySelector(".orb");
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
+  if (orbRaf) {
+    cancelAnimationFrame(orbRaf);
+    orbRaf = 0;
+  }
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const size = Math.max(24, Math.round(
@@ -3049,7 +3747,7 @@ function startOrb() {
       prev = cur;
     }
 
-    if (!reduce) requestAnimationFrame(frame);
+    if (!reduce) orbRaf = requestAnimationFrame(frame);
   }
   frame(reduce ? 1200 : performance.now());
 }

@@ -27,11 +27,22 @@ build is a single `Nexi Launcher.exe` produced by PyInstaller.
   mods require a loader. `.mrpack`, CurseForge `.zip` and plain archives can be
   imported as new profiles.
 - **Accounts**: Microsoft (device-code OAuth), Ely.by (Yggdrasil password or
-  OAuth2 + PKCE) and offline accounts, kept as a list you can switch between.
+  OAuth2 + PKCE) and offline accounts, kept as a list you can reorder and
+  switch between.
 - **Automatic Java**: the Mojang runtime matching the selected version is
   reused or downloaded on demand.
 - **Profile tools**: duplicate, worlds backup, file verification, custom icon,
-  log viewer, worlds and screenshots panes, Play / Stop / Restart.
+  a live Minecraft log viewer (`logs/latest.log` of the selected profile),
+  worlds and screenshots panes, Play / Stop / Restart.
+- **Skins**: a 3D preview whose head follows the cursor (anywhere in the
+  window) and that you can drag to rotate, the classic/slim model toggle, a
+  built-in default skin, and a PNG chooser; the chosen skin is applied to the
+  active Microsoft or Ely.by account (offline accounts can still preview a
+  file).
+- **Themes**: three accent palettes picked in Settings — Mint (default),
+  Soft orange and Indigo — recolour the buttons, highlights and glows.
+- **Launcher log**: the launcher's own rotating diagnostic log is shown in
+  Settings, with buttons to open the file or its folder.
 
 ## Requirements
 

@@ -18,6 +18,7 @@ authlib-injector-*.jar
 settings.json
 logs/
 *.log
+skins/
 
 # Editors / OS
 .vscode/

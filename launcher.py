@@ -32,6 +32,7 @@ import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
 import zipfile
+import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
@@ -49,6 +50,7 @@ def app_dir() -> Path:
 
 LOG_DIR = app_dir() / "logs"
 LOG_FILE = LOG_DIR / "launcher.log"
+SKINS_DIR = app_dir() / "skins"
 
 log = logging.getLogger("launcher")
 
@@ -2315,6 +2317,7 @@ XSTS_URL = "https://xsts.auth.xboxlive.com/xsts/authorize"
 MC_LOGIN_URL = ("https://api.minecraftservices.com/"
                 "authentication/login_with_xbox")
 MC_PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile"
+MC_SKIN_URL = ("https://api.minecraftservices.com/minecraft/profile/skins")
 
 XSTS_ERRORS = {
     "2148916233": "This Microsoft account has no Xbox profile. Sign in "
@@ -2371,6 +2374,157 @@ def _http_json(url, payload=None, token=None, timeout=30, form=False):
         parsed["http_status"] = exc.code
         raise MSRequestError(parsed) from None
     return json.loads(body) if body else {}
+
+
+def _skin_dimensions(data: bytes):
+    """Width/height of a PNG file, or None when it is not a PNG."""
+    if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n" \
+            or data[12:16] != b"IHDR":
+        return None
+    return (int.from_bytes(data[16:20], "big"),
+            int.from_bytes(data[20:24], "big"))
+
+
+_DEFAULT_SKIN = None
+
+
+def _default_skin_png() -> bytes:
+    """A built-in 64×64 skin (mint hoodie, jeans) generated once, in memory."""
+    global _DEFAULT_SKIN
+    if _DEFAULT_SKIN is not None:
+        return _DEFAULT_SKIN
+    size = 64
+    pixels = bytearray(size * size * 4)  # RGBA, transparent
+
+    def fill(x, y, w, h, color):
+        r, g, b = color
+        for row in range(y, y + h):
+            start = (row * size + x) * 4
+            for col in range(start, start + w * 4, 4):
+                pixels[col:col + 4] = bytes((r, g, b, 255))
+
+    skin = (242, 201, 160)
+    hair = (43, 43, 51)
+    shirt = (110, 231, 183)
+    shade = (88, 199, 158)
+    pants = (47, 59, 82)
+    shoes = (29, 36, 51)
+    eye = (31, 41, 55)
+
+    # Head: six faces; the hat overlay stays transparent.
+    fill(8, 0, 8, 8, hair)
+    fill(16, 0, 8, 8, skin)
+    for hx in (0, 16):
+        fill(hx, 8, 8, 8, skin)
+        fill(hx, 8, 8, 2, hair)
+    fill(24, 8, 8, 8, hair)
+    fill(24, 14, 8, 2, skin)
+    fill(8, 8, 8, 8, skin)
+    fill(8, 8, 8, 2, hair)
+    fill(8, 8, 1, 4, hair)
+    fill(15, 8, 1, 4, hair)
+    fill(9, 12, 2, 1, eye)
+    fill(13, 12, 2, 1, eye)
+
+    # Torso.
+    fill(20, 16, 8, 4, shirt)
+    fill(28, 16, 8, 4, shade)
+    fill(16, 20, 4, 12, shirt)
+    fill(28, 20, 4, 12, shirt)
+    fill(32, 20, 8, 12, shirt)
+    fill(20, 20, 8, 12, shirt)
+    fill(20, 20, 8, 1, shade)
+    fill(24, 21, 1, 11, shade)
+    fill(20, 28, 8, 2, shade)
+
+    # Arms: sleeve on top, bare hands below.
+    for top, bottom, sides in (
+            ((44, 16), (48, 16), ((40, 20), (44, 20), (48, 20), (52, 20))),
+            ((36, 48), (40, 48), ((32, 52), (36, 52), (40, 52), (44, 52)))):
+        fill(*top, 4, 4, shirt)
+        fill(*bottom, 4, 4, skin)
+        for sx, sy in sides:
+            fill(sx, sy, 4, 4, shirt)
+            fill(sx, sy + 4, 4, 8, skin)
+
+    # Legs: jeans with dark shoes.
+    for top, bottom, sides in (
+            ((4, 16), (8, 16), ((0, 20), (4, 20), (8, 20), (12, 20))),
+            ((20, 48), (24, 48), ((16, 52), (20, 52), (24, 52), (28, 52)))):
+        fill(*top, 4, 4, pants)
+        fill(*bottom, 4, 4, shoes)
+        for sx, sy in sides:
+            fill(sx, sy, 4, 12, pants)
+            fill(sx, sy + 10, 4, 2, shoes)
+
+    raw = b"".join(
+        b"\x00" + bytes(pixels[row * size * 4:(row + 1) * size * 4])
+        for row in range(size))
+
+    def chunk(tag, payload):
+        return (len(payload).to_bytes(4, "big") + tag + payload
+                + zlib.crc32(tag + payload).to_bytes(4, "big"))
+
+    ihdr = (size.to_bytes(4, "big") + size.to_bytes(4, "big")
+            + bytes((8, 6, 0, 0, 0)))
+    _DEFAULT_SKIN = (b"\x89PNG\r\n\x1a\n"
+                     + chunk(b"IHDR", ihdr)
+                     + chunk(b"IDAT", zlib.compress(raw, 9))
+                     + chunk(b"IEND", b""))
+    return _DEFAULT_SKIN
+
+
+def _multipart_body(fields, files):
+    """Build a multipart/form-data body; returns (boundary, bytes)."""
+    boundary = "----NexiLauncher" + uuid.uuid4().hex
+    chunks = []
+    for name, value in fields:
+        chunks.append(
+            (f"--{boundary}\r\n"
+             f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+             f"{value}\r\n").encode("utf-8"))
+    for name, filename, content in files:
+        chunks.append(
+            (f"--{boundary}\r\n"
+             f'Content-Disposition: form-data; name="{name}"; '
+             f'filename="{filename}"\r\n'
+             f"Content-Type: image/png\r\n\r\n").encode("utf-8"))
+        chunks.append(content)
+        chunks.append(b"\r\n")
+    chunks.append(f"--{boundary}--\r\n".encode("utf-8"))
+    return boundary, b"".join(chunks)
+
+
+def _upload_skin(url, token, fields, skin, method="POST"):
+    """Send a PNG skin (bytes or a path) to an account service."""
+    try:
+        content = bytes(skin) if isinstance(skin, (bytes, bytearray)) \
+            else Path(skin).read_bytes()
+    except OSError as exc:
+        raise RuntimeError(f"Could not read the skin file: {exc}") from None
+    boundary, body = _multipart_body(fields, [("file", "skin.png", content)])
+    request = urllib.request.Request(url, data=body, method=method)
+    request.add_header("Authorization", "Bearer " + token)
+    request.add_header("User-Agent", USER_AGENT)
+    request.add_header(
+        "Content-Type", f"multipart/form-data; boundary={boundary}")
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            response.read()
+            return response.status
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", "replace").strip()
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            message = (parsed.get("errorMessage") or parsed.get("message")
+                       or parsed.get("error_description")
+                       or parsed.get("error") or raw)
+        else:
+            message = raw
+        raise RuntimeError(str(message or f"HTTP {exc.code}")) from None
 
 
 def xbox_authenticate(ms_access_token):
@@ -2458,6 +2612,8 @@ ELY_OAUTH_REDIRECT_DEFAULT = "http://localhost:26206/ely-callback"
 ELY_OAUTH_CLIENT_ID_DEFAULT = "why-launcher"
 # Passed to authlib-injector inside the game; it also enables Ely.by skins.
 ELY_JAVA_AGENT = "ely.by"
+# Yggdrasil "upload skin" endpoint (authlib-injector extension).
+ELY_SKIN_URL = "https://authserver.ely.by/api/user/profile/{uuid}/skin"
 AUTHLIB_VERSION = "1.2.8"
 AUTHLIB_URL = ("https://github.com/yushijinhun/authlib-injector/releases/"
                f"download/v{AUTHLIB_VERSION}/authlib-injector-"
@@ -2635,6 +2791,7 @@ class LauncherApi:
 
     RAM_MIN = 1
     RAM_MAX = 16
+    THEMES = ("mint", "orange", "indigo")
 
     def __init__(self):
         self.instances = []
@@ -2650,6 +2807,8 @@ class LauncherApi:
         except (TypeError, ValueError):
             default_ram = 2
         self.default_ram = max(self.RAM_MIN, min(self.RAM_MAX, default_ram))
+        theme = str(self._saved("theme", "mint") or "mint").strip().lower()
+        self.theme = theme if theme in self.THEMES else "mint"
         self.java_path = str(self._saved("java", "") or "")
         global JAVA_OVERRIDE
         JAVA_OVERRIDE = self.java_path
@@ -2692,6 +2851,8 @@ class LauncherApi:
         self._game_lock = threading.Lock()
         self._log_path = None
         self._log_pos = 0
+        self._game_log_path = None
+        self._game_log_pos = 0
         self.refresh_instances(select=self.selected_slug)
         self._install_trace()
         log.info("api ready: player=%r ram=%s default_ram=%s java=%r "
@@ -2802,6 +2963,9 @@ class LauncherApi:
             account["refresh_token"] = str(
                 item.get("refresh_token", "") or "")
             account["kind"] = str(item.get("kind", "") or "")
+        variant = str(item.get("skin_variant", "") or "")
+        if variant in ("classic", "slim"):
+            account["skin_variant"] = variant
         return account
 
     def _load_accounts(self, legacy_ms):
@@ -2897,6 +3061,7 @@ class LauncherApi:
     def _save(self):
         data = {"player": self.player, "ram": int(self.ram),
                 "default_ram": int(self.default_ram),
+                "theme": self.theme,
                 "java": self.java_path,
                 "instance": self.selected_slug,
                 "accounts": [
@@ -2981,6 +3146,7 @@ class LauncherApi:
                 "player": self.player,
                 "ram": int(self.ram),
                 "default_ram": int(self.default_ram),
+                "theme": self.theme,
                 "java": self.java_path,
                 "accounts": [self._account_public(account)
                              for account in self._accounts],
@@ -3071,6 +3237,24 @@ class LauncherApi:
         log.info("Offline account added/selected: %s", name)
         return {"ok": True, "name": name, "state": self.state()}
 
+    def account_reorder(self, order):
+        """Persist a new account order, given the account ids from top to
+        bottom."""
+        if not isinstance(order, (list, tuple)):
+            return {"ok": False, "error": "Invalid account order.",
+                    "state": self.state()}
+        ids = [str(item) for item in order]
+        with self._lock:
+            by_id = {account["id"]: account for account in self._accounts}
+            if len(ids) != len(by_id) or set(ids) != set(by_id):
+                return {"ok": False, "error": "The account list changed.",
+                        "state": self.state()}
+            if [account["id"] for account in self._accounts] == ids:
+                return {"ok": True, "state": self.state()}
+            self._accounts = [by_id[item] for item in ids]
+            self._save()
+        return {"ok": True, "state": self.state()}
+
     def account_remove(self, account_id):
         with self._lock:
             account = self._account_by_id(account_id)
@@ -3122,6 +3306,17 @@ class LauncherApi:
         self.default_ram = max(self.RAM_MIN, min(self.RAM_MAX, value))
         self._save()
         return {"state": self.state()}
+
+    def set_theme(self, theme):
+        theme = str(theme or "").strip().lower()
+        if theme not in self.THEMES:
+            return {"ok": False, "error": "Unknown theme.",
+                    "state": self.state()}
+        with self._lock:
+            self.theme = theme
+            self._save()
+        log.info("Theme: %s", theme)
+        return {"ok": True, "state": self.state()}
 
     def set_java(self, path):
         path = str(path or "").strip()
@@ -3684,6 +3879,18 @@ class LauncherApi:
         return {"state": state, "message": f'Deleted "{name}"'}
 
     def open(self, kind):
+        if kind in ("launcher_log", "launcher_logs"):
+            target = Path(LOG_FILE) if kind == "launcher_log" else LOG_DIR
+            try:
+                if target.suffix:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.touch(exist_ok=True)
+                else:
+                    target.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                return {"ok": False, "path": str(target)}
+            open_in_system(target)
+            return {"ok": True, "path": str(target)}
         instance = self.active_instance()
         if instance is None:
             return {"ok": False}
@@ -3719,6 +3926,7 @@ class LauncherApi:
             "shaderpacks": game / "shaderpacks",
             "worlds": game / "saves",
             "screenshots": game / "screenshots",
+            "logs": game / "logs",
             "backups": root / "backups",
         }
         base = bases.get(str(kind or ""))
@@ -5137,13 +5345,200 @@ class LauncherApi:
             self._event("busy", task="loaders", on=False)
             self._progress(0, 0)
 
+    # -- skins --------------------------------------------------------------
+
+    def _skin_path(self, account):
+        return SKINS_DIR / f"{account['id']}.png"
+
+    def _skin_payload(self):
+        account = self._active_account()
+        if account is None:
+            return {"ok": False,
+                    "error": "Add an account in Settings first."}
+        path = self._skin_path(account)
+        data = None
+        if path.is_file():
+            try:
+                data = path.read_bytes()
+            except OSError:
+                data = None
+        default = data is None
+        if default:
+            data = _default_skin_png()
+        skin = "data:image/png;base64," + base64.b64encode(data).decode("ascii")
+        return {
+            "ok": True,
+            "name": account["name"],
+            "type": account["type"],
+            "uuid": account.get("uuid", ""),
+            "online": account["type"] != "offline"
+                      and bool(account.get("uuid", "")),
+            "variant": account.get("skin_variant", "classic"),
+            "skin": skin,
+            "default": default,
+            "path": "" if default else str(path),
+        }
+
+    def skin_state(self):
+        return self._skin_payload()
+
+    def skin_pick(self):
+        """Pick a PNG skin file and keep a copy for the active account."""
+        account = self._active_account()
+        if account is None:
+            return {"ok": False,
+                    "error": "Add an account in Settings first."}
+        if os.name != "nt":
+            return {"ok": False, "error": "The image picker needs Windows."}
+        script = (
+            "Add-Type -AssemblyName System.Windows.Forms | Out-Null; "
+            "$d = New-Object System.Windows.Forms.OpenFileDialog; "
+            "$d.Title = 'Select a Minecraft skin'; "
+            "$d.Filter = 'Minecraft skin (*.png)|*.png|All files (*.*)|*.*'; "
+            "if ($d.ShowDialog() -eq 'OK') { [Console]::Out.Write($d.FileName) }"
+        )
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-STA", "-Command", script],
+                capture_output=True, text=True, timeout=600,
+                creationflags=subprocess.CREATE_NO_WINDOW)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return {"ok": False,
+                    "error": f"Could not open the file picker: {exc}"}
+        picked = (result.stdout or "").strip()
+        if not picked:
+            return {"ok": False, "cancelled": True}
+        try:
+            data = Path(picked).read_bytes()
+        except OSError as exc:
+            return {"ok": False, "error": f"Could not read the image: {exc}"}
+        if _skin_dimensions(data) not in ((64, 64), (64, 32)):
+            return {"ok": False,
+                    "error": "A Minecraft skin must be a 64×64 or "
+                             "64×32 PNG."}
+        try:
+            SKINS_DIR.mkdir(parents=True, exist_ok=True)
+            self._skin_path(account).write_bytes(data)
+        except OSError as exc:
+            return {"ok": False, "error": f"Could not save the skin: {exc}"}
+        log.info("Skin selected for account %s", account["name"])
+        return self._skin_payload()
+
+    def skin_variant(self, variant="classic"):
+        variant = "slim" if str(variant).lower() == "slim" else "classic"
+        with self._lock:
+            account = self._active_account()
+            if account is None:
+                return {"ok": False,
+                        "error": "Add an account in Settings first."}
+            account["skin_variant"] = variant
+            self._save()
+        return self._skin_payload()
+
+    def skin_apply(self):
+        """Upload the chosen skin to the active online account."""
+        account = self._active_account()
+        if account is None:
+            return {"ok": False,
+                    "error": "Add an account in Settings first."}
+        path = self._skin_path(account)
+        try:
+            data = path.read_bytes() if path.is_file() else _default_skin_png()
+        except OSError as exc:
+            return {"ok": False, "error": f"Could not read the skin file: {exc}"}
+        variant = account.get("skin_variant", "classic")
+        variant = "slim" if variant == "slim" else "classic"
+        try:
+            if account["type"] == "microsoft":
+                token = self._ms_refresh(account)
+                if not token:
+                    return {"ok": False,
+                            "error": "This Microsoft account needs to sign "
+                                     "in again."}
+                _upload_skin(MC_SKIN_URL, token,
+                             [("variant", variant)], data)
+            elif account["type"] == "ely":
+                token = self._ely_refresh(account)
+                if not token:
+                    return {"ok": False,
+                            "error": "This Ely.by account needs to sign "
+                                     "in again."}
+                uuid_text = str(account.get("uuid", "")).replace("-", "")
+                if not uuid_text:
+                    return {"ok": False,
+                            "error": "This Ely.by account has no profile id."}
+                # Yggdrasil / authlib-injector skin upload (PUT, per spec);
+                # a few servers only accept POST, so fall back to that.
+                url = ELY_SKIN_URL.format(uuid=uuid_text)
+                try:
+                    _upload_skin(url, token, [("model", variant)], data,
+                                 method="PUT")
+                except RuntimeError:
+                    _upload_skin(url, token, [("model", variant)], data,
+                                 method="POST")
+            else:
+                return {"ok": False,
+                        "error": "Offline accounts cannot change the in-game "
+                                 "skin. Add a Microsoft or Ely.by account."}
+        except Exception as exc:
+            log.warning("Skin upload failed: %s", exc)
+            return {"ok": False, "error": f"Skin upload failed: {exc}"}
+        log.info("Skin applied for account %s", account["name"])
+        return {"ok": True,
+                "message": f"Skin applied to {account['name']}."}
+
     # -- logs ---------------------------------------------------------------
 
-    def logs_open(self):
+    def game_logs_open(self):
+        """Tail the selected profile's Minecraft log (logs/latest.log)."""
         instance = self.active_instance()
+        self._game_log_path = None
+        self._game_log_pos = 0
         if instance is None:
             return {"path": "", "text": "", "exists": False}
         path = instance_log_file(instance["_root"])
+        self._game_log_path = path
+        try:
+            size = path.stat().st_size
+        except OSError:
+            return {"path": str(path), "text": "", "exists": False}
+        start = max(0, size - MAX_LOG_BACKLOG)
+        try:
+            with path.open("rb") as handle:
+                handle.seek(start)
+                data = handle.read()
+        except OSError:
+            return {"path": str(path), "text": "", "exists": False}
+        self._game_log_pos = size
+        text = data.decode("utf-8", "replace")
+        if start:
+            text = text.partition("\n")[2]
+        return {"path": str(path), "text": text, "exists": True}
+
+    def game_logs_read(self):
+        if self._game_log_path is None:
+            return {"text": ""}
+        try:
+            size = self._game_log_path.stat().st_size
+        except OSError:
+            return {"text": ""}
+        reset = size < self._game_log_pos
+        if reset:
+            self._game_log_pos = 0
+        if size == self._game_log_pos:
+            return {"text": "", "reset": False}
+        try:
+            with self._game_log_path.open("rb") as handle:
+                handle.seek(self._game_log_pos)
+                data = handle.read()
+        except OSError:
+            return {"text": ""}
+        self._game_log_pos = size
+        return {"text": data.decode("utf-8", "replace"), "reset": reset}
+
+    def logs_open(self):
+        """Tail the launcher's own rotating log file."""
+        path = Path(LOG_FILE)
         self._log_path = path
         self._log_pos = 0
         try:

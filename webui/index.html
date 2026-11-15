@@ -29,6 +29,9 @@
     <rect x="3.2" y="4.6" width="17.6" height="14.8" rx="3"/>
     <path d="m7.2 9.4 3 2.6-3 2.6M12.6 15.2h4.2"/>
   </symbol>
+  <symbol id="i-skin" viewBox="0 0 24 24">
+    <path d="M8.4 4.2 4.4 6.6l1.7 3.1 2-1v11h7.8V8.7l2 1 1.7-3.1-4-2.4-1.6 1.7h-4L8.4 4.2Z"/>
+  </symbol>
   <symbol id="i-folder" viewBox="0 0 24 24">
     <path d="M3.6 7.4c0-1 .8-1.8 1.8-1.8h3.4l2 2.2h7.8c1 0 1.8.8 1.8 1.8v6.8c0 1-.8 1.8-1.8 1.8H5.4c-1 0-1.8-.8-1.8-1.8V7.4Z"/>
   </symbol>
@@ -89,8 +92,8 @@
       <button class="tab" data-screen="create" type="button">
         <svg class="icon"><use href="#i-plus"/></svg><span>New</span>
       </button>
-      <button class="tab" data-screen="logs" type="button">
-        <svg class="icon"><use href="#i-logs"/></svg><span>Logs</span>
+      <button class="tab" data-screen="skin" type="button">
+        <svg class="icon"><use href="#i-skin"/></svg><span>Skins</span>
       </button>
       <button class="tab" data-screen="settings" type="button">
         <svg class="icon"><use href="#i-gear"/></svg><span>Settings</span>
@@ -182,6 +185,10 @@
                 <svg class="icon"><use href="#i-image"/></svg>
                 <span class="detail-tab-label">Screenshots</span>
                 <span class="tab-count" id="count-screenshots">0</span>
+              </button>
+              <button class="detail-tab" data-pane="logs" type="button">
+                <svg class="icon"><use href="#i-logs"/></svg>
+                <span class="detail-tab-label">Logs</span>
               </button>
               <button class="detail-tab" data-pane="settings" type="button">
                 <svg class="icon"><use href="#i-gear"/></svg>
@@ -280,6 +287,22 @@
                 <div class="pane-scroll">
                   <div class="shot-grid" id="pane-shots-list"></div>
                 </div>
+              </section>
+
+              <section class="detail-pane" data-pane="logs">
+                <div class="pane-head">
+                  <div class="pane-heading">
+                    <div class="pane-title">Logs</div>
+                    <div class="pane-sub path" id="game-logs-sub">logs/latest.log</div>
+                  </div>
+                  <div class="pane-actions">
+                    <button class="btn ghost sm" id="btn-open-game-log-folder"
+                            type="button">Folder</button>
+                    <button class="btn ghost sm" id="btn-clear-game-logs"
+                            type="button">Clear view</button>
+                  </div>
+                </div>
+                <div class="log console" id="game-log-console"></div>
               </section>
 
               <section class="detail-pane" data-pane="settings">
@@ -592,25 +615,6 @@
       </div>
     </section>
 
-    <!-- Logs ----------------------------------------------------------- -->
-    <section class="screen" id="screen-logs">
-      <div class="screen-head">
-        <div>
-          <h1 class="screen-title">Logs</h1>
-          <p class="screen-sub path" id="logs-sub">Select a profile to read its
-             logs.</p>
-        </div>
-        <div class="toolbar-tight">
-          <button class="btn ghost" id="btn-open-logs-folder" type="button">
-            <svg class="icon"><use href="#i-folder"/></svg>Folder
-          </button>
-          <button class="btn ghost" id="btn-open-log-file" type="button">File</button>
-          <button class="btn ghost" id="btn-clear-logs" type="button">Clear</button>
-        </div>
-      </div>
-      <div class="log console" id="log-console"></div>
-    </section>
-
     <!-- Settings -------------------------------------------------------- -->
     <section class="screen" id="screen-settings">
       <div class="screen-head">
@@ -632,6 +636,7 @@
           </div>
 
           <div class="account-list" id="account-list"></div>
+          <p class="hint">Drag an account with the mouse to change its order.</p>
 
           <div class="account-add">
             <span class="field-label">ADD ACCOUNT</span>
@@ -881,6 +886,64 @@
 
         <section class="card settings-card wide">
           <div class="card-head">
+            <span class="eyebrow">APPEARANCE</span>
+            <span class="count path" id="theme-name">Mint</span>
+          </div>
+
+          <div class="theme-grid" id="theme-grid" role="radiogroup"
+               aria-label="Launcher theme">
+            <button class="theme-option on" type="button" role="radio"
+                    aria-checked="true" data-theme-option="mint">
+              <span class="theme-swatch"></span>
+              <span class="theme-text">
+                <span class="theme-name">Mint</span>
+                <span class="theme-hex">#6EE7B7 · default</span>
+              </span>
+            </button>
+            <button class="theme-option" type="button" role="radio"
+                    aria-checked="false" data-theme-option="orange">
+              <span class="theme-swatch"></span>
+              <span class="theme-text">
+                <span class="theme-name">Soft orange</span>
+                <span class="theme-hex">#FF7A59</span>
+              </span>
+            </button>
+            <button class="theme-option" type="button" role="radio"
+                    aria-checked="false" data-theme-option="indigo">
+              <span class="theme-swatch"></span>
+              <span class="theme-text">
+                <span class="theme-name">Indigo</span>
+                <span class="theme-hex">#5B6CFF</span>
+              </span>
+            </button>
+          </div>
+
+          <p class="hint">Accent colour of the whole launcher — buttons,
+             highlights, glows and the skin viewer ambience.</p>
+        </section>
+
+        <section class="card settings-card wide">
+          <div class="card-head">
+            <span class="eyebrow">LAUNCHER LOG</span>
+            <span class="count path" id="logs-sub">logs\launcher.log</span>
+          </div>
+          <div class="log console settings-log" id="log-console"></div>
+          <div class="row-head tight">
+            <p class="hint">Diagnostic log of the launcher itself. It rotates
+               automatically and never contains passwords or account tokens.</p>
+            <div class="pane-actions">
+              <button class="btn ghost sm" id="btn-open-logs-folder"
+                      type="button">Folder</button>
+              <button class="btn ghost sm" id="btn-open-log-file"
+                      type="button">File</button>
+              <button class="btn ghost sm" id="btn-clear-logs"
+                      type="button">Clear view</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card settings-card wide">
+          <div class="card-head">
             <span class="eyebrow">FOLDERS</span>
           </div>
           <div class="path-row">
@@ -894,6 +957,52 @@
           <p class="hint">Profiles never copy files from the shared folder —
              versions, libraries and assets are reused in place.</p>
         </section>
+      </div>
+    </section>
+
+    <!-- Skins ----------------------------------------------------------- -->
+    <section class="screen" id="screen-skin">
+      <div class="screen-head">
+        <div>
+          <h1 class="screen-title">Skin</h1>
+          <p class="screen-sub" id="skin-sub">Sign in to manage your skin.</p>
+        </div>
+        <div class="pane-actions">
+          <button class="btn ghost" id="btn-skin-choose" type="button">
+            Choose PNG…
+          </button>
+          <button class="btn primary" id="btn-skin-apply" type="button">
+            Apply to account
+          </button>
+        </div>
+      </div>
+
+      <div class="skin-screen">
+        <div class="skin-preview">
+          <canvas id="skin-canvas" width="260" height="340"
+                  aria-label="3D skin preview"></canvas>
+          <p class="hint skin-hint">Move the cursor to turn the head away from
+            the model; drag the model to rotate it.</p>
+        </div>
+        <div class="card settings-card skin-side">
+          <div>
+            <span class="field-label">MODEL</span>
+            <div class="seg" id="skin-seg">
+              <button type="button" data-skin-variant="classic">Classic</button>
+              <button type="button" data-skin-variant="slim">Slim</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-text">
+              <span class="setting-name" id="skin-account-name">—</span>
+              <span class="hint" id="skin-account-hint">—</span>
+            </div>
+          </div>
+          <p class="hint" id="skin-note">A skin is a 64×64 or 64×32 PNG. The
+             file is stored by the launcher and never sent anywhere except the
+             account you apply it to.</p>
+          <div class="path" id="skin-path" title=""></div>
+        </div>
       </div>
     </section>
 
