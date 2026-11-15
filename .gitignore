@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# PyInstaller output and caches
+_dist/
+_build_tmp/
+build/*
+!build/Nexi Launcher.spec
+*.exe
+
+# Downloaded third-party binaries
+authlib-injector-*.jar
+
+# Runtime data (may contain account tokens!)
+settings.json
+logs/
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

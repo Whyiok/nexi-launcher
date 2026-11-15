@@ -1,0 +1,948 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Nexi Launcher</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg class="sprite" aria-hidden="true">
+  <symbol id="i-profile" viewBox="0 0 24 24">
+    <circle cx="12" cy="8" r="3.4"/><path d="M5.2 19.4c.6-3.3 3.5-5.2 6.8-5.2s6.2 1.9 6.8 5.2"/>
+  </symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24">
+    <path d="M12 5v14M5 12h14"/>
+  </symbol>
+  <symbol id="i-mods" viewBox="0 0 24 24">
+    <rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/>
+    <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/>
+    <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/>
+    <path d="M16.75 13.5v6.5M13.5 16.75H20"/>
+  </symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24">
+    <path d="M12 4 3.8 8.4 12 12.8l8.2-4.4L12 4Z"/>
+    <path d="m4.4 12.4 7.6 4 7.6-4M4.4 16.4l7.6 4 7.6-4"/>
+  </symbol>
+  <symbol id="i-logs" viewBox="0 0 24 24">
+    <rect x="3.2" y="4.6" width="17.6" height="14.8" rx="3"/>
+    <path d="m7.2 9.4 3 2.6-3 2.6M12.6 15.2h4.2"/>
+  </symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24">
+    <path d="M3.6 7.4c0-1 .8-1.8 1.8-1.8h3.4l2 2.2h7.8c1 0 1.8.8 1.8 1.8v6.8c0 1-.8 1.8-1.8 1.8H5.4c-1 0-1.8-.8-1.8-1.8V7.4Z"/>
+  </symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24">
+    <path d="M19 12a7 7 0 1 1-2.05-4.95M19 4.6V9h-4.4"/>
+  </symbol>
+  <symbol id="i-play" viewBox="0 0 24 24">
+    <path d="M8 5.4v13.2L19 12 8 5.4Z"/>
+  </symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24">
+    <path d="M5 7h14M10 7V5.2h4V7M7 7l.9 12.1c0 .5.4.9.9.9h6.4c.5 0 .9-.4.9-.9L17 7"/>
+  </symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="2.9"/>
+    <path d="M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18"/>
+  </symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24">
+    <path d="M4 20h4.2L19 9.2 14.8 5 4 15.8V20Z"/>
+    <path d="m13.4 6.4 4.2 4.2"/>
+  </symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24">
+    <rect x="8.4" y="8.4" width="11.2" height="11.2" rx="2.2"/>
+    <path d="M15.6 5.4c0-1-.8-1.8-1.8-1.8H6.2c-1 0-1.8.8-1.8 1.8v7.6c0 1 .8 1.8 1.8 1.8"/>
+  </symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24">
+    <rect x="4" y="4.4" width="16" height="4.2" rx="1.4"/>
+    <path d="M5.4 8.6v9.6c0 1 .8 1.8 1.8 1.8h9.6c1 0 1.8-.8 1.8-1.8V8.6"/>
+    <path d="M10 12.4h4"/>
+  </symbol>
+  <symbol id="i-check" viewBox="0 0 24 24">
+    <path d="m5 12.6 4.4 4.4L19 6.8"/>
+  </symbol>
+  <symbol id="i-import" viewBox="0 0 24 24">
+    <path d="M12 4v10.4M7.6 10.4 12 14.8l4.4-4.4"/>
+    <path d="M5 16.6v1.8c0 1 .8 1.8 1.8 1.8h10.4c1 0 1.8-.8 1.8-1.8v-1.8"/>
+  </symbol>
+  <symbol id="i-image" viewBox="0 0 24 24">
+    <rect x="3.6" y="4.8" width="16.8" height="14.4" rx="2.6"/>
+    <circle cx="9" cy="9.6" r="1.5"/>
+    <path d="m5.4 16.6 4.4-4 3.1 2.7 2.3-2.1 3.4 3.4"/>
+  </symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand">
+        <span class="brand-main">NEXI</span>
+        <span class="brand-sub">launcher</span>
+      </div>
+      <canvas class="orb" aria-hidden="true"></canvas>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Sections">
+      <button class="tab" data-screen="profiles" type="button">
+        <svg class="icon"><use href="#i-profile"/></svg><span>Profiles</span>
+      </button>
+      <button class="tab" data-screen="create" type="button">
+        <svg class="icon"><use href="#i-plus"/></svg><span>New</span>
+      </button>
+      <button class="tab" data-screen="logs" type="button">
+        <svg class="icon"><use href="#i-logs"/></svg><span>Logs</span>
+      </button>
+      <button class="tab" data-screen="settings" type="button">
+        <svg class="icon"><use href="#i-gear"/></svg><span>Settings</span>
+      </button>
+    </nav>
+  </header>
+  <div class="rule"></div>
+
+  <main class="content">
+
+    <!-- Profiles ------------------------------------------------------- -->
+    <section class="screen" id="screen-profiles">
+      <div class="profiles-layout">
+        <aside class="side">
+          <div class="side-head">
+            <span class="eyebrow">PROFILES</span>
+            <span class="count" id="profiles-count">empty</span>
+          </div>
+          <div class="profile-list" id="profile-list"></div>
+          <button class="btn primary" id="btn-new-profile" type="button"
+                  title="New profile" aria-label="New profile">
+            <svg class="icon"><use href="#i-plus"/></svg>
+          </button>
+          <button class="btn ghost" id="btn-import-modpack" type="button"
+                  title="Import modpack" aria-label="Import modpack">
+            <svg class="icon"><use href="#i-import"/></svg>
+          </button>
+          <button class="btn ghost" id="btn-browse-modpacks" type="button"
+                  title="Browse modpacks" aria-label="Browse modpacks">
+            <svg class="icon"><use href="#i-layers"/></svg>
+          </button>
+        </aside>
+
+        <section class="card empty" id="profile-empty">
+          <div class="empty-icon"><svg><use href="#i-layers"/></svg></div>
+          <h2>No profiles yet</h2>
+          <p>A profile is an isolated game folder — its own worlds, mods and
+             settings. Shared files stay in <code>.minecraft</code>.</p>
+          <button class="btn primary" id="btn-empty-create" type="button">
+            Create the first profile
+          </button>
+        </section>
+
+        <section class="card detail hidden" id="profile-detail">
+          <div class="detail-head">
+            <div class="detail-title">
+              <h1 id="detail-name">Profile</h1>
+              <div class="meta" id="detail-meta"></div>
+              <div class="path" id="detail-path"></div>
+            </div>
+            <div class="detail-side">
+              <span class="badge" id="detail-badge">vanilla</span>
+              <button class="btn primary play" id="btn-play" type="button">
+                <svg class="icon"><use href="#i-play"/></svg>
+                <span id="play-label">Play</span>
+              </button>
+              <div class="play-row hidden" id="play-running">
+                <button class="btn ghost" id="btn-stop" type="button">Stop</button>
+                <button class="btn primary" id="btn-restart" type="button">
+                  Restart
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-body">
+            <nav class="detail-tabs" id="detail-tabs" aria-label="Profile contents">
+              <button class="detail-tab on" data-pane="mods" type="button">
+                <svg class="icon"><use href="#i-mods"/></svg>
+                <span class="detail-tab-label">Mods</span>
+                <span class="tab-count" id="count-mods">0</span>
+              </button>
+              <button class="detail-tab" data-pane="resourcepacks" type="button">
+                <svg class="icon"><use href="#i-archive"/></svg>
+                <span class="detail-tab-label">Resource packs</span>
+                <span class="tab-count" id="count-resourcepacks">0</span>
+              </button>
+              <button class="detail-tab" data-pane="shaderpacks" type="button">
+                <svg class="icon"><use href="#i-layers"/></svg>
+                <span class="detail-tab-label">Shader packs</span>
+                <span class="tab-count" id="count-shaderpacks">0</span>
+              </button>
+              <button class="detail-tab" data-pane="worlds" type="button">
+                <svg class="icon"><use href="#i-folder"/></svg>
+                <span class="detail-tab-label">Worlds</span>
+                <span class="tab-count" id="count-worlds">0</span>
+              </button>
+              <button class="detail-tab" data-pane="screenshots" type="button">
+                <svg class="icon"><use href="#i-image"/></svg>
+                <span class="detail-tab-label">Screenshots</span>
+                <span class="tab-count" id="count-screenshots">0</span>
+              </button>
+              <button class="detail-tab" data-pane="settings" type="button">
+                <svg class="icon"><use href="#i-gear"/></svg>
+                <span class="detail-tab-label">Profile settings</span>
+              </button>
+            </nav>
+
+            <div class="detail-panes">
+              <section class="detail-pane on" data-pane="mods">
+                <div class="pane-head">
+                  <div class="pane-heading">
+                    <div class="pane-title">Installed mods</div>
+                    <div class="pane-sub" id="pane-mods-sub">—</div>
+                  </div>
+                  <div class="pane-actions">
+                    <button class="btn ghost sm" id="btn-pane-update-all" type="button">
+                      Update all
+                    </button>
+                    <button class="btn ghost sm" id="btn-pane-browse-mods" type="button">
+                      Browse mods
+                    </button>
+                    <button class="btn ghost sm" id="btn-pane-open-mods" type="button">
+                      Open folder
+                    </button>
+                  </div>
+                </div>
+                <div class="pane-scroll" id="pane-mods-list"></div>
+              </section>
+
+              <section class="detail-pane" data-pane="resourcepacks">
+                <div class="pane-head">
+                  <div class="pane-heading">
+                    <div class="pane-title">Resource packs</div>
+                    <div class="pane-sub" id="pane-rp-sub">—</div>
+                  </div>
+                  <div class="pane-actions">
+                    <button class="btn ghost sm" id="btn-pane-browse-rp" type="button">
+                      Browse packs
+                    </button>
+                    <button class="btn ghost sm" id="btn-pane-open-rp" type="button">
+                      Open folder
+                    </button>
+                  </div>
+                </div>
+                <div class="pane-scroll" id="pane-rp-list"></div>
+              </section>
+
+              <section class="detail-pane" data-pane="shaderpacks">
+                <div class="pane-head">
+                  <div class="pane-heading">
+                    <div class="pane-title">Shader packs</div>
+                    <div class="pane-sub" id="pane-shaders-sub">—</div>
+                  </div>
+                  <div class="pane-actions">
+                    <button class="btn ghost sm" id="btn-pane-browse-shaders" type="button">
+                      Browse shaders
+                    </button>
+                    <button class="btn ghost sm" id="btn-pane-open-shaders" type="button">
+                      Open folder
+                    </button>
+                  </div>
+                </div>
+                <div class="pane-scroll" id="pane-shaders-list"></div>
+              </section>
+
+              <section class="detail-pane" data-pane="worlds">
+                <div class="pane-head">
+                  <div class="pane-heading">
+                    <div class="pane-title">Worlds</div>
+                    <div class="pane-sub" id="pane-worlds-sub">—</div>
+                  </div>
+                  <div class="pane-actions">
+                    <button class="btn ghost sm" id="btn-pane-backup" type="button">
+                      Backup worlds
+                    </button>
+                    <button class="btn ghost sm" id="btn-pane-open-worlds" type="button">
+                      Open folder
+                    </button>
+                  </div>
+                </div>
+                <div class="pane-scroll" id="pane-worlds-list"></div>
+              </section>
+
+              <section class="detail-pane" data-pane="screenshots">
+                <div class="pane-head">
+                  <div class="pane-heading">
+                    <div class="pane-title">Screenshots</div>
+                    <div class="pane-sub" id="pane-shots-sub">—</div>
+                  </div>
+                  <div class="pane-actions">
+                    <button class="btn ghost sm" id="btn-pane-open-shots" type="button">
+                      Open folder
+                    </button>
+                  </div>
+                </div>
+                <div class="pane-scroll">
+                  <div class="shot-grid" id="pane-shots-list"></div>
+                </div>
+              </section>
+
+              <section class="detail-pane" data-pane="settings">
+                <div class="pane-head">
+                  <div class="pane-heading">
+                    <div class="pane-title">Profile settings</div>
+                    <div class="pane-sub" id="pane-settings-sub">—</div>
+                  </div>
+                </div>
+                <div class="pane-scroll">
+                  <div class="pane-settings">
+                    <div class="setting-row">
+                      <div class="setting-text">
+                        <span class="setting-name">Player</span>
+                        <span class="hint">Shared across profiles</span>
+                      </div>
+                      <span class="setting-value" id="pane-player">Player</span>
+                    </div>
+                    <div class="setting-row">
+                      <div class="setting-text">
+                        <span class="setting-name">Memory</span>
+                        <span class="hint">Used when this profile starts the game</span>
+                      </div>
+                      <div class="stepper">
+                        <button class="step" id="pane-ram-down" type="button">−</button>
+                        <span class="step-value" id="pane-ram-value">2 GB</span>
+                        <button class="step" id="pane-ram-up" type="button">+</button>
+                      </div>
+                    </div>
+                    <div class="setting-row">
+                      <div class="setting-text">
+                        <span class="setting-name">Java</span>
+                        <span class="hint" id="pane-java-hint">Downloaded automatically</span>
+                      </div>
+                      <span class="setting-value" id="pane-java">Automatic</span>
+                    </div>
+                    <div class="setting-row">
+                      <div class="setting-text">
+                        <span class="setting-name">Version</span>
+                        <span class="hint" id="pane-version-hint">—</span>
+                      </div>
+                      <span class="setting-value" id="pane-version">—</span>
+                    </div>
+                    <div class="setting-block">
+                      <span class="field-label">CHANGE VERSION</span>
+                      <div class="version-editor">
+                        <label class="mini-field">
+                          <span class="hint">Minecraft</span>
+                          <select class="input" id="edit-version"
+                                  aria-label="Minecraft version"></select>
+                        </label>
+                        <label class="mini-field">
+                          <span class="hint">Mod loader</span>
+                          <select class="input" id="edit-loader"
+                                  aria-label="Mod loader">
+                            <option value="any">No loader (vanilla)</option>
+                            <option value="fabric">Fabric</option>
+                            <option value="forge">Forge</option>
+                            <option value="neoforge">NeoForge</option>
+                          </select>
+                        </label>
+                        <label class="mini-field">
+                          <span class="hint">Loader version</span>
+                          <select class="input" id="edit-build"
+                                  aria-label="Loader version"></select>
+                        </label>
+                      </div>
+                      <button class="btn primary sm" id="btn-apply-version"
+                              type="button">Apply changes</button>
+                    </div>
+                    <div class="setting-row">
+                      <div class="setting-text">
+                        <span class="setting-name">Icon</span>
+                        <span class="hint">PNG, JPG, WEBP, GIF or BMP</span>
+                      </div>
+                      <div class="pane-actions">
+                        <button class="btn ghost sm" id="btn-pane-icon" type="button">
+                          Set icon
+                        </button>
+                        <button class="btn ghost sm" id="btn-pane-clear-icon" type="button">
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                    <div class="setting-row">
+                      <div class="setting-text">
+                        <span class="setting-name">Game folder</span>
+                        <span class="hint" id="pane-path">—</span>
+                      </div>
+                      <button class="btn ghost sm" id="btn-pane-open-game" type="button">
+                        Open
+                      </button>
+                    </div>
+                    <div class="pane-actions pane-settings-actions">
+                      <button class="btn ghost sm" id="btn-pane-edit" type="button">
+                        <svg class="icon"><use href="#i-edit"/></svg>Edit profile
+                      </button>
+                      <button class="btn ghost sm" id="btn-pane-settings" type="button">
+                        <svg class="icon"><use href="#i-gear"/></svg>All settings
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- New profile ---------------------------------------------------- -->
+    <section class="screen" id="screen-create">
+      <div class="create-layout">
+        <div class="create-main">
+          <h1 class="screen-title" id="create-title">New profile</h1>
+          <p class="screen-sub" id="create-sub">Pick any Minecraft version —
+             missing files are downloaded from Mojang.</p>
+
+          <label class="field">
+            <span class="field-label">PROFILE NAME</span>
+            <input class="input" id="new-name" maxlength="48"
+                   placeholder="My build" spellcheck="false" autocomplete="off">
+          </label>
+
+          <div class="row-head">
+            <span class="field-label">MINECRAFT VERSION</span>
+            <button class="link" id="btn-refresh-versions" type="button">
+              <svg class="icon"><use href="#i-refresh"/></svg>Refresh
+            </button>
+          </div>
+          <input class="input" id="version-search" placeholder="Search versions"
+                 spellcheck="false" autocomplete="off">
+          <div class="version-filters" id="version-filters">
+            <label class="chip-check">
+              <input type="checkbox" data-vtype="release" checked>
+              <span>Releases</span>
+            </label>
+            <label class="chip-check">
+              <input type="checkbox" data-vtype="snapshot">
+              <span>Snapshots</span>
+            </label>
+            <label class="chip-check">
+              <input type="checkbox" data-vtype="old_beta">
+              <span>Old betas</span>
+            </label>
+            <label class="chip-check">
+              <input type="checkbox" data-vtype="old_alpha">
+              <span>Old alphas</span>
+            </label>
+          </div>
+          <div class="list-box versions" id="version-list"></div>
+
+          <div class="row-head">
+            <span class="field-label">MOD LOADER</span>
+            <button class="link" id="btn-refresh-builds" type="button">
+              <svg class="icon"><use href="#i-refresh"/></svg>Refresh
+            </button>
+          </div>
+          <div class="seg" id="loader-seg">
+            <button data-loader="None" class="on" type="button">None</button>
+            <button data-loader="Fabric" type="button">Fabric</button>
+            <button data-loader="Forge" type="button">Forge</button>
+            <button data-loader="NeoForge" type="button">NeoForge</button>
+          </div>
+          <div class="list-box builds" id="build-list"></div>
+        </div>
+
+        <aside class="create-side">
+          <section class="card log-card">
+            <div class="log-head">
+              <span class="eyebrow">LOG</span>
+              <button class="link" id="btn-clear-create-log" type="button">
+                Clear
+              </button>
+            </div>
+            <div class="log small" id="create-log"></div>
+          </section>
+          <div class="progress"><div class="bar" id="create-progress"></div></div>
+          <div class="status-line" id="create-status">Pick a version to begin.</div>
+          <div class="side-actions">
+            <button class="btn primary" id="btn-create" type="button">
+              Create profile
+            </button>
+            <button class="btn ghost hidden" id="btn-cancel-create"
+                    type="button">Cancel</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Mods ----------------------------------------------------------- -->
+    <section class="screen" id="screen-mods">
+      <div class="screen-head">
+        <div>
+          <h1 class="screen-title" id="mods-title">Mods</h1>
+          <p class="screen-sub" id="mods-sub">Search Modrinth by name.</p>
+        </div>
+        <div class="toolbar-tight">
+          <button class="btn primary hidden" id="btn-mod-install-many"
+                  type="button">Install selected (0)</button>
+          <button class="btn ghost" id="btn-mod-update-all" type="button">
+            <svg class="icon"><use href="#i-refresh"/></svg>Update all
+          </button>
+          <button class="btn ghost" id="btn-open-mods-folder" type="button">
+            <svg class="icon"><use href="#i-folder"/></svg><span
+              id="btn-open-folder-label">Open mods folder</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="seg" id="kind-seg">
+          <button data-kind="mod" class="on" type="button">Mods</button>
+          <button data-kind="resourcepack" type="button">Resource packs</button>
+          <button data-kind="shader" type="button">Shaders</button>
+          <button data-kind="modpack" type="button">Modpacks</button>
+        </div>
+        <div class="seg" id="mods-seg">
+          <button data-loader="any" class="on" type="button">Any</button>
+          <button data-loader="fabric" type="button">Fabric</button>
+          <button data-loader="forge" type="button">Forge</button>
+          <button data-loader="neoforge" type="button">NeoForge</button>
+        </div>
+        <input class="input grow" id="mods-query" placeholder="Search by name"
+               spellcheck="false" autocomplete="off">
+        <button class="btn ghost" id="btn-mod-search" type="button">Search</button>
+      </div>
+
+      <div class="mods-layout">
+        <div class="list-box mods" id="mod-list"></div>
+        <aside class="card mod-info">
+          <div class="mod-head">
+            <span class="avatar big" id="mod-avatar"></span>
+            <div class="mod-head-text">
+              <h2 id="mod-name">Select a mod</h2>
+              <span class="muted" id="mod-author"></span>
+            </div>
+          </div>
+          <p class="muted" id="mod-desc"></p>
+          <div class="spacer"></div>
+          <div class="status-line" id="mods-status"></div>
+          <div class="mod-actions">
+            <button class="btn primary" id="btn-mod-install"
+                    type="button" disabled>Install</button>
+            <div class="mod-action-row hidden" id="mod-manage">
+              <button class="btn ghost" id="btn-mod-uninstall" type="button"
+                      disabled>Uninstall</button>
+              <button class="btn primary" id="btn-mod-update" type="button"
+                      disabled>Update</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Loaders -------------------------------------------------------- -->
+    <section class="screen" id="screen-loaders">
+      <div class="screen-head">
+        <div>
+          <h1 class="screen-title">Mod loader</h1>
+          <p class="screen-sub" id="loaders-sub">Select a profile to install a
+             loader.</p>
+        </div>
+        <button class="btn ghost" id="btn-open-loader-folder" type="button">
+          <svg class="icon"><use href="#i-folder"/></svg>Open folder
+        </button>
+      </div>
+
+      <div class="toolbar">
+        <div class="seg" id="loaders-seg">
+          <button data-loader="Fabric" class="on" type="button">Fabric</button>
+          <button data-loader="Forge" type="button">Forge</button>
+          <button data-loader="NeoForge" type="button">NeoForge</button>
+        </div>
+        <div class="spacer"></div>
+        <button class="link" id="btn-refresh-loader-builds" type="button">
+          <svg class="icon"><use href="#i-refresh"/></svg>Refresh builds
+        </button>
+      </div>
+
+      <div class="loaders-layout">
+        <section class="card builds-card">
+          <div class="card-head">
+            <span class="eyebrow">BUILDS</span>
+            <span class="count" id="builds-count">—</span>
+          </div>
+          <div class="list-box builds" id="loader-build-list"></div>
+        </section>
+
+        <aside class="loaders-side">
+          <section class="card log-card">
+            <div class="log-head">
+              <span class="eyebrow">LOG</span>
+              <button class="link" id="btn-clear-loader-log" type="button">
+                Clear
+              </button>
+            </div>
+            <div class="log small" id="loader-log"></div>
+          </section>
+          <div class="progress"><div class="bar" id="loader-progress"></div></div>
+          <div class="status-line" id="loaders-status">Pick a loader build.</div>
+          <div class="side-actions">
+            <button class="btn primary" id="btn-install-loader" type="button">
+              Install loader
+            </button>
+            <button class="btn ghost hidden" id="btn-cancel-loader"
+                    type="button">Cancel</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Logs ----------------------------------------------------------- -->
+    <section class="screen" id="screen-logs">
+      <div class="screen-head">
+        <div>
+          <h1 class="screen-title">Logs</h1>
+          <p class="screen-sub path" id="logs-sub">Select a profile to read its
+             logs.</p>
+        </div>
+        <div class="toolbar-tight">
+          <button class="btn ghost" id="btn-open-logs-folder" type="button">
+            <svg class="icon"><use href="#i-folder"/></svg>Folder
+          </button>
+          <button class="btn ghost" id="btn-open-log-file" type="button">File</button>
+          <button class="btn ghost" id="btn-clear-logs" type="button">Clear</button>
+        </div>
+      </div>
+      <div class="log console" id="log-console"></div>
+    </section>
+
+    <!-- Settings -------------------------------------------------------- -->
+    <section class="screen" id="screen-settings">
+      <div class="screen-head">
+        <div>
+          <h1 class="screen-title">Settings</h1>
+          <p class="screen-sub">Account and Minecraft launch options. Changes
+             are saved automatically.</p>
+        </div>
+        <button class="btn ghost" id="btn-open-shared" type="button">
+          <svg class="icon"><use href="#i-folder"/></svg>Shared folder
+        </button>
+      </div>
+
+      <div class="settings-grid">
+        <section class="card settings-card">
+          <div class="card-head">
+            <span class="eyebrow">ACCOUNT</span>
+            <span class="count" id="account-status">offline</span>
+          </div>
+
+          <div class="account-list" id="account-list"></div>
+
+          <div class="account-add">
+            <span class="field-label">ADD ACCOUNT</span>
+            <div class="seg account-methods" id="account-methods">
+            <button class="account-method" id="btn-method-microsoft"
+                    data-method="microsoft" type="button">Microsoft</button>
+            <button class="account-method" id="btn-method-ely"
+                    data-method="ely" type="button">Ely.by</button>
+            <button class="account-method" id="btn-method-offline"
+                    data-method="offline" type="button">Offline</button>
+          </div>
+
+          <div class="account-panel" id="panel-microsoft">
+            <div class="account-row" id="account-signed-out">
+              <span class="account-avatar">
+                <svg class="icon"><use href="#i-profile"/></svg>
+              </span>
+              <div class="setting-text">
+                <span class="account-name">Not signed in</span>
+                <span class="hint">Sign in to add a Microsoft account. You can
+                   add more than one and switch between them at any time.</span>
+              </div>
+              <button class="btn primary" id="btn-ms-login" type="button">
+                Sign in
+              </button>
+            </div>
+
+            <div class="ms-code hidden" id="ms-code">
+              <span class="field-label">SIGN-IN CODE</span>
+              <div class="ms-code-row">
+                <code id="ms-code-value">…</code>
+                <button class="link" id="btn-ms-cancel" type="button">
+                  Cancel
+                </button>
+              </div>
+              <p class="hint" id="ms-code-hint">Enter this code at
+                <strong>microsoft.com/link</strong>. The browser should open
+                by itself; you can also open the page on any device.</p>
+            </div>
+
+            <details class="ms-help" id="ms-advanced">
+              <summary>Advanced: Azure Client ID</summary>
+              <p class="hint">A built-in Client ID is already configured —
+                 leave the field empty to use it. Paste your own Azure
+                 application ID only if you want a different app
+                 registration.</p>
+              <label class="field">
+                <span class="field-label">AZURE CLIENT ID</span>
+                <div class="input-row">
+                  <input class="input" id="ms-client-id" spellcheck="false"
+                         autocomplete="off"
+                         placeholder="Built-in Client ID is used">
+                  <button class="btn ghost" id="btn-save-client-id"
+                          type="button">
+                    Save
+                  </button>
+                </div>
+              </label>
+              <details class="ms-help nested">
+                <summary>How to get your own Client ID (free, ~5 minutes)</summary>
+                <ol>
+                  <li>Open <strong>portal.azure.com</strong> and sign in.</li>
+                  <li>Go to <strong>Microsoft Entra ID → App registrations →
+                     New registration</strong>.</li>
+                  <li>Name it anything, pick <strong>Personal Microsoft accounts
+                     only</strong>, then press <strong>Register</strong>.</li>
+                  <li>Copy the <strong>Application (client) ID</strong> from the
+                     overview page.</li>
+                  <li>Open <strong>Authentication</strong>, set <strong>Allow
+                     public client flows</strong> to <strong>Yes</strong> and
+                     save.</li>
+                  <li>Paste the ID above, press Save, then Sign in.</li>
+                </ol>
+              </details>
+            </details>
+          </div>
+
+          <div class="account-panel hidden" id="panel-ely">
+            <button class="btn primary" id="btn-ely-browser" type="button">
+              Sign in with browser
+            </button>
+            <p class="hint" id="ely-browser-hint">A browser page opens on
+               ely.by — sign in there and the launcher picks your account up
+               automatically. No password to type here.</p>
+
+            <div class="account-row hidden" id="ely-wait">
+              <span class="account-avatar">
+                <svg class="icon"><use href="#i-profile"/></svg>
+              </span>
+              <div class="setting-text">
+                <span class="account-name">Waiting for the browser…</span>
+                <span class="hint" id="ely-wait-hint">Finish signing in on
+                   the ely.by page that just opened.</span>
+              </div>
+              <button class="btn ghost" id="btn-ely-cancel" type="button">
+                Cancel
+              </button>
+            </div>
+
+            <details class="ms-help" id="ely-password-box">
+              <summary>Sign in with password instead</summary>
+              <div class="ely-form">
+                <label class="field">
+                  <span class="field-label">ELY.BY EMAIL OR USERNAME</span>
+                  <input class="input" id="ely-username" spellcheck="false"
+                         autocomplete="username">
+                </label>
+                <label class="field">
+                  <span class="field-label">PASSWORD</span>
+                  <input class="input" id="ely-password" type="password"
+                         autocomplete="current-password">
+                </label>
+                <label class="field hidden" id="ely-totp-field">
+                  <span class="field-label">TWO-FACTOR CODE</span>
+                  <input class="input" id="ely-totp" inputmode="numeric"
+                         maxlength="6" autocomplete="one-time-code"
+                         placeholder="6-digit code">
+                </label>
+                <button class="btn primary" id="btn-ely-login" type="button">
+                  Sign in with Ely.by
+                </button>
+                <p class="hint">The password goes only to ely.by and is never
+                   stored. First launch downloads authlib-injector, which signs
+                   the game in and loads Ely.by skins.</p>
+              </div>
+            </details>
+
+            <details class="ms-help" id="ely-oauth-help">
+              <summary>Advanced: browser sign-in (OAuth) setup</summary>
+              <p class="hint" id="ely-oauth-status">Browser sign-in only needs
+                 an Ely.by Client ID for a “Desktop application” (PKCE, no
+                 secret). A “Website” app also works — then paste its Client
+                 Secret too. Enter them here once; everyone using this copy of
+                 the launcher can then sign in with the button above.</p>
+              <label class="field">
+                <span class="field-label">OAUTH CLIENT ID</span>
+                <input class="input" id="ely-oauth-client-id"
+                       spellcheck="false" autocomplete="off">
+              </label>
+              <label class="field">
+                <span class="field-label">OAUTH CLIENT SECRET (OPTIONAL)</span>
+                <input class="input" id="ely-oauth-client-secret"
+                       type="password" autocomplete="off"
+                       placeholder="Only for Website apps — leave blank for PKCE">
+              </label>
+              <label class="field">
+                <span class="field-label">REDIRECT URI</span>
+                <div class="input-row">
+                  <input class="input" id="ely-oauth-redirect"
+                         spellcheck="false" autocomplete="off">
+                  <button class="btn ghost" id="btn-save-ely-oauth"
+                          type="button">
+                    Save
+                  </button>
+                </div>
+              </label>
+              <details class="ms-help nested">
+                <summary>How to get a Client ID (and a Secret)</summary>
+                <ol>
+                  <li>Open <strong>account.ely.by</strong> and sign in.</li>
+                  <li>Open your applications page and create a new
+                     application. <strong>Desktop application</strong> is the
+                     simplest choice: it uses PKCE, so only a Client ID is
+                     needed. <strong>Website</strong> also works but then the
+                     Client Secret is required.</li>
+                  <li>Add the exact <strong>Redirect URI</strong> shown above
+                     (by default <strong>http://localhost:26206/ely-callback</strong>)
+                     to that application.</li>
+                  <li>Copy the application's <strong>Client ID</strong> — and
+                     its <strong>Client Secret</strong> if it has one — into
+                     the fields above and press Save.</li>
+                  <li>Press <strong>Sign in with browser</strong>.</li>
+                </ol>
+              </details>
+            </details>
+          </div>
+
+          <div class="account-panel hidden" id="panel-offline">
+            <div class="input-row">
+              <input class="input" id="player-name" maxlength="16"
+                     spellcheck="false" autocomplete="off"
+                     placeholder="Offline player name">
+              <button class="btn primary" id="btn-add-offline" type="button">
+                Add
+              </button>
+            </div>
+            <p class="hint">Offline accounts skip signing in. The game uses
+               the name you type here; skins come from the profile files.</p>
+          </div>
+          </div>
+        </section>
+
+        <section class="card settings-card">
+          <div class="card-head">
+            <span class="eyebrow">MINECRAFT</span>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-text">
+              <span class="setting-name">Memory for new profiles</span>
+              <span class="hint">Every new profile starts with this much
+                 RAM.</span>
+            </div>
+            <div class="stepper">
+              <button class="step" id="default-ram-down" type="button"
+                      aria-label="Less default memory">−</button>
+              <span class="step-value" id="default-ram-value">2 GB</span>
+              <button class="step" id="default-ram-up" type="button"
+                      aria-label="More default memory">+</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-text">
+              <span class="setting-name" id="ram-profile-name">Memory for this profile</span>
+              <span class="hint" id="ram-profile-hint">Select a profile to
+                 change its memory.</span>
+            </div>
+            <div class="stepper">
+              <button class="step" id="ram-down" type="button"
+                      aria-label="Less memory">−</button>
+              <span class="step-value" id="ram-value">—</span>
+              <button class="step" id="ram-up" type="button"
+                      aria-label="More memory">+</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="field-label">JAVA EXECUTABLE</span>
+            <div class="input-row">
+              <input class="input" id="java-path" spellcheck="false"
+                     autocomplete="off"
+                     placeholder="Automatic — downloaded for each version">
+              <button class="btn ghost" id="btn-pick-java" type="button">
+                Browse…
+              </button>
+            </div>
+            <div class="row-head tight">
+              <p class="hint" id="java-hint">Leave empty — the launcher
+                 downloads the Java runtime each version needs.</p>
+              <button class="link" id="btn-auto-java" type="button">
+                Use automatic
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card settings-card wide">
+          <div class="card-head">
+            <span class="eyebrow">FOLDERS</span>
+          </div>
+          <div class="path-row">
+            <span class="path-label">Shared files</span>
+            <code id="settings-shared">…</code>
+          </div>
+          <div class="path-row">
+            <span class="path-label">Profiles</span>
+            <code id="settings-instances">…</code>
+          </div>
+          <p class="hint">Profiles never copy files from the shared folder —
+             versions, libraries and assets are reused in place.</p>
+        </section>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="statusbar">
+    <span class="status-text" id="status">Ready.</span>
+    <span class="status-hint">offline mode · mojang + modrinth</span>
+  </footer>
+</div>
+
+<div class="profile-tip" id="profile-tip" role="tooltip"></div>
+
+<div class="ctx-menu" id="profile-menu" role="menu" aria-label="Profile actions">
+  <button class="ctx-item" type="button" role="menuitem" data-profile-action="open-folder">
+    <svg class="icon"><use href="#i-folder"/></svg><span>Open folder</span>
+  </button>
+  <button class="ctx-item" type="button" role="menuitem" data-profile-action="mods">
+    <svg class="icon"><use href="#i-mods"/></svg><span>Mods</span>
+  </button>
+  <button class="ctx-item" type="button" role="menuitem" data-profile-action="logs">
+    <svg class="icon"><use href="#i-logs"/></svg><span>Logs</span>
+  </button>
+  <div class="ctx-sep"></div>
+  <button class="ctx-item" type="button" role="menuitem" data-profile-action="icon">
+    <svg class="icon"><use href="#i-image"/></svg><span>Set icon</span>
+  </button>
+  <button class="ctx-item" type="button" role="menuitem" data-profile-action="edit">
+    <svg class="icon"><use href="#i-edit"/></svg><span>Edit</span>
+  </button>
+  <button class="ctx-item" type="button" role="menuitem" data-profile-action="duplicate">
+    <svg class="icon"><use href="#i-copy"/></svg><span>Duplicate</span>
+  </button>
+  <div class="ctx-sep"></div>
+  <button class="ctx-item" type="button" role="menuitem" data-profile-action="backup">
+    <svg class="icon"><use href="#i-archive"/></svg><span>Backup worlds</span>
+  </button>
+  <button class="ctx-item" type="button" role="menuitem" data-profile-action="verify">
+    <svg class="icon"><use href="#i-check"/></svg><span>Verify files</span>
+  </button>
+  <button class="ctx-item" type="button" role="menuitem" data-profile-action="settings">
+    <svg class="icon"><use href="#i-gear"/></svg><span>Settings</span>
+  </button>
+  <div class="ctx-sep"></div>
+  <button class="ctx-item" type="button" role="menuitem" data-profile-action="delete">
+    <svg class="icon"><use href="#i-trash"/></svg><span class="ctx-label">Delete</span>
+  </button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
