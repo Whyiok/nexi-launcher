@@ -16,6 +16,7 @@ authlib-injector-*.jar
 
 # Runtime data (may contain account tokens!)
 settings.json
+accounts.json
 logs/
 *.log
 skins/

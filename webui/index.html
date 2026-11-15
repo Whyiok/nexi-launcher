@@ -12,6 +12,10 @@
   <symbol id="i-profile" viewBox="0 0 24 24">
     <circle cx="12" cy="8" r="3.4"/><path d="M5.2 19.4c.6-3.3 3.5-5.2 6.8-5.2s6.2 1.9 6.8 5.2"/>
   </symbol>
+  <symbol id="i-builds" viewBox="0 0 24 24">
+    <path d="M12 3.4 20 8v8l-8 4.6L4 16V8l8-4.6Z"/>
+    <path d="m4 8 8 4.6L20 8M12 12.6v8"/>
+  </symbol>
   <symbol id="i-plus" viewBox="0 0 24 24">
     <path d="M12 5v14M5 12h14"/>
   </symbol>
@@ -46,8 +50,8 @@
   </symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="2.9"/>
-    <path d="M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18"/>
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
   </symbol>
   <symbol id="i-edit" viewBox="0 0 24 24">
     <path d="M4 20h4.2L19 9.2 14.8 5 4 15.8V20Z"/>
@@ -79,6 +83,8 @@
 <div class="app">
   <header class="topbar">
     <div class="topbar-left">
+      <img class="brand-icon" src="star_icon.svg" alt=""
+           aria-hidden="true">
       <div class="brand">
         <span class="brand-main">NEXI</span>
         <span class="brand-sub">launcher</span>
@@ -87,10 +93,13 @@
     </div>
     <nav class="tabs" id="tabs" aria-label="Sections">
       <button class="tab" data-screen="profiles" type="button">
-        <svg class="icon"><use href="#i-profile"/></svg><span>Profiles</span>
+        <svg class="icon"><use href="#i-builds"/></svg><span>Profiles</span>
       </button>
       <button class="tab" data-screen="create" type="button">
         <svg class="icon"><use href="#i-plus"/></svg><span>New</span>
+      </button>
+      <button class="tab" data-screen="modpacks" type="button">
+        <svg class="icon"><use href="#i-layers"/></svg><span>Modpacks</span>
       </button>
       <button class="tab" data-screen="skin" type="button">
         <svg class="icon"><use href="#i-skin"/></svg><span>Skins</span>
@@ -103,30 +112,33 @@
   <div class="rule"></div>
 
   <main class="content">
+    <!-- The profile rail is outside the screens: it stays visible on every
+         tab, so switching away from Profiles never hides the builds. -->
+    <aside class="side">
+      <div class="side-head">
+        <span class="eyebrow">PROFILES</span>
+        <span class="count" id="profiles-count">empty</span>
+      </div>
+      <div class="profile-list" id="profile-list"></div>
+      <button class="btn primary" id="btn-new-profile" type="button"
+              title="New profile" aria-label="New profile">
+        <svg class="icon"><use href="#i-plus"/></svg>
+      </button>
+      <button class="btn ghost" id="btn-import-modpack" type="button"
+              title="Import modpack" aria-label="Import modpack">
+        <svg class="icon"><use href="#i-import"/></svg>
+      </button>
+      <button class="btn ghost" id="btn-browse-modpacks" type="button"
+              title="Browse modpacks" aria-label="Browse modpacks">
+        <svg class="icon"><use href="#i-layers"/></svg>
+      </button>
+    </aside>
+
+    <div class="screen-stack">
 
     <!-- Profiles ------------------------------------------------------- -->
     <section class="screen" id="screen-profiles">
       <div class="profiles-layout">
-        <aside class="side">
-          <div class="side-head">
-            <span class="eyebrow">PROFILES</span>
-            <span class="count" id="profiles-count">empty</span>
-          </div>
-          <div class="profile-list" id="profile-list"></div>
-          <button class="btn primary" id="btn-new-profile" type="button"
-                  title="New profile" aria-label="New profile">
-            <svg class="icon"><use href="#i-plus"/></svg>
-          </button>
-          <button class="btn ghost" id="btn-import-modpack" type="button"
-                  title="Import modpack" aria-label="Import modpack">
-            <svg class="icon"><use href="#i-import"/></svg>
-          </button>
-          <button class="btn ghost" id="btn-browse-modpacks" type="button"
-                  title="Browse modpacks" aria-label="Browse modpacks">
-            <svg class="icon"><use href="#i-layers"/></svg>
-          </button>
-        </aside>
-
         <section class="card empty" id="profile-empty">
           <div class="empty-icon"><svg><use href="#i-layers"/></svg></div>
           <h2>No profiles yet</h2>
@@ -429,30 +441,16 @@
 
           <div class="row-head">
             <span class="field-label">MINECRAFT VERSION</span>
-            <button class="link" id="btn-refresh-versions" type="button">
-              <svg class="icon"><use href="#i-refresh"/></svg>Refresh
-            </button>
+            <div class="version-tools">
+              <button class="btn ghost sm" id="btn-show-all-versions"
+                      type="button">Show all versions</button>
+              <button class="link" id="btn-refresh-versions" type="button">
+                <svg class="icon"><use href="#i-refresh"/></svg>Refresh
+              </button>
+            </div>
           </div>
           <input class="input" id="version-search" placeholder="Search versions"
                  spellcheck="false" autocomplete="off">
-          <div class="version-filters" id="version-filters">
-            <label class="chip-check">
-              <input type="checkbox" data-vtype="release" checked>
-              <span>Releases</span>
-            </label>
-            <label class="chip-check">
-              <input type="checkbox" data-vtype="snapshot">
-              <span>Snapshots</span>
-            </label>
-            <label class="chip-check">
-              <input type="checkbox" data-vtype="old_beta">
-              <span>Old betas</span>
-            </label>
-            <label class="chip-check">
-              <input type="checkbox" data-vtype="old_alpha">
-              <span>Old alphas</span>
-            </label>
-          </div>
           <div class="list-box versions" id="version-list"></div>
 
           <div class="row-head">
@@ -501,8 +499,6 @@
           <p class="screen-sub" id="mods-sub">Search Modrinth by name.</p>
         </div>
         <div class="toolbar-tight">
-          <button class="btn primary hidden" id="btn-mod-install-many"
-                  type="button">Install selected (0)</button>
           <button class="btn ghost" id="btn-mod-update-all" type="button">
             <svg class="icon"><use href="#i-refresh"/></svg>Update all
           </button>
@@ -518,7 +514,6 @@
           <button data-kind="mod" class="on" type="button">Mods</button>
           <button data-kind="resourcepack" type="button">Resource packs</button>
           <button data-kind="shader" type="button">Shaders</button>
-          <button data-kind="modpack" type="button">Modpacks</button>
         </div>
         <div class="seg" id="mods-seg">
           <button data-loader="any" class="on" type="button">Any</button>
@@ -545,10 +540,14 @@
           <div class="spacer"></div>
           <div class="status-line" id="mods-status"></div>
           <div class="mod-actions">
-            <button class="btn primary" id="btn-mod-install"
-                    type="button" disabled>Install</button>
+            <div class="mod-action-row">
+              <button class="btn primary" id="btn-mod-install"
+                      type="button" disabled>Install</button>
+              <button class="btn ghost hidden" id="btn-mod-install-many"
+                      type="button">Install selected (0)</button>
+            </div>
             <div class="mod-action-row hidden" id="mod-manage">
-              <button class="btn ghost" id="btn-mod-uninstall" type="button"
+              <button class="btn danger" id="btn-mod-uninstall" type="button"
                       disabled>Uninstall</button>
               <button class="btn primary" id="btn-mod-update" type="button"
                       disabled>Update</button>
@@ -920,6 +919,36 @@
 
           <p class="hint">Accent colour of the whole launcher — buttons,
              highlights, glows and the skin viewer ambience.</p>
+
+          <div class="appearance-controls">
+            <div class="setting-row">
+              <div class="setting-text">
+                <span class="setting-name">Colour mode</span>
+                <p class="hint">Dark is the default; light switches to white
+                   surfaces.</p>
+              </div>
+              <div class="seg" id="mode-seg" role="radiogroup"
+                   aria-label="Colour mode">
+                <button type="button" data-mode-option="dark">Dark</button>
+                <button type="button" data-mode-option="light">Light</button>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <span class="setting-name">Language</span>
+                <p class="hint">Interface language. Changes apply right
+                   away.</p>
+              </div>
+              <div class="seg" id="lang-seg" role="radiogroup"
+                   aria-label="Interface language">
+                <button type="button" data-lang-option="en"
+                        data-i18n-skip>English</button>
+                <button type="button" data-lang-option="ru"
+                        data-i18n-skip>Русский</button>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section class="card settings-card wide">
@@ -938,6 +967,31 @@
                       type="button">File</button>
               <button class="btn ghost sm" id="btn-clear-logs"
                       type="button">Clear view</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card settings-card wide">
+          <div class="card-head">
+            <span class="eyebrow">NETWORK</span>
+            <span class="count" id="net-sub">Not checked yet</span>
+          </div>
+          <div class="net-targets" id="net-targets">
+            <p class="hint net-empty" id="net-empty">Run the check to see which
+               game hosts this network can reach.</p>
+          </div>
+          <div class="log console settings-log" id="net-console"></div>
+          <div class="row-head tight">
+            <p class="hint">Every host the launcher tried to download from and
+               what came back. When something fails, copy this report — it shows
+               exactly which host is blocked on this network.</p>
+            <div class="pane-actions">
+              <button class="btn ghost sm" id="btn-net-check"
+                      type="button">Run check</button>
+              <button class="btn ghost sm" id="btn-net-copy"
+                      type="button">Copy report</button>
+              <button class="btn ghost sm" id="btn-net-clear"
+                      type="button">Clear log</button>
             </div>
           </div>
         </section>
@@ -981,10 +1035,15 @@
         <div class="skin-preview">
           <canvas id="skin-canvas" width="260" height="340"
                   aria-label="3D skin preview"></canvas>
-          <p class="hint skin-hint">Move the cursor to turn the head away from
-            the model; drag the model to rotate it.</p>
+          <p class="hint skin-hint">Move the cursor to turn the head in any
+            direction; drag the model sideways to spin it.</p>
         </div>
         <div class="card settings-card skin-side">
+          <div>
+            <span class="field-label">ACCOUNT</span>
+            <select class="input" id="skin-account-select"
+                    aria-label="Account whose skin is shown"></select>
+          </div>
           <div>
             <span class="field-label">MODEL</span>
             <div class="seg" id="skin-seg">
@@ -1002,10 +1061,15 @@
              file is stored by the launcher and never sent anywhere except the
              account you apply it to.</p>
           <div class="path" id="skin-path" title=""></div>
+          <a class="skin-ely-link hidden" id="skin-ely-link"
+             href="https://ely.by/skins" target="_blank" rel="noreferrer">
+            Change skin on ely.by →
+          </a>
         </div>
       </div>
     </section>
 
+    </div>
   </main>
 
   <footer class="statusbar">
@@ -1047,11 +1111,26 @@
     <svg class="icon"><use href="#i-gear"/></svg><span>Settings</span>
   </button>
   <div class="ctx-sep"></div>
-  <button class="ctx-item" type="button" role="menuitem" data-profile-action="delete">
+  <button class="ctx-item danger" type="button" role="menuitem"
+          data-profile-action="delete">
     <svg class="icon"><use href="#i-trash"/></svg><span class="ctx-label">Delete</span>
   </button>
 </div>
 
-<script src="app.js"></script>
+<script src="i18n.js"></script>
+<!-- Classic scripts (not ES modules: WebView2 loads the page from file://).
+     Order matters: earlier files declare shared state and helpers. -->
+<script src="js/core.js"></script>
+<script src="js/screens.js"></script>
+<script src="js/profiles.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/create.js"></script>
+<script src="js/mods.js"></script>
+<script src="js/loaders.js"></script>
+<script src="js/logs.js"></script>
+<script src="js/network.js"></script>
+<script src="js/skin.js"></script>
+<script src="js/events.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

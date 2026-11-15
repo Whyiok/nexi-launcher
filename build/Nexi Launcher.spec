@@ -3,7 +3,7 @@
 
 a = Analysis(
     ['../launcher.py'],
-    pathex=[],
+    pathex=['..'],
     binaries=[],
     datas=[('../webui', 'webui')],
     hiddenimports=[],
@@ -22,11 +22,16 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Nexi Launcher',
+    name='nexi',
+    icon='../assets/nexi.ico',
+    version='../assets/version_info.txt',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # UPX-packed executables are the single biggest trigger for antivirus
+    # false positives: packed bootloaders look like malware heuristics. The
+    # exe is larger without it but flags much less often.
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
