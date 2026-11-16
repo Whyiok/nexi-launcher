@@ -18,13 +18,9 @@ Runtime are required (Windows 11 includes it).
 
 ## Screenshots
 
-| Home | Builds |
-| :---: | :---: |
-| [![Home screen](docs/screenshots/home.png)](docs/screenshots/home.png) | [![Builds and error notifications](docs/screenshots/profiles.png)](docs/screenshots/profiles.png) |
-
-| Settings |
-| :---: |
-| [![Settings](docs/screenshots/settings.png)](docs/screenshots/settings.png) |
+| Main menu | Skins | Builds |
+| :---: | :---: | :---: |
+| [![Main menu](docs/screenshots/home.png)](docs/screenshots/home.png) | [![Skins](docs/screenshots/skins.png)](docs/screenshots/skins.png) | [![Builds](docs/screenshots/builds.png)](docs/screenshots/builds.png) |
 
 ## Features
 
