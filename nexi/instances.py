@@ -304,6 +304,32 @@ def _pack_entries(folder: Path) -> list:
     return items
 
 
+def screenshot_entries(game: Path) -> list:
+    """Screenshots of a profile, newest first (the file system path included)."""
+    entries = []
+    shots = Path(game) / "screenshots"
+    if not shots.is_dir():
+        return entries
+    try:
+        files = [item for item in shots.iterdir()
+                 if item.is_file() and item.suffix.lower() in IMAGE_SUFFIXES]
+    except OSError:
+        return entries
+
+    def _mtime(item):
+        try:
+            return item.stat().st_mtime
+        except OSError:
+            return 0.0
+
+    files.sort(key=_mtime, reverse=True)
+    for path in files[:240]:
+        entries.append({"name": path.name, "path": str(path),
+                        "size": _file_size(path),
+                        "modified": _mtime_label(path)})
+    return entries
+
+
 def instance_contents(root: Path) -> dict:
     """Mods, packs, worlds and screenshots of one isolated profile."""
     root = Path(root)
@@ -376,23 +402,7 @@ def instance_contents(root: Path) -> dict:
                 "modified": _mtime_label(level if level.is_file() else path),
             })
 
-    screenshots = []
-    shots = game / "screenshots"
-    if shots.is_dir():
-        try:
-            files = [item for item in shots.iterdir()
-                     if item.is_file() and item.suffix.lower() in IMAGE_SUFFIXES]
-        except OSError:
-            files = []
-        files.sort(key=lambda item: _file_size(item), reverse=True)
-        for path in files[:160]:
-            try:
-                url = path.resolve().as_uri()
-            except (OSError, ValueError):
-                url = ""
-            screenshots.append({"name": path.name, "url": url,
-                                "size": _file_size(path),
-                                "modified": _mtime_label(path)})
+    screenshots = screenshot_entries(game)
 
     data = {
         "mods": mods,

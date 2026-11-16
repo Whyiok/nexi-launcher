@@ -32,9 +32,16 @@
     "Worlds": "Миры",
     "Screenshots": "Скриншоты",
     "Logs": "Логи",
+    "Crash": "Сбой",
+    "Error": "Ошибка",
+    "Game crash": "Игра вылетела",
+    "Launcher error": "Ошибка лаунчера",
+    "Dismiss": "Закрыть",
+    "Dismiss notification": "Закрыть уведомление",
     "Profile settings": "Настройки сборки",
     "Installed mods": "Установленные моды",
     "Update all": "Обновить все",
+    "Any version": "Любая версия",
     "Browse mods": "Обзор модов",
     "Open folder": "Открыть папку",
     "Browse packs": "Обзор ресурспаков",
@@ -42,8 +49,8 @@
     "Backup worlds": "Резервная копия миров",
     "Folder": "Папка",
     "Clear view": "Очистить",
-    "Player": "Игрок",
-    "Shared across profiles": "Общее для всех сборок",
+    "Account": "Аккаунт",
+    "Launcher default": "Как в настройках",
     "Memory": "Память",
     "Used when this profile starts the game": "Используется при запуске этой сборки",
     "Java": "Java",
@@ -102,6 +109,16 @@
     "Select a profile to install a loader.": "Выберите сборку, чтобы установить загрузчик.",
     "Refresh builds": "Обновить сборки",
     "BUILDS": "СБОРКИ",
+    /* Home — the main menu screen */
+    "Home": "Главная",
+    "MAIN MENU": "ГЛАВНОЕ МЕНЮ",
+    "RECENT WORLDS": "НЕДАВНИЕ МИРЫ",
+    "New build": "Новая сборка",
+    "No recent worlds yet.": "Пока нет недавних миров.",
+    "Create a profile to get started.": "Создайте сборку, чтобы начать.",
+    "Play this build": "Играть в эту сборку",
+    "Stop the game": "Остановить игру",
+    "This profile is already running.": "Эта сборка уже запущена.",
     "Pick a loader build.": "Выберите сборку загрузчика.",
     "Install loader": "Установить загрузчик",
     "Search mods by name": "Поиск модов по названию",
@@ -136,6 +153,17 @@
     "No worlds yet. Start the game to create one.": "Миров пока нет. Запустите игру, чтобы создать мир.",
     "No screenshots yet. Press F2 in game to take one.": "Скриншотов пока нет. Нажмите F2 в игре.",
     "Open the world folder": "Открыть папку мира",
+    "Copy": "Копировать",
+    "Open file": "Открыть файл",
+    "Close": "Закрыть",
+    "Minimize": "Свернуть",
+    "Maximize": "Развернуть",
+    "Restore": "Восстановить",
+    "Copy screenshot": "Копировать скриншот",
+    "Screenshot copied to the clipboard.": "Скриншот скопирован в буфер обмена.",
+    "Could not copy the screenshot.": "Не удалось скопировать скриншот.",
+    "That screenshot is not valid.": "Некорректный скриншот.",
+    "That screenshot no longer exists.": "Этот скриншот больше не существует.",
     "untracked": "без учёта",
     "This profile is already running.": "Эта сборка уже запущена.",
     "Starting…": "Запуск…",
@@ -241,6 +269,19 @@
     "Light": "Светлая",
     "Language": "Язык",
     "Interface language. Changes apply right away.": "Язык интерфейса. Изменения применяются сразу.",
+    "Home background": "Фон главного меню",
+    "A GIF, MP4 or WebM clip behind the main menu. Leave it empty to keep the animated panorama.": "GIF, MP4 или WebM на фоне главного меню. Оставьте пустым, чтобы осталась анимированная панорама.",
+    "Choose a background…": "Выбрать фон…",
+    "Use panorama": "Панорама",
+    "Panorama": "Панорама",
+    "Could not set the background.": "Не удалось установить фон.",
+    "Could not clear the background.": "Не удалось убрать фон.",
+    "Home background saved.": "Фон главного меню сохранён.",
+    "Home background cleared.": "Фон главного меню убран.",
+    "Pick a GIF, MP4 or WebM file.": "Выберите файл GIF, MP4 или WebM.",
+    "The selected file was not found.": "Выбранный файл не найден.",
+    "The background picker needs Windows.": "Выбор фона доступен только в Windows.",
+    "Background": "Фон",
     "LAUNCHER LOG": "ЛОГ ЛАУНЧЕРА",
     "Diagnostic log of the launcher itself. It rotates automatically and never contains passwords or account tokens.": "Диагностический лог лаунчера. Он ротируется автоматически и никогда не содержит паролей или токенов аккаунтов.",
     "File": "Файл",
@@ -350,6 +391,7 @@
     "Browser sign-in is ready. Press “Sign in with browser”.": "Вход через браузер готов. Нажмите «Войти через браузер».",
     "Saved. Add the Ely.by Client ID before browser sign-in works.": "Сохранено. Добавьте Client ID Ely.by, чтобы включить вход через браузер.",
     "Could not switch accounts.": "Не удалось переключить аккаунт.",
+    "Could not change the account.": "Не удалось сменить аккаунт.",
     "Active account switched.": "Активный аккаунт переключён.",
     "Could not reorder accounts.": "Не удалось изменить порядок аккаунтов.",
     "Could not save the theme.": "Не удалось сохранить тему.",
@@ -467,10 +509,14 @@
     [/^Modrinth · (mods|resource packs|shaders|modpacks)( · .*)?$/, (m) =>
       `Modrinth · ${sectionName(m[1])}${(m[2] || "")
         .replace("all versions", "все версии")
-        .replace("any loader", "любой загрузчик")}`],
+        .replace("any loader", "любой загрузчик")
+        .replace("installs as a new profile", "устанавливаются как новая сборка")}`],
     [/^(.*) · Offline — unavailable$/, (m) =>
       `${m[1]} · оффлайн — недоступен`],
     [/^(.*) · Offline$/, (m) => `${m[1]} · оффлайн`],
+    [/^Launcher default · (.*)$/, (m) => `Как в настройках · ${m[1]}`],
+    [/^Uses the active account: (.*)$/, (m) =>
+      `Используется активный аккаунт: ${m[1]}`],
     [/^(\d+) total$/, (m) => `${m[1]} всего`],
     [/^(\d+) versions — pick one$/, (m) =>
       `${m[1]} ${plural(+m[1], "версия", "версии", "версий")} — выберите одну`],
@@ -519,6 +565,19 @@
     [/^Offline account “(.*)” is active\.$/, (m) =>
       `Активен оффлайн-аккаунт «${m[1]}».`],
     [/^Starting "(.*)"…$/, (m) => `Запускаем «${m[1]}»…`],
+    /* Home */
+    [/^Starting "(.*)" in "(.*)"…$/, (m) =>
+      `Запускаем «${m[1]}» в мире «${m[2]}»…`],
+    [/^Play "(.*)"$/, (m) => `Играть: «${m[1]}»`],
+    [/^Selected "(.*)" — Play starts it\.$/, (m) =>
+      `Выбрана сборка «${m[1]}» — «Играть» запустит её.`],
+    [/^Play (.+)$/, (m) => `Играть: ${m[1]}`],
+    [/^Continue in "(.*)"$/, (m) => `Продолжить в «${m[1]}»`],
+    [/^just now$/, "только что"],
+    [/^(\d+) min ago$/, (m) =>
+      `${m[1]} ${plural(+m[1], "минуту", "минуты", "минут")} назад`],
+    [/^(\d+) h ago$/, (m) => `${m[1]} ч назад`],
+    [/^(\d+) d ago$/, (m) => `${m[1]} дн назад`],
     [/^Java set: (.*)$/, (m) => `Java: ${m[1]}`],
     [/^Press Delete again to permanently remove "(.*)" — its worlds, mods and configs are deleted, shared versions stay\.$/, (m) =>
       `Нажмите «Удалить» ещё раз, чтобы навсегда удалить «${m[1]}» — миры, моды и конфиги будут стёрты, общие версии останутся.`],
@@ -539,6 +598,10 @@
     [/^Profile "(.*)" was created, but (.*)$/, (m) =>
       `Сборка «${m[1]}» создана, но ${m[2]}`],
     [/^Renamed to "(.*)"\.$/, (m) => `Переименовано в «${m[1]}».`],
+    [/^"(.*)" now uses the active account from Settings\.$/, (m) =>
+      `«${m[1]}» использует активный аккаунт из настроек.`],
+    [/^"(.*)" now signs in as (.*)\.$/, (m) =>
+      `«${m[1]}» теперь входит как ${m[2]}.`],
     [/^"(.*)" now runs Minecraft (.*) with (.*)\.$/, (m) =>
       `«${m[1]}» теперь запускает Minecraft ${m[2]} с ${m[3]}.`],
     [/^"(.*)" now runs Minecraft (.*)\.$/, (m) =>
@@ -571,6 +634,8 @@
     [/^Could not import the modpack: (.*)$/, (m) =>
       `Не удалось импортировать модпак: ${m[1]}`],
     [/^Could not back up the worlds\.?$/, "Не удалось сохранить резервную копию миров."],
+    [/^Could not copy the background: (.*)$/, (m) =>
+      `Не удалось скопировать фон: ${m[1]}`],
     [/^(.*) is already up to date\.$/, (m) => `${m[1]} уже обновлён.`],
     [/^(.*) is already installed\.$/, (m) => `${m[1]} уже установлен.`],
     [/^Installed (.*)\.$/, (m) => `${m[1]} установлен.`],

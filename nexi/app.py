@@ -38,6 +38,10 @@ def main():
         "Nexi Launcher", str(page), js_api=api,
         width=1180, height=780, min_size=(1000, 690),
         background_color="#0a0a0a",
+        # The page draws its own title bar (logo, minimize, close); the
+        # native frame would show a second one above it. easy_drag stays off so
+        # only the .pywebview-drag-region strips move the window.
+        frameless=True, easy_drag=False,
     )
     window.events.closing += api.on_close
 

@@ -32,11 +32,9 @@ def search_modrinth(query: str, game_version: str, loader: str,
                     limit: int = 30):
     """(hits, total_hits) — Modrinth search is paginated by offset."""
     facets = [[f"project_type:{project_type}"]]
-    if project_type == "modpack":
-        game_version = ""
     if game_version:
         facets.append([f"versions:{game_version}"])
-    if project_type == "mod" and loader and loader != "any":
+    if project_type in ("mod", "modpack") and loader and loader != "any":
         facets.append([f"categories:{loader}"])
     params = {
         "query": query,

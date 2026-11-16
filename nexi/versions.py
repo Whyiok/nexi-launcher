@@ -305,7 +305,8 @@ def prepare_legacy_assets(version: dict, game_dir: Path) -> Path:
 
 
 def build_command(version: dict, meta: Path, player: str, ram_gb: int,
-                  game_dir: Path = None, auth: dict = None):
+                  game_dir: Path = None, auth: dict = None,
+                  extra_args=None):
     version_id = version.get("id", Path(meta).stem)
     jars, missing = collect_classpath(version)
     client = client_jar(version, meta)
@@ -387,6 +388,9 @@ def build_command(version: dict, meta: Path, player: str, ram_gb: int,
     else:
         for token in version.get("minecraftArguments", "").split():
             command.append(expand_arg(token, variables))
+
+    # Extras such as --quickPlaySingleplayer go after the game arguments.
+    command += [str(arg) for arg in (extra_args or [])]
 
     return command, missing
 

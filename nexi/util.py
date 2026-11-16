@@ -47,6 +47,34 @@ def open_in_system(path) -> None:
         pass
 
 
+def copy_image_to_clipboard(path) -> bool:
+    """Put an image file on the clipboard (Windows only).
+
+    ``Clipboard::Flush`` renders every format before the helper process
+    exits — without it Windows drops the data with the process.
+    """
+    if os.name != "nt":
+        return False
+    escaped = str(path).replace("'", "''")
+    script = (
+        "Add-Type -AssemblyName System.Windows.Forms;"
+        "Add-Type -AssemblyName System.Drawing;"
+        f"$img=[System.Drawing.Image]::FromFile('{escaped}');"
+        "$bmp=New-Object System.Drawing.Bitmap $img;"
+        "[System.Windows.Forms.Clipboard]::SetImage($bmp);"
+        "[System.Windows.Forms.Clipboard]::Flush();"
+        "$bmp.Dispose();$img.Dispose()"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-STA", "-Command", script],
+            capture_output=True, text=True, timeout=20,
+            creationflags=subprocess.CREATE_NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
 def _read_json(path):
     """Parse JSON tolerating a UTF-8 BOM (editors and PowerShell add one)."""
     try:

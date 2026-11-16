@@ -9,7 +9,10 @@ from .content import ContentApi
 from .loaders import LoadersApi
 from .skins import SkinsApi
 from .diagnostics import DiagnosticsApi
+from .home import HomeApi
+from .background import BackgroundApi
 from .launch import LaunchApi
+from .window import WindowApi
 
 
 class LauncherApi(
@@ -22,6 +25,9 @@ class LauncherApi(
     LoadersApi,
     SkinsApi,
     DiagnosticsApi,
+    HomeApi,
+    BackgroundApi,
     LaunchApi,
+    WindowApi,
 ):
     """State and commands exposed to the page as ``window.pywebview.api``."""

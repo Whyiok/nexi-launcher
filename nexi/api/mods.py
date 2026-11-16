@@ -52,8 +52,8 @@ class ModsApi:
             "game": game, "loader": loader, "total": total, "error": "",
         }
 
-    def mods_install(self, project_id, loader, slug=None):
-        instance, game, detected = self._instance_game()
+    def mods_install(self, project_id, loader, slug=None, game_version=None):
+        instance, profile_game, detected = self._instance_game()
         if instance is None:
             return {"ok": False, "error": "No profile selected."}
         if detected == "any":
@@ -65,6 +65,7 @@ class ModsApi:
         self.busy = "mods"
         self._event("busy", task="mods", on=True)
         loader = str(loader or "any")
+        game = str(game_version or "") or profile_game
         root = instance["_root"]
         mods_dir = instance_mods_dir(root)
         where = f"Minecraft {game}" if game else "this version"
@@ -166,8 +167,8 @@ class ModsApi:
         self._status("mods", message)
         return {"ok": True, "message": message}
 
-    def mods_update(self, project_id, loader, slug=None):
-        instance, game, detected = self._instance_game()
+    def mods_update(self, project_id, loader, slug=None, game_version=None):
+        instance, profile_game, detected = self._instance_game()
         if instance is None:
             return {"ok": False, "error": "No profile selected."}
         if detected == "any":
@@ -179,6 +180,7 @@ class ModsApi:
         self.busy = "mods"
         self._event("busy", task="mods", on=True)
         loader = str(loader or "any")
+        game = str(game_version or "") or profile_game
         root = instance["_root"]
         mods_dir = instance_mods_dir(root)
         project = str(project_id or "")

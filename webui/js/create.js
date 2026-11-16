@@ -3,9 +3,9 @@
 /* ---------------------------------------------------------------- create */
 
 function resetCreateMode() {
-  if (!editSlug) return;
   editSlug = "";
-  // A fresh profile must not inherit the edited build's Minecraft version.
+  // A fresh profile never inherits a version picked for another profile or
+  // for a previous create, so nothing is preselected when this opens.
   versions.selected = "";
   $("#new-name").value = "";
   $("#create-title").textContent = "New profile";
@@ -84,6 +84,7 @@ function ensureVersionOptions() {
     versions.all = result.versions || [];
     versions.installed = new Set(result.installed || []);
     fillVersionSelect();
+    fillModsVersionFilter();
     renderVersions();
   });
 }
@@ -205,6 +206,7 @@ function loadVersions(force) {
     versions.loaded = true;
     versions.all = result.versions || [];
     versions.installed = new Set(result.installed || []);
+    fillModsVersionFilter();
     renderVersions();
     if (result.error) {
       screenStatus("create", `Could not load the Mojang version list: ${result.error}`, true);
@@ -248,8 +250,10 @@ function renderVersions() {
   }).slice(0, 600);
 
   versions.rows = rows;
-  if (!rows.some((row) => row.id === versions.selected)) {
-    versions.selected = rows.length ? rows[0].id : "";
+  // Never pick a version automatically: the list only highlights what the
+  // user clicked, and Create stays disabled until they pick one.
+  if (versions.selected && !rows.some((row) => row.id === versions.selected)) {
+    versions.selected = "";
   }
 
   if (!rows.length) {

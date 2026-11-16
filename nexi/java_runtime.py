@@ -25,7 +25,10 @@ def _java_runtime_intact(javaw: Path) -> bool:
     if not javaw.is_file():
         return False
     if platform.system() == "Windows":
-        return (javaw.parent.parent / "lib" / "jvm.cfg").is_file()
+        lib = javaw.parent.parent / "lib"
+        # Java 17+ runtimes keep jvm.cfg directly in lib\; the Java 8 legacy
+        # runtime (jre-legacy) uses the older lib\<arch>\jvm.cfg layout.
+        return (lib / "jvm.cfg").is_file() or any(lib.glob("*/jvm.cfg"))
     return True
 
 

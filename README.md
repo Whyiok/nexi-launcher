@@ -8,6 +8,24 @@ build is a single `nexi.exe` produced by PyInstaller.
 > Unofficial project. Not affiliated with Mojang, Microsoft or Modrinth.
 > You still need to own a copy of Minecraft to play online.
 
+## Download
+
+[**Download the latest release →**](https://github.com/Whyiok/nexi-launcher/releases/latest)
+
+Get `nexi.exe` from the Releases page and run it — no installer or Python
+installation is needed. Windows 10/11 x64 and the Microsoft Edge WebView2
+Runtime are required (Windows 11 includes it).
+
+## Screenshots
+
+| Home | Builds |
+| :---: | :---: |
+| [![Home screen](docs/screenshots/home.png)](docs/screenshots/home.png) | [![Builds and error notifications](docs/screenshots/profiles.png)](docs/screenshots/profiles.png) |
+
+| Settings |
+| :---: |
+| [![Settings](docs/screenshots/settings.png)](docs/screenshots/settings.png) |
+
 ## Features
 
 - **Isolated profiles** (Prism-style): each profile has its own game directory
@@ -20,22 +38,27 @@ build is a single `nexi.exe` produced by PyInstaller.
   build of an existing profile without recreating it.
 - **Loaders**: Fabric, Forge and NeoForge installed from their official
   installers.
-- **Mods**: Modrinth browser with infinite scroll (pages are prefetched before
-  you reach the bottom), multi-select batch install, per-profile browser state,
-  installed mod names and icons resolved from Modrinth or straight from the jar
-  files (works offline).
+- **Mods**: Modrinth browser with explicit Minecraft-version and mod-loader
+  filters that do not follow the selected profile, infinite scroll (pages are
+  prefetched before you reach the bottom), multi-select batch install,
+  per-profile browser state, installed mod names and icons resolved from
+  Modrinth or straight from the jar files (works offline). Mod updates live in
+  the profile pane, not in the browser.
 - **Resource packs, shaders and modpacks**: packs work on vanilla profiles;
   mods require a loader. Modpacks have their own page in the top bar, and
   `.mrpack`, CurseForge `.zip` and plain archives can be imported as new
   profiles.
 - **Accounts**: Microsoft (device-code OAuth), Ely.by (Yggdrasil password or
   OAuth2 + PKCE) and offline accounts, kept as a list you can reorder and
-  switch between.
+  switch between. Each profile can also pin its own account in Profile
+  settings; profiles left on the default use the active account.
 - **Automatic Java**: the Mojang runtime matching the selected version is
   reused or downloaded on demand.
 - **Profile tools**: duplicate, worlds backup, file verification, custom icon,
   a live Minecraft log viewer (`logs/latest.log` of the selected profile),
-  worlds and screenshots panes, Play / Stop / Restart.
+  worlds and screenshots panes, Play / Stop / Restart. The screenshots pane
+  shows live thumbnails, refreshes itself while it is open, previews a
+  screenshot in a lightbox and copies it to the clipboard.
 - **Skins**: a 3D preview that turns left and right, the classic/slim model
   toggle, a built-in default skin, and a PNG chooser. The skin page has its own
   account picker; offline accounts are greyed out. The chosen skin is applied
@@ -48,6 +71,15 @@ build is a single `nexi.exe` produced by PyInstaller.
   glows. A dark/light colour mode (dark by default) switches the whole
   interface between black and white surfaces, and the interface language can be
   set to English or Russian without a restart (the choice is remembered).
+- **Home / main menu**: the first tab shows a slowly panning blocky panorama,
+  the builds ordered by their last launch, the recently played worlds of every
+  profile and one large Play button for the default build. Clicking a build
+  makes it the default without leaving the page. The background can be
+  replaced in Settings with a GIF, MP4 or WebM file. On Minecraft 1.20+ a
+  world can be started straight into the game (Quick Play).
+- **Custom window chrome**: the native frame is replaced by a title bar drawn
+  by the page — the NEXI logo and name, minimize / maximize / close buttons,
+  double-click to maximize, and native edge resizing.
 - **Launcher log**: the launcher's own rotating diagnostic log is shown in
   Settings, with buttons to open the file or its folder.
 
@@ -99,6 +131,7 @@ nexi/
   loaders.py              Fabric / Forge / NeoForge builds and installers
   vanilla.py              vanilla install and file verification
   modpacks.py             `.zip` / `.mrpack` import helpers
+  media.py                loopback image/video server (previews, backgrounds)
   ms_auth.py              Microsoft OAuth and Minecraft services login
   ely_auth.py             Ely.by Yggdrasil, OAuth2 PKCE, authlib-injector
   skin_images.py          skin PNG handling and uploads
@@ -113,7 +146,10 @@ nexi/
     loaders.py            loader installation endpoint
     skins.py              skin preview, picker and upload
     diagnostics.py        launcher and network log panels
+    home.py               main menu data: recently played worlds
+    background.py         GIF / MP4 / WebM Home background
     launch.py             game process lifecycle
+    window.py             custom title bar window controls
 webui/index.html          single-page UI
 webui/style.css           design tokens and layout
 webui/i18n.js             English/Russian interface dictionary and DOM translator

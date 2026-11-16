@@ -25,6 +25,7 @@ function applyTheme(theme) {
   const brandIcon = document.querySelector(".brand-icon");
   if (brandIcon) brandIcon.src = THEME_BRAND_ICONS[next] || THEME_BRAND_ICONS.mint;
   startOrb();
+  if (typeof refreshHomePanorama === "function") refreshHomePanorama();
 }
 
 function applyMode(mode) {
@@ -33,6 +34,7 @@ function applyMode(mode) {
   activeMode = next;
   document.documentElement.dataset.mode = next;
   startOrb();
+  if (typeof refreshHomePanorama === "function") refreshHomePanorama();
 }
 
 function applyLanguage(language) {
@@ -47,6 +49,7 @@ function applyState(next) {
   const previous = S.instance ? S.instance.slug : null;
   saveBrowserState();
   S = next;
+  selectionConfirmed = S.selected;
   applyTheme(S.theme);
   applyMode(S.color_mode);
   applyLanguage(S.language);
@@ -58,6 +61,10 @@ function applyState(next) {
   updateScreenHeads();
   fillSettings();
   if (screen === "skin") loadSkin();
+  if (screen === "home") {
+    renderHome();
+    maybeReloadHome();
+  }
   if (previous !== (S.instance ? S.instance.slug : null)) resetDeleteConfirm();
   syncBusy();
   ensureScreenData();
@@ -99,6 +106,10 @@ function setScreen(name) {
     if (mods.kind !== "modpack") {
       mods.kind = "modpack";
       mods.key = "";
+      // The Modpacks page is global, so it never inherits the version or
+      // loader picked for the mods browser of a profile.
+      mods.loader = "any";
+      mods.game = "";
       mods.busy = false;
       mods.loadingMore = false;
       mods.searchSeq += 1;
@@ -106,6 +117,10 @@ function setScreen(name) {
   } else if (name === "mods" && mods.kind === "modpack") {
     mods.kind = modsAllowed() ? "mod" : "resourcepack";
     mods.key = "";
+    // Coming back from Modpacks starts on the profile's version and loader
+    // again, exactly like the profile pane's Browse buttons.
+    mods.loader = defaultModsLoader();
+    mods.game = defaultModsGame();
     mods.busy = false;
     mods.loadingMore = false;
     mods.searchSeq += 1;
@@ -118,9 +133,15 @@ function setScreen(name) {
   renderTabs();
   if (name !== "settings") stopLogsTimer();
   if (name !== "profiles") stopGameLogsTimer();
+  if (name !== "profiles") stopShotsTimer();
   if (name !== "skin") stopSkinView();
+  if (name !== "home") stopHomePanorama();
 
-  if (name === "profiles") {
+  if (name === "home") {
+    renderHome();
+    loadHome();
+    startHomePanorama();
+  } else if (name === "profiles") {
     renderProfiles();
   } else if (name === "create") {
     if (!versions.loaded && !versions.loading) loadVersions(false);
@@ -158,9 +179,14 @@ function renderTabs() {
 
 function updateScreenHeads() {
   const meta = CONTENT_KINDS[mods.kind] || CONTENT_KINDS.mod;
+  /* The version and loader shown here belong to the browser filters, not to
+     the selected profile, so switching profiles never changes the search. */
+  const target = mods.game ? `Minecraft ${mods.game}` : "all versions";
+  const loaderPart = ["mod", "modpack"].includes(mods.kind)
+    && mods.loader !== "any" ? ` · ${mods.loader}` : "";
   if (!S.instance) {
     $("#mods-sub").textContent = mods.kind === "modpack"
-      ? "Modrinth · modpacks · installs as a new profile"
+      ? `Modrinth · modpacks · ${target}${loaderPart} · installs as a new profile`
       : `Select a profile to manage its ${meta.plural}.`;
     $("#loaders-sub").textContent = "Select a profile to install a loader.";
     return;
@@ -168,12 +194,9 @@ function updateScreenHeads() {
   const inst = S.instance;
   const loader = inst.loader === "any"
     ? "vanilla" : (LOADER_LABELS[inst.loader] || inst.loader);
-  const target = mods.kind === "modpack"
-    ? "all versions" : `Minecraft ${inst.base}`;
-  const loaderPart = mods.kind === "mod"
-    ? ` · ${mods.loader === "any" ? "any loader" : mods.loader}` : "";
-  $("#mods-sub").textContent =
-    `Modrinth · ${meta.plural} · ${target}${loaderPart} · ${inst.name}`;
+  $("#mods-sub").textContent = mods.kind === "modpack"
+    ? `Modrinth · ${meta.plural} · ${target}${loaderPart}`
+    : `Modrinth · ${meta.plural} · ${target}${loaderPart} · ${inst.name}`;
   $("#loaders-sub").textContent =
     `${inst.name} · Minecraft ${inst.base} · currently ${loader === "vanilla" ? inst.version : loader}`;
 }

@@ -29,10 +29,61 @@ function spawnRipple(event) {
 
 let bound = false;
 
+function syncWindowMaximized(maximized) {
+  const button = $("#btn-win-max");
+  if (!button) return;
+  const use = button.querySelector("use");
+  if (use) use.setAttribute("href", maximized ? "#i-restore" : "#i-max");
+  button.title = maximized ? "Restore" : "Maximize";
+  button.setAttribute("aria-label", button.title);
+}
+
+async function toggleWindowMaximize() {
+  const result = await call("window_toggle_maximize");
+  if (result && result.ok) syncWindowMaximized(!!result.maximized);
+}
+
+/* Maximizing through Win+Up or by dragging to the top of the screen never
+   goes through our button, so the glyph is refreshed from the real window
+   state whenever the window changes size. */
+let maximizedSyncTimer = 0;
+
+function queueMaximizedSync() {
+  clearTimeout(maximizedSyncTimer);
+  maximizedSyncTimer = setTimeout(async () => {
+    const result = await call("window_state");
+    if (result && result.ok) syncWindowMaximized(!!result.maximized);
+  }, 120);
+}
+
 function bind() {
   if (bound) return;
   bound = true;
+  // The selected build is only highlighted while the launcher window is the
+  // one in front; alt-tabbing away drops the highlight.
+  const setWindowActive = (active) => {
+    document.documentElement.classList.toggle("window-inactive", !active);
+  };
+  window.addEventListener("focus", () => setWindowActive(true));
+  window.addEventListener("blur", () => {
+    setWindowActive(false);
+    if (typeof hideProfileTip === "function") hideProfileTip();
+  });
+  setWindowActive(document.hasFocus());
   document.addEventListener("pointerdown", spawnRipple);
+  $("#btn-win-min").addEventListener("click", () => call("window_minimize"));
+  $("#btn-win-max").addEventListener("click", toggleWindowMaximize);
+  $("#btn-win-close").addEventListener("click", () => call("window_close"));
+  const dragRegion = $(".titlebar-drag");
+  if (dragRegion) dragRegion.addEventListener("dblclick", toggleWindowMaximize);
+  $$("[data-window-resize]").forEach((node) => {
+    node.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      call("window_resize", node.dataset.windowResize);
+    });
+  });
   $("#tabs").addEventListener("click", (event) => {
     const tab = event.target.closest(".tab");
     if (tab && !tab.disabled) {
@@ -44,6 +95,33 @@ function bind() {
   $("#btn-new-profile").addEventListener("click", () => {
     resetCreateMode();
     setScreen("create");
+  });
+  $("#home-play").addEventListener("click", homePlay);
+  $("#home-new-build").addEventListener("click", () => {
+    resetCreateMode();
+    setScreen("create");
+  });
+  $("#home-builds").addEventListener("click", (event) => {
+    const play = event.target.closest("[data-home-play]");
+    if (play) {
+      event.stopPropagation();
+      homeStart(play.dataset.homePlay);
+      return;
+    }
+    const row = event.target.closest("[data-slug]");
+    if (row) selectHomeBuild(row.dataset.slug);
+  });
+  $("#home-builds").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.target.closest("button")) return;
+    const row = event.target.closest("[data-slug]");
+    if (!row) return;
+    event.preventDefault();
+    selectHomeBuild(row.dataset.slug);
+  });
+  $("#home-worlds").addEventListener("click", (event) => {
+    const row = event.target.closest("[data-world]");
+    if (row) homePlayWorld(row.dataset.slug, row.dataset.world);
   });
   $("#btn-empty-create").addEventListener("click", () => {
     resetCreateMode();
@@ -61,6 +139,8 @@ function bind() {
     hideProfileMenu();
     updateAllSegFills(true);
     updateAllSegHovers();
+    queueMaximizedSync();
+    if (typeof resizeHomePanorama === "function") resizeHomePanorama();
   });
 
   $("#player-name").addEventListener("keydown", (event) => {
@@ -92,6 +172,8 @@ function bind() {
     const option = event.target.closest("[data-lang-option]");
     if (option) changeLanguage(option.dataset.langOption);
   });
+  $("#btn-pick-background").addEventListener("click", pickBackground);
+  $("#btn-clear-background").addEventListener("click", clearBackground);
   $("#btn-play").addEventListener("click", play);
   $("#btn-stop").addEventListener("click", stopGame);
   $("#btn-restart").addEventListener("click", restartGame);
@@ -119,7 +201,12 @@ function bind() {
     hideProfileMenu();
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") hideProfileMenu();
+    if (event.key !== "Escape") return;
+    if (!$("#shot-viewer").classList.contains("hidden")) {
+      hideShotViewer();
+      return;
+    }
+    hideProfileMenu();
   });
   window.addEventListener("blur", hideProfileMenu);
 
@@ -144,6 +231,14 @@ function bind() {
     call("open_instance", "worlds"));
   $("#btn-pane-open-shots").addEventListener("click", () =>
     call("open_instance", "screenshots"));
+  $("#shot-viewer").addEventListener("click", (event) => {
+    if (event.target.closest("[data-shot-close]")) hideShotViewer();
+  });
+  $("#btn-shot-close").addEventListener("click", hideShotViewer);
+  $("#btn-shot-copy").addEventListener("click", () => copyShot(shots.open));
+  $("#btn-shot-open").addEventListener("click", () => {
+    if (shots.open) call("open_instance", "screenshots", shots.open.name);
+  });
   $("#btn-pane-open-game").addEventListener("click", () => call("open", "game"));
   $("#btn-pane-edit").addEventListener("click", openEditProfile);
   $("#btn-apply-version").addEventListener("click", applyVersionChange);
@@ -166,6 +261,9 @@ function bind() {
   $("#btn-pane-clear-icon").addEventListener("click", clearProfileIcon);
   $("#pane-ram-down").addEventListener("click", () => changePaneRam(-1));
   $("#pane-ram-up").addEventListener("click", () => changePaneRam(1));
+  $("#pane-account").addEventListener("change", (event) => {
+    changePaneAccount(event.target.value || "");
+  });
 
   $("#default-ram-down").addEventListener("click", () => changeDefaultRam(-1));
   $("#default-ram-up").addEventListener("click", () => changeDefaultRam(1));
@@ -243,6 +341,13 @@ function bind() {
     mods.searchedKey = "";
     searchMods();
   });
+  $("#mods-version").addEventListener("change", () => {
+    if (mods.busy) return;
+    mods.game = $("#mods-version").value || "";
+    updateScreenHeads();
+    mods.searchedKey = "";
+    searchMods();
+  });
   $("#kind-seg").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-kind]");
     if (button) setBrowserKind(button.dataset.kind);
@@ -259,8 +364,6 @@ function bind() {
   });
   $("#btn-mod-install").addEventListener("click", installMod);
   $("#btn-mod-uninstall").addEventListener("click", uninstallMod);
-  $("#btn-mod-update").addEventListener("click", updateMod);
-  $("#btn-mod-update-all").addEventListener("click", updateAllMods);
   $("#btn-mod-install-many").addEventListener("click", installSelected);
   $("#mod-list").addEventListener("scroll", maybeLoadMore);
   $("#btn-open-mods-folder").addEventListener("click", () => {
@@ -468,7 +571,8 @@ async function boot() {
   bind();
   initSegHover();
   await refreshState();
-  setScreen("profiles");
+  queueMaximizedSync();
+  setScreen("home");
   setInterval(pollOnce, 160);
   if (!S.instances.length) {
     setStatus("Create a profile to get started.");

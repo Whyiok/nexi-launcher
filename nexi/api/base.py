@@ -43,6 +43,9 @@ class BaseApi:
         self.language = language if language in ("en", "ru") else "en"
         self.java_path = str(self._saved("java", "") or "")
         config.JAVA_OVERRIDE = self.java_path
+        # Home background: {"file", "name", "kind"} or {} for the panorama.
+        background = self._saved("background", {})
+        self._background = background if isinstance(background, dict) else {}
         ms = self._saved("ms", {})
         if not isinstance(ms, dict):
             ms = {}
@@ -85,6 +88,7 @@ class BaseApi:
         self._lock = threading.RLock()
         self._launching = set()
         self._game_processes = {}
+        self._game_stop_requested = set()
         self._game_lock = threading.RLock()
         self._log_path = None
         self._log_pos = 0
@@ -389,6 +393,7 @@ class BaseApi:
                 "language": self.language,
                 "java": self.java_path,
                 "instance": self.selected_slug,
+                "background": self._background,
                 "ms": {"client_id": self._ms_client_id},
                 "ely": {"oauth": {
                     "client_id": self._ely_oauth_client_id,

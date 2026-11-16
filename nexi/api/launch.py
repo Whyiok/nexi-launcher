@@ -1,15 +1,36 @@
 """Game process lifecycle."""
 
 import os
+import re
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 from ..ely_auth import ensure_authlib_injector
-from ..instances import instance_game_dir, instance_label
+from ..instances import (instance_game_dir, instance_label,
+                         write_instance)
 from ..java_runtime import ensure_java
+from ..logging_setup import log
 from ..vanilla import fetch_missing_libraries
-from ..versions import build_command, load_version, version_meta
+from ..versions import (build_command, game_version_of, load_version,
+                        version_meta)
+
+
+def quick_play_supported(version_id: str) -> bool:
+    """Quick Play arguments ship with Minecraft 1.20 and newer releases."""
+    match = re.match(r"^(\d+)\.(\d+)", str(version_id or ""))
+    if not match:
+        return False
+    return (int(match.group(1)), int(match.group(2))) >= (1, 20)
+
+
+def world_for_quick_play(game_dir, world: str) -> str:
+    """A safe saves/ folder name, or "" when it is gone or not a plain name."""
+    name = str(world or "")
+    if not name or name in (".", "..") or Path(name).name != name:
+        return ""
+    return name if (Path(game_dir) / "saves" / name).is_dir() else ""
 
 
 class LaunchApi:
@@ -64,12 +85,27 @@ class LaunchApi:
             process.wait()
         except Exception:
             pass
+        code = process.returncode
         with self._game_lock:
             if self._game_processes.get(slug) is not process:
                 return
             self._game_processes.pop(slug, None)
-        self._event("gameproc", running=False, slug=slug,
-                    message="The game has closed.")
+            stopped = process.pid in self._game_stop_requested
+            self._game_stop_requested.discard(process.pid)
+        if stopped:
+            self._event("gameproc", running=False, slug=slug,
+                        message="Game stopped.")
+        elif code:
+            # A non-zero exit that we did not ask for is a crash: keep the
+            # status bar quiet and put a notification in the lower-right.
+            log.warning("game %r exited with code %s", slug, code)
+            self._event("gameproc", running=False, slug=slug, crashed=True,
+                        exit_code=code,
+                        message=f"Minecraft closed unexpectedly "
+                                f"(exit code {code}). Check the game log.")
+        else:
+            self._event("gameproc", running=False, slug=slug,
+                        message="The game has closed.")
 
     def game_stop(self):
         instance = self.active_instance()
@@ -84,6 +120,10 @@ class LaunchApi:
             self._event("gameproc", running=False, slug=slug,
                         message="Game stopped.")
             return {"ok": True, "message": "Game stopped."}
+        with self._game_lock:
+            # Mark the kill as intentional so the watcher does not report the
+            # taskkill exit code as a crash.
+            self._game_stop_requested.add(process.pid)
         self._kill_game(process)
         with self._game_lock:
             stopped = self._game_processes.get(slug) is process
@@ -104,7 +144,7 @@ class LaunchApi:
         self.game_stop()
         return self.play()
 
-    def play(self):
+    def play(self, world=""):
         instance = self.active_instance()
         slug = str(instance.get("_slug", "")) if instance is not None else ""
         if instance is None:
@@ -113,7 +153,10 @@ class LaunchApi:
             return {"ok": False, "error": "The game is already starting."}
         if self._instance_running(slug):
             return {"ok": False, "error": "This profile is already running."}
-        account = self._active_account()
+        # A profile may pin its own account; otherwise the account active in
+        # Settings is used. A pinned account that was removed falls back too.
+        account = (self._account_by_id(instance.get("account", ""))
+                   or self._active_account())
         auth = None
         if account is not None and account["type"] == "microsoft":
             token = self._ms_refresh(account)
@@ -173,8 +216,21 @@ class LaunchApi:
             game_dir.mkdir(parents=True, exist_ok=True)
             if auth and auth.get("kind") == "ely":
                 auth["authlib"] = str(ensure_authlib_injector())
+            # Home's recent worlds launch straight into a save when the
+            # version supports Quick Play (1.20+); older versions just open
+            # the main menu.
+            extra_args = []
+            target_world = world_for_quick_play(game_dir, world)
+            if target_world:
+                if quick_play_supported(game_version_of(meta)):
+                    extra_args = ["--quickPlaySingleplayer", target_world]
+                else:
+                    self._game_line(
+                        "This version cannot open a world directly — "
+                        "starting the main menu.")
             command, missing = build_command(
-                version, meta, player, int(self.ram), game_dir, auth=auth)
+                version, meta, player, int(self.ram), game_dir, auth=auth,
+                extra_args=extra_args)
             if missing:
                 # Loader installs can leave a profile whose version JSON lists
                 # libraries that never arrived (an interrupted installer, a
@@ -185,7 +241,8 @@ class LaunchApi:
                     "downloading them…")
                 fetch_missing_libraries(version, meta, self._game_line)
                 command, missing = build_command(
-                    version, meta, player, int(self.ram), game_dir, auth=auth)
+                    version, meta, player, int(self.ram), game_dir, auth=auth,
+                    extra_args=extra_args)
             if missing:
                 shown = ", ".join(missing[:3])
                 extra = "" if len(missing) <= 3 \
@@ -206,6 +263,10 @@ class LaunchApi:
                 creationflags=subprocess.CREATE_NO_WINDOW
                 if os.name == "nt" else 0,
             )
+            # Home shows the most recently played build first.
+            instance["last_played"] = time.time()
+            write_instance(instance["_root"], instance)
+            self.refresh_instances(select=slug)
         except Exception as exc:
             self._game_line(f"ERROR: {exc}")
             self._launching.discard(slug)

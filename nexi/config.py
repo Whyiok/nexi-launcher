@@ -41,6 +41,9 @@ LOG_FILE = LOG_DIR / "launcher.log"
 SKINS_DIR = DATA_DIR / "skins"
 
 
+BACKGROUNDS_DIR = DATA_DIR / "backgrounds"
+
+
 INSTANCES_DIR = DATA_DIR / "instances"
 
 

@@ -13,8 +13,8 @@ function syncKindUi() {
     modButton.title = modsAllowed() ? ""
       : "This profile is vanilla — install a mod loader first";
   }
-  $("#mods-seg").classList.toggle("hidden", mods.kind !== "mod");
-  $("#btn-mod-update-all").classList.toggle("hidden", mods.kind !== "mod");
+  $("#mods-seg").classList.toggle("hidden",
+    !["mod", "modpack"].includes(mods.kind));
   $("#btn-open-mods-folder").classList.toggle("hidden",
     mods.kind === "modpack");
   $("#btn-open-folder-label").textContent = mods.kind === "resourcepack"
@@ -43,6 +43,7 @@ function resetBrowser() {
   $("#mods-query").value = "";
   renderHits();
   showModInfo(null);
+  syncMods();
 }
 
 function saveBrowserState() {
@@ -51,6 +52,7 @@ function saveBrowserState() {
   browserStates.set(mods.profile, {
     kind: mods.kind,
     loader: mods.loader,
+    game: mods.game,
     query: $("#mods-query").value,
     hits: mods.hits,
     selected: mods.selected,
@@ -67,9 +69,10 @@ function saveBrowserState() {
   }
 }
 
-function restoreBrowserState(saved, detected) {
+function restoreBrowserState(saved) {
   mods.kind = CONTENT_KINDS[saved.kind] ? saved.kind : "mod";
-  mods.loader = saved.loader || detected;
+  mods.loader = MOD_LOADERS.includes(saved.loader) ? saved.loader : "any";
+  mods.game = saved.game || "";
   mods.hits = saved.hits || [];
   mods.selected = Number.isInteger(saved.selected) ? saved.selected : -1;
   mods.installed = saved.installed || null;
@@ -83,12 +86,10 @@ function restoreBrowserState(saved, detected) {
   renderHits();
   showModInfo(mods.hits[mods.selected] || null);
   if (mods.selected >= 0) refreshModStatus();
+  else syncMods();
 }
 
 function initMods(forceKind) {
-  const detected = S.instance
-    && ["fabric", "forge", "neoforge"].includes(S.instance.loader)
-    ? S.instance.loader : "any";
   if (forceKind && CONTENT_KINDS[forceKind] && mods.kind !== forceKind) {
     mods.kind = forceKind;
     mods.key = "";
@@ -99,12 +100,27 @@ function initMods(forceKind) {
     mods.profile = profile;
     if (profile) {
       const saved = browserStates.get(profile);
-      if (saved && saved.kind === mods.kind) {
-        restoreBrowserState(saved, detected);
+      if (saved && saved.kind === mods.kind && mods.kind !== "modpack") {
+        restoreBrowserState(saved);
+      } else if (mods.kind === "modpack") {
+        // The Modpacks page is global, not tied to a profile, so it never
+        // inherits a profile's version or loader.
+        mods.loader = "any";
+        mods.game = "";
+        resetBrowser();
       } else {
-        mods.loader = detected;
+        // A browser opened for a profile starts on that profile's version and
+        // loader so the results are compatible; both stay user-editable.
+        mods.loader = defaultModsLoader();
+        mods.game = defaultModsGame();
         resetBrowser();
       }
+    } else {
+      // The Modpacks tab has no profile of its own, so it never keeps the
+      // filters of the profile the user visited before it.
+      mods.loader = "any";
+      mods.game = "";
+      resetBrowser();
     }
     mods.key = browserKey();
   } else if (mods.key !== browserKey()) {
@@ -117,11 +133,50 @@ function initMods(forceKind) {
     resetBrowser();
     mods.key = browserKey();
   }
+  ensureVersionOptions();
+  fillModsVersionFilter();
   setSeg("#kind-seg", mods.kind);
   setSeg("#mods-seg", mods.loader);
   syncKindUi();
   updateScreenHeads();
   syncMods();
+}
+
+function defaultModsLoader() {
+  return S.instance
+    && ["fabric", "forge", "neoforge"].includes(S.instance.loader)
+    ? S.instance.loader : "any";
+}
+
+function defaultModsGame() {
+  return S.instance ? String(S.instance.base || "") : "";
+}
+
+function fillModsVersionFilter() {
+  const select = $("#mods-version");
+  if (!select) return;
+  const installed = versions.installed || new Set();
+  const rows = (versions.all || []).filter(
+    (entry) => entry.type === "release" || installed.has(entry.id));
+  // Keep the current pick (for example a snapshot profile) selectable even if
+  // the Mojang list has not loaded yet or does not list it as a release.
+  if (mods.game && !rows.some((entry) => entry.id === mods.game)) {
+    rows.unshift({ id: mods.game, type: "installed" });
+  }
+  const signature = `${rows.length}|${rows[0] ? rows[0].id : ""}`;
+  if (select.dataset.signature !== signature) {
+    select.dataset.signature = signature;
+    select.replaceChildren();
+    const any = elem("option", "", "Any version");
+    any.value = "";
+    select.appendChild(any);
+    for (const entry of rows) {
+      const option = elem("option", "", entry.id);
+      option.value = entry.id;
+      select.appendChild(option);
+    }
+  }
+  select.value = mods.game;
 }
 
 function setBrowserKind(kind) {
@@ -157,9 +212,19 @@ function openBrowser(kind) {
     setScreen("modpacks");
     return;
   }
-  if (CONTENT_KINDS[kind] && mods.kind !== kind) {
+  if (CONTENT_KINDS[kind]) {
+    // Browse mods / resource packs / shaders in the profile pane always opens
+    // on that profile's version and loader so the results are compatible with
+    // it. A remembered browser state must not override that choice.
+    if (mods.profile !== instanceKey()) {
+      saveBrowserState();
+      mods.profile = instanceKey();
+    }
+    browserStates.delete(instanceKey());
     mods.kind = kind;
     mods.key = "";
+    mods.loader = defaultModsLoader();
+    mods.game = defaultModsGame();
     resetBrowser();
     setSeg("#kind-seg", kind);
     syncKindUi();
@@ -190,7 +255,7 @@ async function searchMods(more = false) {
   renderHits();
   syncMods();
   const result = await call("content_search", mods.kind, mods.query || "",
-                            mods.loader, mods.offset);
+                            mods.loader, mods.offset, mods.game);
   if (request !== mods.searchSeq) return;
   if (more) mods.loadingMore = false;
   else mods.busy = false;
@@ -214,7 +279,7 @@ async function searchMods(more = false) {
     }
   }
   renderHits();
-  if (mods.selected >= 0) applyHitSelection();
+  applyHitSelection();
   const meta = CONTENT_KINDS[mods.kind] || CONTENT_KINDS.mod;
   if (!mods.hits.length) {
     screenStatus("mods", "Nothing found — try another name"
@@ -342,7 +407,12 @@ function showModInfo(hit) {
     $("#mod-author").textContent = "";
     $("#mod-desc").textContent = "";
     holder.replaceChildren();
+    // Drop the previous item's installed state and ignore any status call
+    // that is still in flight, so Uninstall/Update cannot reappear while
+    // nothing is selected.
     mods.installed = null;
+    mods.statusSeq += 1;
+    mods.statusLoading = false;
   }
 }
 
@@ -372,17 +442,15 @@ async function refreshModStatus() {
 function syncMods() {
   const busy = mods.busy || mods.statusLoading || !!S.busy;
   const hasHit = mods.selected >= 0 && !!mods.hits[mods.selected];
-  const installed = !!mods.installed && mods.kind !== "modpack";
+  const installed = hasHit && !!mods.installed && mods.kind !== "modpack";
   const needsProfile = mods.kind !== "modpack";
   $("#btn-mod-search").disabled = busy || (needsProfile && !S.instance);
-  $("#btn-mod-update-all").disabled = busy || !S.instance
-    || mods.kind !== "mod";
   $("#btn-mod-install").classList.toggle("hidden", installed);
+  // Nothing selected means nothing to manage: no Uninstall row.
   $("#mod-manage").classList.toggle("hidden",
     mods.kind === "modpack" || !installed);
   $("#btn-mod-install").disabled = busy || !hasHit;
   $("#btn-mod-uninstall").disabled = busy || !installed;
-  $("#btn-mod-update").disabled = busy || !installed;
   syncBatch();
 }
 
@@ -397,7 +465,7 @@ async function installMod() {
     : `Preparing ${hit.title}…`);
   syncMods();
   const result = await call("content_install", mods.kind, hit.project_id,
-                            mods.loader, hit.slug || "");
+                            mods.loader, hit.slug || "", mods.game);
   mods.busy = false;
   syncMods();
   if (mods.kind === "modpack" && result.ok) {
@@ -428,7 +496,7 @@ async function installSelected() {
     screenStatus("mods",
       `Downloading ${hit.title} (${index + 1}/${hits.length})…`);
     const result = await call("content_install", mods.kind, hit.project_id,
-                              mods.loader, hit.slug || "");
+                              mods.loader, hit.slug || "", mods.game);
     if (result.ok) {
       done += 1;
       mods.checked.delete(hit.project_id);
@@ -465,34 +533,4 @@ async function uninstallMod() {
     await refreshModStatus();
     await loadProfileContents(true);
   }
-}
-
-async function updateMod() {
-  if (!S.instance || mods.busy) return;
-  const hit = mods.hits[mods.selected];
-  if (!hit) return;
-  mods.busy = true;
-  screenStatus("mods", `Checking ${hit.title}…`);
-  syncMods();
-  const result = await call("content_update", mods.kind, hit.project_id,
-                            mods.loader, hit.slug || "");
-  mods.busy = false;
-  syncMods();
-  screenStatus("mods", result.message || result.error || "Done.", !result.ok);
-  if (result.ok) {
-    await refreshModStatus();
-    await loadProfileContents(true);
-  }
-}
-
-async function updateAllMods() {
-  if (!S.instance || mods.busy) return;
-  mods.busy = true;
-  screenStatus("mods", "Checking installed mods…");
-  syncMods();
-  const result = await call("mods_update_all", mods.loader);
-  mods.busy = false;
-  syncMods();
-  screenStatus("mods", result.message || result.error || "Done.", !result.ok);
-  if (result.ok) refreshModStatus();
 }

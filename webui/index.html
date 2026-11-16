@@ -16,6 +16,17 @@
     <path d="M12 3.4 20 8v8l-8 4.6L4 16V8l8-4.6Z"/>
     <path d="m4 8 8 4.6L20 8M12 12.6v8"/>
   </symbol>
+  <symbol id="i-home" viewBox="0 0 24 24">
+    <path d="M4.2 10.2 12 4l7.8 6.2v7.6c0 .9-.7 1.6-1.6 1.6H5.8c-.9 0-1.6-.7-1.6-1.6v-7.6Z"/>
+    <path d="M9.8 19.4v-5.2h4.4v5.2"/>
+  </symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24">
+    <rect x="7" y="7" width="10" height="10" rx="2"/>
+  </symbol>
+  <symbol id="i-world" viewBox="0 0 24 24">
+    <path d="m12 3.6 7.4 4.2v8.4L12 20.4l-7.4-4.2V7.8L12 3.6Z"/>
+    <path d="m4.6 7.8 7.4 4.2 7.4-4.2M12 12v8.4"/>
+  </symbol>
   <symbol id="i-plus" viewBox="0 0 24 24">
     <path d="M12 5v14M5 12h14"/>
   </symbol>
@@ -49,6 +60,14 @@
     <path d="M5 7h14M10 7V5.2h4V7M7 7l.9 12.1c0 .5.4.9.9.9h6.4c.5 0 .9-.4.9-.9L17 7"/>
   </symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></symbol>
+  <symbol id="i-min" viewBox="0 0 24 24"><path d="M6.4 12h11.2"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24">
+    <rect x="6.2" y="6.2" width="11.6" height="11.6" rx="1.3"/>
+  </symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24">
+    <rect x="5.4" y="8.2" width="10.4" height="10.4" rx="1.2"/>
+    <path d="M9.4 8.2V6.6c0-.7.5-1.2 1.2-1.2h6.6c.7 0 1.2.5 1.2 1.2v6.6c0 .7-.5 1.2-1.2 1.2h-1.6"/>
+  </symbol>
   <symbol id="i-gear" viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="3"/>
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
@@ -78,11 +97,16 @@
     <circle cx="9" cy="9.6" r="1.5"/>
     <path d="m5.4 16.6 4.4-4 3.1 2.7 2.3-2.1 3.4 3.4"/>
   </symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24">
+    <path d="M12 3.8 21 20H3L12 3.8Z"/>
+    <path d="M12 9.4v4.8"/>
+    <path d="M12 17.1v.1"/>
+  </symbol>
 </svg>
 
 <div class="app">
-  <header class="topbar">
-    <div class="topbar-left">
+  <header class="titlebar">
+    <div class="titlebar-drag pywebview-drag-region">
       <img class="brand-icon" src="star_icon.svg" alt=""
            aria-hidden="true">
       <div class="brand">
@@ -91,7 +115,26 @@
       </div>
       <canvas class="orb" aria-hidden="true"></canvas>
     </div>
+    <div class="titlebar-controls">
+      <button class="titlebar-btn" id="btn-win-min" type="button"
+              title="Minimize" aria-label="Minimize">
+        <svg class="icon"><use href="#i-min"/></svg>
+      </button>
+      <button class="titlebar-btn" id="btn-win-max" type="button"
+              title="Maximize" aria-label="Maximize">
+        <svg class="icon"><use href="#i-max"/></svg>
+      </button>
+      <button class="titlebar-btn close" id="btn-win-close" type="button"
+              title="Close" aria-label="Close">
+        <svg class="icon"><use href="#i-x"/></svg>
+      </button>
+    </div>
+  </header>
+  <header class="topbar">
     <nav class="tabs" id="tabs" aria-label="Sections">
+      <button class="tab" data-screen="home" type="button">
+        <svg class="icon"><use href="#i-home"/></svg><span>Home</span>
+      </button>
       <button class="tab" data-screen="profiles" type="button">
         <svg class="icon"><use href="#i-builds"/></svg><span>Profiles</span>
       </button>
@@ -135,6 +178,45 @@
     </aside>
 
     <div class="screen-stack">
+
+    <!-- Home ----------------------------------------------------------- -->
+    <section class="screen home-screen" id="screen-home">
+      <canvas class="home-panorama" id="home-panorama" aria-hidden="true"></canvas>
+      <img class="home-bg-media" id="home-bg-image" alt="" hidden>
+      <video class="home-bg-media" id="home-bg-video" muted loop playsinline
+             preload="auto" hidden></video>
+      <div class="home-scrim" aria-hidden="true"></div>
+      <div class="home-panel">
+        <div class="home-hero">
+          <span class="eyebrow">MAIN MENU</span>
+          <h1 class="home-title" id="home-title">Nexi</h1>
+          <p class="home-meta" id="home-meta"></p>
+        </div>
+        <button class="home-play" id="home-play" type="button">
+          <span class="home-play-glyph">
+            <svg class="icon"><use href="#i-play" id="home-play-icon"/></svg>
+          </span>
+          <span class="home-play-label" id="home-play-label">Play</span>
+        </button>
+        <div class="home-scroll">
+          <section class="home-section">
+            <div class="home-section-head">
+              <span class="eyebrow">BUILDS</span>
+              <button class="home-link" id="home-new-build" type="button">
+                <svg class="icon"><use href="#i-plus"/></svg>New build
+              </button>
+            </div>
+            <div class="home-builds" id="home-builds"></div>
+          </section>
+          <section class="home-section">
+            <div class="home-section-head">
+              <span class="eyebrow">RECENT WORLDS</span>
+            </div>
+            <div class="home-worlds" id="home-worlds"></div>
+          </section>
+        </div>
+      </div>
+    </section>
 
     <!-- Profiles ------------------------------------------------------- -->
     <section class="screen" id="screen-profiles">
@@ -216,14 +298,14 @@
                     <div class="pane-sub" id="pane-mods-sub">—</div>
                   </div>
                   <div class="pane-actions">
-                    <button class="btn ghost sm" id="btn-pane-update-all" type="button">
-                      Update all
+                    <button class="btn ghost" id="btn-pane-update-all" type="button">
+                      <svg class="icon"><use href="#i-refresh"/></svg>Update all
                     </button>
-                    <button class="btn ghost sm" id="btn-pane-browse-mods" type="button">
-                      Browse mods
+                    <button class="btn ghost" id="btn-pane-browse-mods" type="button">
+                      <svg class="icon"><use href="#i-mods"/></svg>Browse mods
                     </button>
-                    <button class="btn ghost sm" id="btn-pane-open-mods" type="button">
-                      Open folder
+                    <button class="btn ghost" id="btn-pane-open-mods" type="button">
+                      <svg class="icon"><use href="#i-folder"/></svg>Open folder
                     </button>
                   </div>
                 </div>
@@ -237,11 +319,11 @@
                     <div class="pane-sub" id="pane-rp-sub">—</div>
                   </div>
                   <div class="pane-actions">
-                    <button class="btn ghost sm" id="btn-pane-browse-rp" type="button">
-                      Browse packs
+                    <button class="btn ghost" id="btn-pane-browse-rp" type="button">
+                      <svg class="icon"><use href="#i-image"/></svg>Browse packs
                     </button>
-                    <button class="btn ghost sm" id="btn-pane-open-rp" type="button">
-                      Open folder
+                    <button class="btn ghost" id="btn-pane-open-rp" type="button">
+                      <svg class="icon"><use href="#i-folder"/></svg>Open folder
                     </button>
                   </div>
                 </div>
@@ -255,11 +337,11 @@
                     <div class="pane-sub" id="pane-shaders-sub">—</div>
                   </div>
                   <div class="pane-actions">
-                    <button class="btn ghost sm" id="btn-pane-browse-shaders" type="button">
-                      Browse shaders
+                    <button class="btn ghost" id="btn-pane-browse-shaders" type="button">
+                      <svg class="icon"><use href="#i-layers"/></svg>Browse shaders
                     </button>
-                    <button class="btn ghost sm" id="btn-pane-open-shaders" type="button">
-                      Open folder
+                    <button class="btn ghost" id="btn-pane-open-shaders" type="button">
+                      <svg class="icon"><use href="#i-folder"/></svg>Open folder
                     </button>
                   </div>
                 </div>
@@ -273,11 +355,11 @@
                     <div class="pane-sub" id="pane-worlds-sub">—</div>
                   </div>
                   <div class="pane-actions">
-                    <button class="btn ghost sm" id="btn-pane-backup" type="button">
-                      Backup worlds
+                    <button class="btn ghost" id="btn-pane-backup" type="button">
+                      <svg class="icon"><use href="#i-archive"/></svg>Backup worlds
                     </button>
-                    <button class="btn ghost sm" id="btn-pane-open-worlds" type="button">
-                      Open folder
+                    <button class="btn ghost" id="btn-pane-open-worlds" type="button">
+                      <svg class="icon"><use href="#i-folder"/></svg>Open folder
                     </button>
                   </div>
                 </div>
@@ -291,8 +373,8 @@
                     <div class="pane-sub" id="pane-shots-sub">—</div>
                   </div>
                   <div class="pane-actions">
-                    <button class="btn ghost sm" id="btn-pane-open-shots" type="button">
-                      Open folder
+                    <button class="btn ghost" id="btn-pane-open-shots" type="button">
+                      <svg class="icon"><use href="#i-folder"/></svg>Open folder
                     </button>
                   </div>
                 </div>
@@ -308,10 +390,10 @@
                     <div class="pane-sub path" id="game-logs-sub">logs/latest.log</div>
                   </div>
                   <div class="pane-actions">
-                    <button class="btn ghost sm" id="btn-open-game-log-folder"
-                            type="button">Folder</button>
-                    <button class="btn ghost sm" id="btn-clear-game-logs"
-                            type="button">Clear view</button>
+                    <button class="btn ghost" id="btn-open-game-log-folder"
+                            type="button"><svg class="icon"><use href="#i-folder"/></svg>Folder</button>
+                    <button class="btn ghost" id="btn-clear-game-logs"
+                            type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear view</button>
                   </div>
                 </div>
                 <div class="log console" id="game-log-console"></div>
@@ -328,10 +410,11 @@
                   <div class="pane-settings">
                     <div class="setting-row">
                       <div class="setting-text">
-                        <span class="setting-name">Player</span>
-                        <span class="hint">Shared across profiles</span>
+                        <span class="setting-name">Account</span>
+                        <span class="hint">Used when this profile starts the game</span>
                       </div>
-                      <span class="setting-value" id="pane-player">Player</span>
+                      <select class="input" id="pane-account"
+                              aria-label="Account"></select>
                     </div>
                     <div class="setting-row">
                       <div class="setting-text">
@@ -391,11 +474,11 @@
                         <span class="hint">PNG, JPG, WEBP, GIF or BMP</span>
                       </div>
                       <div class="pane-actions">
-                        <button class="btn ghost sm" id="btn-pane-icon" type="button">
-                          Set icon
+                        <button class="btn ghost" id="btn-pane-icon" type="button">
+                          <svg class="icon"><use href="#i-image"/></svg>Set icon
                         </button>
-                        <button class="btn ghost sm" id="btn-pane-clear-icon" type="button">
-                          Remove
+                        <button class="btn ghost" id="btn-pane-clear-icon" type="button">
+                          <svg class="icon"><use href="#i-x"/></svg>Remove
                         </button>
                       </div>
                     </div>
@@ -404,15 +487,15 @@
                         <span class="setting-name">Game folder</span>
                         <span class="hint" id="pane-path">—</span>
                       </div>
-                      <button class="btn ghost sm" id="btn-pane-open-game" type="button">
-                        Open
+                      <button class="btn ghost" id="btn-pane-open-game" type="button">
+                        <svg class="icon"><use href="#i-folder"/></svg>Open
                       </button>
                     </div>
                     <div class="pane-actions pane-settings-actions">
-                      <button class="btn ghost sm" id="btn-pane-edit" type="button">
+                      <button class="btn ghost" id="btn-pane-edit" type="button">
                         <svg class="icon"><use href="#i-edit"/></svg>Edit profile
                       </button>
-                      <button class="btn ghost sm" id="btn-pane-settings" type="button">
+                      <button class="btn ghost" id="btn-pane-settings" type="button">
                         <svg class="icon"><use href="#i-gear"/></svg>All settings
                       </button>
                     </div>
@@ -499,9 +582,6 @@
           <p class="screen-sub" id="mods-sub">Search Modrinth by name.</p>
         </div>
         <div class="toolbar-tight">
-          <button class="btn ghost" id="btn-mod-update-all" type="button">
-            <svg class="icon"><use href="#i-refresh"/></svg>Update all
-          </button>
           <button class="btn ghost" id="btn-open-mods-folder" type="button">
             <svg class="icon"><use href="#i-folder"/></svg><span
               id="btn-open-folder-label">Open mods folder</span>
@@ -521,6 +601,9 @@
           <button data-loader="forge" type="button">Forge</button>
           <button data-loader="neoforge" type="button">NeoForge</button>
         </div>
+        <select class="input" id="mods-version" aria-label="Minecraft version">
+          <option value="">Any version</option>
+        </select>
         <input class="input grow" id="mods-query" placeholder="Search by name"
                spellcheck="false" autocomplete="off">
         <button class="btn ghost" id="btn-mod-search" type="button">Search</button>
@@ -549,8 +632,6 @@
             <div class="mod-action-row hidden" id="mod-manage">
               <button class="btn danger" id="btn-mod-uninstall" type="button"
                       disabled>Uninstall</button>
-              <button class="btn primary" id="btn-mod-update" type="button"
-                      disabled>Update</button>
             </div>
           </div>
         </aside>
@@ -948,6 +1029,25 @@
                         data-i18n-skip>Русский</button>
               </div>
             </div>
+
+            <div class="setting-row">
+              <div class="setting-text">
+                <span class="setting-name">Home background</span>
+                <p class="hint">A GIF, MP4 or WebM clip behind the main menu.
+                   Leave it empty to keep the animated panorama.</p>
+              </div>
+              <div class="background-actions">
+                <span class="count path background-name" id="background-name">Panorama</span>
+                <div class="background-buttons">
+                  <button class="btn ghost" id="btn-pick-background"
+                          type="button" title="Choose a background…">
+                    <svg class="icon"><use href="#i-folder"/></svg>Choose…
+                  </button>
+                  <button class="link" id="btn-clear-background"
+                          type="button">Use panorama</button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -961,12 +1061,12 @@
             <p class="hint">Diagnostic log of the launcher itself. It rotates
                automatically and never contains passwords or account tokens.</p>
             <div class="pane-actions">
-              <button class="btn ghost sm" id="btn-open-logs-folder"
-                      type="button">Folder</button>
-              <button class="btn ghost sm" id="btn-open-log-file"
-                      type="button">File</button>
-              <button class="btn ghost sm" id="btn-clear-logs"
-                      type="button">Clear view</button>
+              <button class="btn ghost" id="btn-open-logs-folder"
+                      type="button"><svg class="icon"><use href="#i-folder"/></svg>Folder</button>
+              <button class="btn ghost" id="btn-open-log-file"
+                      type="button"><svg class="icon"><use href="#i-logs"/></svg>File</button>
+              <button class="btn ghost" id="btn-clear-logs"
+                      type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear view</button>
             </div>
           </div>
         </section>
@@ -986,12 +1086,12 @@
                what came back. When something fails, copy this report — it shows
                exactly which host is blocked on this network.</p>
             <div class="pane-actions">
-              <button class="btn ghost sm" id="btn-net-check"
-                      type="button">Run check</button>
-              <button class="btn ghost sm" id="btn-net-copy"
-                      type="button">Copy report</button>
-              <button class="btn ghost sm" id="btn-net-clear"
-                      type="button">Clear log</button>
+              <button class="btn ghost" id="btn-net-check"
+                      type="button"><svg class="icon"><use href="#i-refresh"/></svg>Run check</button>
+              <button class="btn ghost" id="btn-net-copy"
+                      type="button"><svg class="icon"><use href="#i-copy"/></svg>Copy report</button>
+              <button class="btn ghost" id="btn-net-clear"
+                      type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear log</button>
             </div>
           </div>
         </section>
@@ -1078,6 +1178,16 @@
   </footer>
 </div>
 
+<!-- The native frame is gone, so these strips start a native resize. -->
+<div class="window-resize top" data-window-resize="top" aria-hidden="true"></div>
+<div class="window-resize bottom" data-window-resize="bottom" aria-hidden="true"></div>
+<div class="window-resize left" data-window-resize="left" aria-hidden="true"></div>
+<div class="window-resize right" data-window-resize="right" aria-hidden="true"></div>
+<div class="window-resize topleft" data-window-resize="topleft" aria-hidden="true"></div>
+<div class="window-resize topright" data-window-resize="topright" aria-hidden="true"></div>
+<div class="window-resize bottomleft" data-window-resize="bottomleft" aria-hidden="true"></div>
+<div class="window-resize bottomright" data-window-resize="bottomright" aria-hidden="true"></div>
+
 <div class="profile-tip" id="profile-tip" role="tooltip"></div>
 
 <div class="ctx-menu" id="profile-menu" role="menu" aria-label="Profile actions">
@@ -1117,12 +1227,40 @@
   </button>
 </div>
 
+<div class="shot-viewer hidden" id="shot-viewer" role="dialog"
+     aria-modal="true" aria-label="Screenshot preview">
+  <div class="shot-viewer-backdrop" data-shot-close></div>
+  <figure class="shot-viewer-frame">
+    <img id="shot-viewer-img" alt="">
+    <figcaption class="shot-viewer-bar">
+      <span class="shot-viewer-name" id="shot-viewer-name"></span>
+      <span class="pane-actions">
+        <button class="btn ghost" id="btn-shot-copy" type="button">
+          <svg class="icon"><use href="#i-copy"/></svg>Copy
+        </button>
+        <button class="btn ghost" id="btn-shot-open" type="button">
+          <svg class="icon"><use href="#i-folder"/></svg>Open file
+        </button>
+        <button class="btn ghost" id="btn-shot-close" type="button">
+          <svg class="icon"><use href="#i-x"/></svg>Close
+        </button>
+      </span>
+    </figcaption>
+  </figure>
+</div>
+
+<!-- Crashes and failed actions appear as small cards in the lower-right
+     corner instead of only as a line in the status bar. -->
+<div class="toast-stack" id="toast-stack" aria-live="assertive"
+     aria-relevant="additions" aria-label="Errors"></div>
+
 <script src="i18n.js"></script>
 <!-- Classic scripts (not ES modules: WebView2 loads the page from file://).
      Order matters: earlier files declare shared state and helpers. -->
 <script src="js/core.js"></script>
 <script src="js/screens.js"></script>
 <script src="js/profiles.js"></script>
+<script src="js/home.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/create.js"></script>
 <script src="js/mods.js"></script>

@@ -28,6 +28,19 @@ function fillSettings() {
 
   fillAccount();
   fillTheme();
+  fillBackground();
+}
+
+function fillBackground() {
+  const bg = S.background;
+  const active = !!(bg && bg.active);
+  const name = $("#background-name");
+  if (name) name.textContent = active
+    ? (bg.name || "Background") : "Panorama";
+  const clear = $("#btn-clear-background");
+  if (clear) clear.disabled = !active;
+  const pick = $("#btn-pick-background");
+  if (pick) pick.disabled = !!S.busy;
 }
 
 function fillTheme() {
@@ -468,6 +481,33 @@ async function changeLanguage(language) {
   setStatus(`Language: ${language === "ru" ? "Русский" : "English"}.`);
 }
 
+async function pickBackground() {
+  if (S.busy) return;
+  const result = await call("background_pick");
+  if (!result || !result.ok) {
+    if (result && result.cancelled) return;
+    setStatus((result && result.error)
+      || "Could not set the background.", true);
+    return;
+  }
+  if (result.state) applyState(result.state);
+  fillBackground();
+  setStatus("Home background saved.");
+}
+
+async function clearBackground() {
+  const result = await call("background_clear");
+  if (!result || !result.ok) {
+    setStatus((result && result.error)
+      || "Could not clear the background.", true);
+    if (result && result.state) applyState(result.state);
+    return;
+  }
+  if (result.state) applyState(result.state);
+  fillBackground();
+  setStatus("Home background cleared.");
+}
+
 async function removeAccount(accountId) {
   const account = (S.accounts || []).find((item) => item.id === accountId);
   const result = await call("account_remove", accountId);
@@ -644,6 +684,7 @@ function syncPlay() {
   $("#play-label").textContent = starting ? "Starting…" : "Play";
   $("#btn-stop").disabled = playBusy || !showRunning;
   $("#btn-restart").disabled = playBusy || !showRunning;
+  if (typeof syncHome === "function") syncHome();
 }
 
 async function play() {
@@ -658,6 +699,9 @@ async function play() {
     clearStarting(slug);
     syncPlay();
     setStatus(result.error || "Could not start the game.", true);
+  } else {
+    // Pick up the launch time so Home can list this build first.
+    refreshState();
   }
 }
 

@@ -25,6 +25,7 @@ function handleEvent(ev) {
       break;
     case "refresh":
       refreshState();
+      if (typeof maybeReloadHome === "function") maybeReloadHome();
       break;
     case "msauth":
       if (ev.status === "code") {
@@ -90,7 +91,13 @@ function handleEvent(ev) {
         clearRunning(slug);
         clearStarting(slug);
         syncPlay();
-        if (ev.message) setStatus(ev.message);
+        // The save was written while playing, so the world order changes.
+        if (typeof maybeReloadHome === "function") maybeReloadHome();
+        if (ev.crashed) {
+          showErrorToast(ev.message || "Minecraft closed unexpectedly.",
+                         "Game crash");
+        }
+        if (ev.message) setStatus(ev.message, !!ev.crashed);
       }
       break;
     }
@@ -121,7 +128,8 @@ function syncBusy() {
   $("#btn-install-loader").disabled = busy || lb.loading || lb.selected < 0;
   for (const id of ["btn-new-profile", "btn-empty-create",
                     "btn-import-modpack", "btn-pane-update-all",
-                    "btn-pane-backup", "btn-pane-icon", "btn-pane-edit"]) {
+                    "btn-pane-backup", "btn-pane-icon", "btn-pane-edit",
+                    "btn-pick-background"]) {
     const node = $("#" + id);
     if (node) node.disabled = busy;
   }

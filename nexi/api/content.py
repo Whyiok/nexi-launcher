@@ -22,25 +22,35 @@ class ContentApi:
         return kind if kind in ("mod", "resourcepack", "shader",
                                 "modpack") else "mod"
 
-    def content_search(self, kind, query="", loader="any", offset=0):
+    def content_search(self, kind, query="", loader="any", offset=0,
+                       game_version=None):
         kind = self._content_kind(kind)
         try:
             offset = max(0, int(offset or 0))
         except (TypeError, ValueError):
             offset = 0
         game = ""
-        if kind != "modpack":
-            instance, game, detected = self._instance_game()
-            if instance is None:
-                return {"hits": [], "game": "", "loader": str(loader or "any"),
+        if game_version is None:
+            # Legacy callers: derive the filters from the selected profile.
+            if kind != "modpack":
+                instance, game, detected = self._instance_game()
+                if instance is None:
+                    return {"hits": [], "game": "", "loader": str(loader or "any"),
+                            "total": 0, "offset": offset,
+                            "error": "No profile selected."}
+                if kind == "mod" and detected == "any":
+                    return {"hits": [], "game": game,
+                            "loader": str(loader or "any"), "kind": kind,
+                            "total": 0, "offset": offset,
+                            "error": ("This profile has no mod loader — install "
+                                      "Fabric, Forge or NeoForge first.")}
+        else:
+            # The browser passes explicit filters; "" means no version filter.
+            game = str(game_version or "")
+            if kind != "modpack" and self.active_instance() is None:
+                return {"hits": [], "game": game, "loader": str(loader or "any"),
                         "total": 0, "offset": offset,
                         "error": "No profile selected."}
-            if kind == "mod" and detected == "any":
-                return {"hits": [], "game": game,
-                        "loader": str(loader or "any"), "kind": kind,
-                        "total": 0, "offset": offset,
-                        "error": ("This profile has no mod loader — install "
-                                  "Fabric, Forge or NeoForge first.")}
         loader = str(loader or "any")
         try:
             hits, total = search_modrinth(str(query or ""), game, loader, kind,
@@ -83,13 +93,14 @@ class ContentApi:
             "version_number": str(entry.get("version_number") or ""),
         }
 
-    def content_install(self, kind, project_id, loader="any", slug=None):
+    def content_install(self, kind, project_id, loader="any", slug=None,
+                        game_version=None):
         kind = self._content_kind(kind)
         if kind == "mod":
-            return self.mods_install(project_id, loader, slug)
+            return self.mods_install(project_id, loader, slug, game_version)
         if kind == "modpack":
             return self.modpack_install(project_id, slug)
-        return self.pack_install(kind, project_id, loader, slug)
+        return self.pack_install(kind, project_id, loader, slug, game_version)
 
     def content_uninstall(self, kind, project_id, filename=None):
         kind = self._content_kind(kind)
@@ -100,16 +111,19 @@ class ContentApi:
         return {"ok": False,
                 "error": "Modpacks are profiles — remove the profile instead."}
 
-    def content_update(self, kind, project_id, loader="any", slug=None):
+    def content_update(self, kind, project_id, loader="any", slug=None,
+                       game_version=None):
         kind = self._content_kind(kind)
         if kind == "mod":
-            return self.mods_update(project_id, loader, slug)
+            return self.mods_update(project_id, loader, slug, game_version)
         if kind in PACK_DIRS:
-            return self.pack_update(kind, project_id, loader, slug)
+            return self.pack_update(kind, project_id, loader, slug,
+                                    game_version)
         return {"ok": False, "error": "Modpacks are installed as profiles."}
 
-    def pack_install(self, kind, project_id, loader="any", slug=None):
-        instance, game, _detected = self._instance_game()
+    def pack_install(self, kind, project_id, loader="any", slug=None,
+                     game_version=None):
+        instance, profile_game, _detected = self._instance_game()
         if instance is None:
             return {"ok": False, "error": "No profile selected."}
         if kind not in PACK_DIRS:
@@ -119,6 +133,7 @@ class ContentApi:
         self.busy = "packs"
         self._event("busy", task="packs", on=True)
         loader = str(loader or "any")
+        game = str(game_version or "") or profile_game
         root = instance["_root"]
         folder = instance_pack_dir(root, kind)
         project = str(project_id or "")
@@ -201,8 +216,9 @@ class ContentApi:
         self._status("mods", message)
         return {"ok": True, "message": message}
 
-    def pack_update(self, kind, project_id, loader="any", slug=None):
-        instance, game, _detected = self._instance_game()
+    def pack_update(self, kind, project_id, loader="any", slug=None,
+                    game_version=None):
+        instance, profile_game, _detected = self._instance_game()
         if instance is None:
             return {"ok": False, "error": "No profile selected."}
         if kind not in PACK_DIRS:
@@ -212,6 +228,7 @@ class ContentApi:
         self.busy = "packs"
         self._event("busy", task="packs", on=True)
         loader = str(loader or "any")
+        game = str(game_version or "") or profile_game
         root = instance["_root"]
         folder = instance_pack_dir(root, kind)
         project = str(project_id or "")

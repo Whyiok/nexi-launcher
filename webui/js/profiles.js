@@ -24,6 +24,54 @@ function showProfileTip(card, name) {
 
 let menuSlug = "";
 
+/* Switching builds is optimistic: the rail highlights the clicked card right
+   away and the backend catches up in the background. Only the newest click
+   may apply its state, and the select calls are serialised so the backend
+   always ends on the build the user picked last. */
+let profileSelectSeq = 0;
+let profileSelectChain = Promise.resolve();
+/* The build the backend has actually selected. The rail and S.instance move
+   ahead optimistically, so Play must compare against this before launching. */
+let selectionConfirmed = "";
+
+function queueProfileSelect(slug) {
+  const next = profileSelectChain.then(() => call("select", slug));
+  profileSelectChain = next.then(() => {}, () => {});
+  return next;
+}
+
+function paintProfileSelection(slug) {
+  $$("#profile-list .profile-card").forEach((card) => {
+    card.classList.toggle("selected", card.dataset.slug === slug);
+  });
+}
+
+function previewProfileSelection(slug) {
+  const inst = S.instances.find((item) => item.slug === slug);
+  if (!inst || !S.instance) return;
+  S.selected = slug;
+  S.instance = inst;
+  S.ram = Number(inst.ram) || S.ram;
+  paintProfileSelection(slug);
+  // The profile pane follows at once, but its contents are only requested
+  // after the backend has actually switched profiles.
+  if (screen === "profiles") {
+    fillDetail(inst, { load: false });
+    detail.loading = true;
+    renderDetailPanes();
+  }
+}
+
+async function commitProfileSelection(slug) {
+  if (!slug) return;
+  const seq = ++profileSelectSeq;
+  previewProfileSelection(slug);
+  const result = await queueProfileSelect(slug);
+  if (seq !== profileSelectSeq) return;
+  if (result.state) applyState(result.state);
+  else await refreshState();
+}
+
 function hideProfileMenu() {
   const menu = $("#profile-menu");
   menuSlug = "";
@@ -48,10 +96,11 @@ function showProfileMenu(x, y, slug) {
 }
 
 async function selectProfileSilently(slug) {
-  if (!slug || !S.instance || S.instance.slug === slug) return;
-  const result = await call("select", slug);
-  if (result.state) applyState(result.state);
-  else await refreshState();
+  if (!slug || !S.instance) return;
+  if (S.instance.slug === slug && selectionConfirmed === slug) return;
+  // A select may still be in flight (or the preview may have moved ahead of
+  // the backend); wait for the backend before actions such as Play.
+  await commitProfileSelection(slug);
 }
 
 function runProfileMenuAction(action) {
@@ -67,57 +116,81 @@ function runProfileMenuAction(action) {
     case "duplicate": duplicateProfile(); break;
     case "backup": backupWorlds(); break;
     case "verify": verifyFiles(); break;
-    case "settings": setScreen("settings"); break;
+    case "settings":
+      /* The context menu belongs to the profile card, so its “Settings”
+         opens that profile's settings pane — not the launcher settings. */
+      setScreen("profiles");
+      setDetailPane("settings");
+      break;
     default: break;
   }
+}
+
+/* The rail is only rebuilt when the builds themselves change. A selection
+   change just repaints the cards, so their grow/push animation is never cut
+   short by a full re-render. */
+let profilesKey = "";
+
+function profilesSignature() {
+  return S.instances.map((inst) => {
+    const icon = inst.icon || "";
+    return [inst.slug, inst.name, inst.base, inst.loader,
+            inst.loader_version || "", inst.account || "",
+            icon.length, icon.slice(-24)].join("\u0000");
+  }).join("\u0001");
 }
 
 function renderProfiles() {
   hideProfileTip();
   hideProfileMenu();
-  const list = $("#profile-list");
-  list.replaceChildren();
+  const key = profilesSignature();
+  if (key !== profilesKey) {
+    profilesKey = key;
+    const list = $("#profile-list");
+    list.replaceChildren();
+
+    for (const inst of S.instances) {
+      const card = elem("button", "profile-card");
+      card.type = "button";
+      card.dataset.slug = inst.slug;
+      card.dataset.name = inst.name;
+      const loader = inst.loader === "any"
+        ? "vanilla" : (LOADER_LABELS[inst.loader] || inst.loader);
+      card.title = `${inst.name} — Minecraft ${inst.base} · ${loader}`;
+      if (inst.icon) {
+        const img = new Image();
+        img.className = "profile-icon";
+        img.alt = "";
+        img.decoding = "async";
+        img.src = inst.icon;
+        img.addEventListener("error", () => {
+          img.remove();
+          if (!card.querySelector(".profile-card-letter")) {
+            card.appendChild(elem("span", "profile-card-letter",
+                                 profileLetter(inst.name)));
+          }
+        });
+        card.appendChild(img);
+      } else {
+        card.appendChild(elem("span", "profile-card-letter",
+                             profileLetter(inst.name)));
+      }
+      card.addEventListener("click", () => selectInstance(inst.slug));
+      card.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        hideProfileTip();
+        showProfileMenu(event.clientX, event.clientY, inst.slug);
+      });
+      card.addEventListener("mouseenter", () => showProfileTip(card, inst.name));
+      card.addEventListener("mouseleave", hideProfileTip);
+      card.addEventListener("focus", () => showProfileTip(card, inst.name));
+      card.addEventListener("blur", hideProfileTip);
+      list.appendChild(card);
+    }
+  }
+  paintProfileSelection(S.selected);
   $("#profiles-count").textContent = S.instances.length
     ? `${S.instances.length} total` : "empty";
-
-  for (const inst of S.instances) {
-    const card = elem("button", "profile-card");
-    card.type = "button";
-    if (inst.slug === S.selected) card.classList.add("selected");
-    card.dataset.name = inst.name;
-    const loader = inst.loader === "any"
-      ? "vanilla" : (LOADER_LABELS[inst.loader] || inst.loader);
-    card.title = `${inst.name} — Minecraft ${inst.base} · ${loader}`;
-    if (inst.icon) {
-      const img = new Image();
-      img.className = "profile-icon";
-      img.alt = "";
-      img.decoding = "async";
-      img.src = inst.icon;
-      img.addEventListener("error", () => {
-        img.remove();
-        if (!card.querySelector(".profile-card-letter")) {
-          card.appendChild(elem("span", "profile-card-letter",
-                               profileLetter(inst.name)));
-        }
-      });
-      card.appendChild(img);
-    } else {
-      card.appendChild(elem("span", "profile-card-letter",
-                           profileLetter(inst.name)));
-    }
-    card.addEventListener("click", () => selectInstance(inst.slug));
-    card.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      hideProfileTip();
-      showProfileMenu(event.clientX, event.clientY, inst.slug);
-    });
-    card.addEventListener("mouseenter", () => showProfileTip(card, inst.name));
-    card.addEventListener("mouseleave", hideProfileTip);
-    card.addEventListener("focus", () => showProfileTip(card, inst.name));
-    card.addEventListener("blur", hideProfileTip);
-    list.appendChild(card);
-  }
 
   const has = !!S.instance;
   $("#profile-empty").classList.toggle("hidden", has);
@@ -125,7 +198,7 @@ function renderProfiles() {
   if (has) fillDetail(S.instance);
 }
 
-function fillDetail(inst) {
+function fillDetail(inst, options = {}) {
   $("#detail-name").textContent = inst.name;
   const loader = inst.loader === "any"
     ? "vanilla" : (LOADER_LABELS[inst.loader] || inst.loader);
@@ -136,7 +209,7 @@ function fillDetail(inst) {
   $("#detail-path").title = inst.path;
   $("#detail-badge").textContent = loader;
 
-  $("#pane-player").textContent = S.player || "Player";
+  renderPaneAccount(inst);
   $("#pane-ram-value").textContent = `${S.ram} GB`;
   $("#pane-java").textContent = S.java ? S.java.split(/[\\/]/).pop() : "Automatic";
   $("#pane-java").title = S.java || "Downloaded automatically for each version";
@@ -154,11 +227,48 @@ function fillDetail(inst) {
     detail.contents = null;
     detail.loading = false;
     detail.pane = "mods";
+    shots.key = "";
   }
   syncDetailTabs();
   fillVersionEditor();
-  loadProfileContents();
+  if (options.load !== false) {
+    loadProfileContents();
+    if (detail.pane === "screenshots") pollShots();
+  }
   syncPlay();
+}
+
+const ACCOUNT_KINDS = {
+  microsoft: "Microsoft", ely: "Ely.by", offline: "Offline",
+};
+
+/* The account select in Profile settings: one entry per account plus the
+   launcher-wide active account as the default. */
+function renderPaneAccount(inst) {
+  const select = $("#pane-account");
+  if (!select) return;
+  const accounts = S.accounts || [];
+  const active = accounts.find((account) => account.active)
+    || accounts.find((account) => account.id === S.active_account) || null;
+  select.replaceChildren();
+  const fallback = document.createElement("option");
+  fallback.value = "";
+  fallback.textContent = active
+    ? `Launcher default · ${active.name}` : "Launcher default";
+  select.appendChild(fallback);
+  for (const account of accounts) {
+    const option = document.createElement("option");
+    option.value = account.id;
+    option.textContent =
+      `${account.name} · ${ACCOUNT_KINDS[account.type] || account.type}`;
+    select.appendChild(option);
+  }
+  const chosen = accounts.find((account) => account.id === inst.account);
+  select.value = chosen ? chosen.id : "";
+  select.disabled = !accounts.length;
+  select.title = chosen
+    ? `${chosen.name} · ${ACCOUNT_KINDS[chosen.type] || chosen.type}`
+    : (active ? `Uses the active account: ${active.name}` : "");
 }
 
 function syncDetailTabs() {
@@ -176,6 +286,12 @@ function setDetailPane(name) {
   syncDetailTabs();
   if (name === "logs") openGameLogs();
   else stopGameLogsTimer();
+  if (name === "screenshots") {
+    startShotsTimer();
+    pollShots();
+  } else {
+    stopShotsTimer();
+  }
   if (!detail.contents) loadProfileContents();
 }
 
@@ -212,6 +328,132 @@ async function loadProfileContents(force = false) {
 
 function paneEmpty(text) {
   return elem("div", "pane-empty", text);
+}
+
+/* --------------------------------------------------------- screenshots */
+
+function shotsSignature(items) {
+  return (items || []).map((shot) =>
+    `${shot.name}|${shot.size}|${shot.modified}|${shot.url}`).join("\n");
+}
+
+function renderShots() {
+  const data = detail.contents;
+  const loading = detail.loading && !data;
+  const items = (data && data.screenshots) || [];
+  const key = `${detail.slug}|${loading}|${shotsSignature(items)}`;
+  if (key === shots.key) return;
+  shots.key = key;
+  const list = $("#pane-shots-list");
+  $("#pane-shots-sub").textContent = data
+    ? paneSub(items.length, "screenshot") : (loading ? "Loading…" : "—");
+  list.replaceChildren();
+  if (loading) {
+    list.appendChild(paneEmpty("Reading the profile folder…"));
+    return;
+  }
+  if (!items.length) {
+    list.appendChild(paneEmpty(
+      "No screenshots yet. Press F2 in game to take one."));
+    return;
+  }
+  for (const shot of items) list.appendChild(shotCard(shot));
+}
+
+function shotCard(shot) {
+  const card = elem("div", "shot");
+  const open = elem("button", "shot-open");
+  open.type = "button";
+  open.title = `${shot.name}\n${fmtSize(shot.size)} · ${shot.modified}`;
+  if (shot.url) {
+    const img = new Image();
+    img.className = "shot-thumb";
+    img.alt = "";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.src = shot.url;
+    img.addEventListener("error", () => {
+      const placeholder = elem("div", "shot-thumb");
+      img.replaceWith(placeholder);
+    });
+    open.appendChild(img);
+  } else {
+    open.appendChild(elem("div", "shot-thumb"));
+  }
+  open.appendChild(elem("span", "shot-name", shot.name));
+  open.addEventListener("click", () => showShotViewer(shot));
+  card.appendChild(open);
+  const copy = elem("button", "shot-copy");
+  copy.type = "button";
+  copy.title = "Copy screenshot";
+  copy.setAttribute("aria-label", "Copy screenshot");
+  copy.appendChild(iconNode("i-copy"));
+  copy.addEventListener("click", (event) => {
+    event.stopPropagation();
+    copyShot(shot);
+  });
+  card.appendChild(copy);
+  return card;
+}
+
+function showShotViewer(shot) {
+  shots.open = shot;
+  const img = $("#shot-viewer-img");
+  img.src = shot.url || "";
+  img.alt = shot.name;
+  $("#shot-viewer-name").textContent =
+    `${shot.name} · ${fmtSize(shot.size)} · ${shot.modified}`;
+  $("#btn-shot-open").disabled = !shot.url;
+  $("#shot-viewer").classList.remove("hidden");
+}
+
+function hideShotViewer() {
+  shots.open = null;
+  $("#shot-viewer").classList.add("hidden");
+  $("#shot-viewer-img").removeAttribute("src");
+}
+
+async function copyShot(shot) {
+  if (!shot) return;
+  const result = await call("screenshot_copy", shot.name);
+  setStatus(result && result.ok
+    ? (result.message || "Screenshot copied to the clipboard.")
+    : ((result && result.error) || "Could not copy the screenshot."),
+  !(result && result.ok));
+}
+
+/* New screenshots must appear right away, so the pane rechecks the folder
+   while it is open. Only a changed list re-renders the grid, which keeps
+   hovering, copying and scrolling untouched. */
+function startShotsTimer() {
+  stopShotsTimer();
+  shots.timer = setInterval(pollShots, 1500);
+}
+
+function stopShotsTimer() {
+  if (shots.timer) {
+    clearInterval(shots.timer);
+    shots.timer = null;
+  }
+}
+
+async function pollShots() {
+  if (screen !== "profiles" || detail.pane !== "screenshots" || !S.instance) {
+    stopShotsTimer();
+    return;
+  }
+  const slug = S.instance.slug;
+  const result = await call("screenshot_list");
+  if (!result || !result.ok) return;
+  if (slug !== detail.slug || !detail.contents) return;
+  const items = result.screenshots || [];
+  const key = `${detail.slug}|false|${shotsSignature(items)}`;
+  if (key === shots.key) return;
+  detail.contents.screenshots = items;
+  detail.contents.counts = Object.assign({}, detail.contents.counts, {
+    screenshots: items.length,
+  });
+  renderShots();
 }
 
 /* Modrinth knows the names and icons of installed mods; ask once per profile. */
@@ -312,41 +554,7 @@ function renderDetailPanes() {
     }
   }
 
-  const shotsList = $("#pane-shots-list");
-  shotsList.replaceChildren();
-  $("#pane-shots-sub").textContent = data
-    ? paneSub(counts.screenshots || 0, "screenshot")
-    : (loading ? "Loading…" : "—");
-  if (loading) {
-    shotsList.appendChild(paneEmpty("Reading the profile folder…"));
-  } else if (!counts.screenshots) {
-    shotsList.appendChild(paneEmpty(
-      "No screenshots yet. Press F2 in game to take one."));
-  } else {
-    for (const shot of data.screenshots) {
-      const card = elem("button", "shot");
-      card.type = "button";
-      card.title = `${shot.name}\n${fmtSize(shot.size)} · ${shot.modified}`;
-      if (shot.url) {
-        const img = new Image();
-        img.className = "shot-thumb";
-        img.alt = "";
-        img.loading = "lazy";
-        img.src = shot.url;
-        img.addEventListener("error", () => {
-          const placeholder = elem("div", "shot-thumb");
-          img.replaceWith(placeholder);
-        });
-        card.appendChild(img);
-      } else {
-        card.appendChild(elem("div", "shot-thumb"));
-      }
-      card.appendChild(elem("span", "shot-name", shot.name));
-      card.addEventListener("click", () =>
-        call("open_instance", "screenshots", shot.name));
-      shotsList.appendChild(card);
-    }
-  }
+  renderShots();
 
   $("#btn-pane-clear-icon").disabled = !!S.busy
     || !S.instance || !S.instance.icon;
@@ -417,6 +625,20 @@ async function changePaneRam(delta) {
   if (result.state) applyState(result.state);
 }
 
+async function changePaneAccount(accountId) {
+  if (!S.instance) return;
+  const result = await call("instance_set_account", accountId || "");
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not change the account.",
+              true);
+    if (S.instance) renderPaneAccount(S.instance);
+    return;
+  }
+  setStatus(result.message || "Account changed.");
+  if (result.state) applyState(result.state);
+  else await refreshState();
+}
+
 async function setProfileIcon() {
   if (!S.instance) return;
   const result = await call("set_profile_icon");
@@ -444,14 +666,18 @@ async function clearProfileIcon() {
 
 async function selectInstance(slug) {
   if (!slug) return;
+  // On Home a rail click chooses the build the Play button starts, exactly
+  // like clicking one of the build rows there; it must not leave Home.
+  if (screen === "home") {
+    await selectHomeBuild(slug);
+    return;
+  }
   // The rail is global: a click on a build always opens its details, even
   // when another tab (Settings, Modpacks, New…) is in front.
   if (screen !== "profiles") setScreen("profiles");
   if (slug === S.selected) return;
   resetDeleteConfirm();
-  const result = await call("select", slug);
-  if (result.state) applyState(result.state);
-  else await refreshState();
+  await commitProfileSelection(slug);
 }
 
 async function changeRam(delta) {

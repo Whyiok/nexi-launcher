@@ -10,20 +10,30 @@ from pathlib import Path
 
 from ..config import ELY_SKIN_SITE, INSTANCES_DIR, LOG_DIR, LOG_FILE, MC
 from ..ely_auth import ELY_OAUTH_CLIENT_ID_DEFAULT
+from .. import media
+from ..logging_setup import log
 from ..instances import (
-    ICON_MAX_BYTES, ICON_SUFFIXES, _file_sha1, delete_instance,
+    ICON_MAX_BYTES, ICON_SUFFIXES, IMAGE_SUFFIXES, _file_sha1, delete_instance,
     instance_contents, instance_game_dir, instance_log_file,
     instance_mods_dir, list_instances, profile_icon_data_url,
     profile_loader_version, read_instance, read_modrinth_cache,
-    write_instance, write_modrinth_cache,
+    screenshot_entries, write_instance, write_modrinth_cache,
 )
 from ..modpacks import _zip_member_target
 from ..modrinth import modrinth_get
 from ..ms_auth import MS_CLIENT_ID_DEFAULT
-from ..util import open_in_system
+from ..util import copy_image_to_clipboard, open_in_system
 from ..versions import (
     detect_loader, game_version_of, load_version, version_meta,
 )
+
+
+def _attach_shot_urls(entries):
+    """Replace file-system paths with loopback preview URLs for the page."""
+    for entry in entries:
+        path = entry.pop("path", "")
+        entry["url"] = media.url_for(path) if path else ""
+    return entries
 
 
 class ProfilesApi:
@@ -50,9 +60,13 @@ class ProfilesApi:
         except (TypeError, ValueError):
             ram = int(self.ram)
         ram = max(self.RAM_MIN, min(self.RAM_MAX, ram))
+        account = self._account_by_id(instance.get("account", ""))
         return {
             "slug": instance.get("_slug", ""),
             "name": instance.get("name", ""),
+            # The account this profile signs in with, or "" for the account
+            # that is active in Settings.
+            "account": account["id"] if account is not None else "",
             "version": version,
             "base": base,
             "loader": loader,
@@ -61,6 +75,9 @@ class ProfilesApi:
                              "neoforge": "NeoForge", "quilt": "Quilt"}
             .get(loader, "Fabric"),
             "ram": ram,
+            # Epoch seconds of the last launch (0 when never started), so the
+            # Home screen can show the most recent build first.
+            "last_played": float(instance.get("last_played") or 0),
             "path": str(instance_game_dir(instance["_root"])),
             "icon": profile_icon_data_url(
                 instance["_root"], instance.get("icon")),
@@ -118,6 +135,7 @@ class ProfilesApi:
                             if active_account is not None else "offline"),
                 "paths": {"shared": str(MC),
                           "instances": str(INSTANCES_DIR)},
+                "background": self._background_payload(),
                 "busy": self.busy,
                 "launching": bool(self._launching),
                 "launching_slugs": sorted(self._launching),
@@ -169,6 +187,34 @@ class ProfilesApi:
                 write_instance(instance["_root"], instance)
             self._save()
         return {"state": self.state()}
+
+    def instance_set_account(self, account_id):
+        """Pick the account this profile launches with ("" = the active one)."""
+        account_id = str(account_id or "")
+        with self._lock:
+            instance = self.active_instance()
+            if instance is None:
+                return {"ok": False, "error": "Select a profile first.",
+                        "state": self.state()}
+            account = self._account_by_id(account_id) if account_id else None
+            if account_id and account is None:
+                return {"ok": False,
+                        "error": "That account no longer exists.",
+                        "state": self.state()}
+            if account is None:
+                instance.pop("account", None)
+            else:
+                instance["account"] = account["id"]
+            write_instance(instance["_root"], instance)
+            name = instance.get("name", "This profile")
+            if account is None:
+                message = (f'"{name}" now uses the active account from '
+                           "Settings.")
+            else:
+                message = f'"{name}" now signs in as {account["name"]}.'
+        log.info("Profile account set: slug=%r account=%r",
+                 instance.get("_slug", ""), account_id or "(active)")
+        return {"ok": True, "message": message, "state": self.state()}
 
     def delete(self, slug):
         with self._lock:
@@ -267,8 +313,39 @@ class ProfilesApi:
             data = instance_contents(instance["_root"])
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
+        _attach_shot_urls(data.get("screenshots", []))
         data["ok"] = True
         return data
+
+    def screenshot_list(self):
+        """Cheap screenshot poll with preview URLs (the pane refreshes often)."""
+        instance = self.active_instance()
+        if instance is None:
+            return {"ok": False, "error": "Select a profile first."}
+        entries = screenshot_entries(instance_game_dir(instance["_root"]))
+        _attach_shot_urls(entries)
+        return {"ok": True, "screenshots": entries, "count": len(entries)}
+
+    def screenshot_copy(self, name):
+        """Put one screenshot on the Windows clipboard as an image."""
+        instance = self.active_instance()
+        if instance is None:
+            return {"ok": False, "error": "Select a profile first."}
+        folder = instance_game_dir(instance["_root"]) / "screenshots"
+        name = str(name or "")
+        try:
+            base = folder.resolve()
+            target = (folder / name).resolve()
+        except (OSError, ValueError):
+            return {"ok": False, "error": "That screenshot is not valid."}
+        if (base not in target.parents
+                or target.suffix.lower() not in IMAGE_SUFFIXES):
+            return {"ok": False, "error": "That screenshot is not valid."}
+        if not target.is_file():
+            return {"ok": False, "error": "That screenshot no longer exists."}
+        if not copy_image_to_clipboard(target):
+            return {"ok": False, "error": "Could not copy the screenshot."}
+        return {"ok": True, "message": "Screenshot copied to the clipboard."}
 
     def resolve_mod_icons(self):
         """Modrinth names and icons for the installed mods, cached per profile."""

@@ -6,6 +6,11 @@ const reportedErrors = new Set();
 function reportError(text) {
   const message = String(text);
   window.__errors.push(message);
+  try {
+    // Uncaught page errors are crashes the user should actually see, not just
+    // a line in the console.
+    showErrorToast(message, "Crash");
+  } catch (_) { /* the error handler must never throw itself */ }
   if (reportedErrors.size >= 50 || reportedErrors.has(message)) return;
   reportedErrors.add(message);
   try {
@@ -67,7 +72,7 @@ let S = {
   game_instance: "", running: [], theme: "mint",
   color_mode: "dark", language: "en",
 };
-let screen = "profiles";
+let screen = "home";
 let booted = false;
 
 const msFlow = { active: false };
@@ -88,8 +93,8 @@ const builds = { list: [], selected: -1, loading: false, request: 0 };
 const vedit = { key: "", mc: "", loader: "any", build: "", origMc: "",
                 req: 0, busy: false, optionsFor: "" };
 
-const mods = { hits: [], selected: -1, loader: "any", kind: "mod", key: "",
-               searchedKey: "", busy: false, installed: null,
+const mods = { hits: [], selected: -1, loader: "any", game: "", kind: "mod",
+               key: "", searchedKey: "", busy: false, installed: null,
                statusSeq: 0, statusLoading: false, profile: "",
                checked: new Set(), query: "", offset: 0, total: 0,
                loadingMore: false, searchSeq: 0 };
@@ -109,6 +114,9 @@ const gameLogs = {
   el: "#game-log-console",
   visible: () => screen === "profiles" && detail.pane === "logs",
 };
+/* Screenshot previews: the grid rechecks the folder while it is visible and
+   re-renders only when a new file or a size changes. */
+const shots = { timer: null, key: "", open: null };
 
 const createLogLines = [];
 const loaderLogLines = [];
@@ -123,9 +131,18 @@ async function call(method, ...args) {
     return { error: "The interface is still starting." };
   }
   try {
-    return (await bridge[method](...args)) ?? {};
+    const result = (await bridge[method](...args)) ?? {};
+    // Bridge methods report failures as {ok: false, error}. Show them even if
+    // the caller only puts the message in the status bar. Polling is exempt:
+    // if the backend dies it fails continuously and one toast is enough.
+    if (method !== "poll" && result && result.error) {
+      showErrorToast(result.error, "Launcher error");
+    }
+    return result;
   } catch (err) {
-    return { error: String((err && err.message) || err) };
+    const message = String((err && err.message) || err);
+    showErrorToast(message, "Launcher error");
+    return { error: message };
   }
 }
 
@@ -136,10 +153,22 @@ function elem(tag, cls, text) {
   return node;
 }
 
+/* Icon sprite node for markup created at runtime. */
+function iconNode(id) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("class", "icon");
+  const use = document.createElementNS(ns, "use");
+  use.setAttribute("href", "#" + id);
+  svg.appendChild(use);
+  return svg;
+}
+
 function setStatus(text, error = false) {
   const bar = $("#status");
   bar.textContent = text;
   bar.classList.toggle("error", !!error);
+  if (error && text) showErrorToast(text, "Error");
 }
 
 function screenStatus(name, text, error = false) {
@@ -148,6 +177,80 @@ function screenStatus(name, text, error = false) {
   if (!node) return;
   node.textContent = text;
   node.classList.toggle("error", !!error);
+  if (error && text) showErrorToast(text, "Error");
+}
+
+/* ---------------------------------------------------------------- toasts */
+
+/* Small cards in the lower-right corner for crashes and failed actions.
+   They auto-dismiss, pause while the pointer is over them, and keep the last
+   few messages on screen. Built with plain DOM calls so the global error
+   handler can use them even very early in page load. */
+const toastHistory = new Map();
+
+function toastMessage(value) {
+  const text = String(value == null ? "" : value).replace(/\r/g, "").trim();
+  return text.length > 600 ? `${text.slice(0, 597)}…` : text;
+}
+
+function toastIcon(id, cls) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("class", cls ? `icon ${cls}` : "icon");
+  const use = document.createElementNS(ns, "use");
+  use.setAttribute("href", "#" + id);
+  svg.appendChild(use);
+  return svg;
+}
+
+function dismissToast(node) {
+  if (!node || node.classList.contains("leaving") || !node.isConnected) return;
+  node.classList.add("leaving");
+  window.setTimeout(() => node.remove(), 180);
+}
+
+function showErrorToast(message, title = "Error") {
+  const text = toastMessage(message);
+  const stack = document.getElementById("toast-stack");
+  if (!text || !stack) return;
+  const now = Date.now();
+  const seen = toastHistory.get(text);
+  if (seen && now - seen < 4000) return;
+  toastHistory.set(text, now);
+  for (const [key, stamp] of toastHistory) {
+    if (now - stamp > 60000) toastHistory.delete(key);
+  }
+
+  const node = document.createElement("div");
+  node.className = "toast";
+  node.setAttribute("role", "alert");
+  const body = document.createElement("div");
+  body.className = "toast-body";
+  const heading = document.createElement("div");
+  heading.className = "toast-title";
+  heading.textContent = String(title || "Error");
+  const line = document.createElement("div");
+  line.className = "toast-text";
+  line.textContent = text;
+  body.append(heading, line);
+  const close = document.createElement("button");
+  close.className = "toast-close";
+  close.type = "button";
+  close.title = "Dismiss";
+  close.setAttribute("aria-label", "Dismiss notification");
+  close.appendChild(toastIcon("i-x"));
+  close.addEventListener("click", () => dismissToast(node));
+  node.append(toastIcon("i-alert", "toast-icon"), body, close);
+  stack.appendChild(node);
+  // The stack is intentionally small: the oldest cards go first.
+  while (stack.children.length > 4) stack.firstElementChild.remove();
+
+  let timer = window.setTimeout(() => dismissToast(node), 9000);
+  node.addEventListener("pointerenter", () => window.clearTimeout(timer));
+  node.addEventListener("pointerleave", () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => dismissToast(node), 2500);
+  });
 }
 
 function instanceKey() {
