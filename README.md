@@ -18,17 +18,9 @@ Runtime are required (Windows 11 includes it).
 
 ## Screenshots
 
-**Main menu, skins and builds**
-
-[![Main menu, skins and builds](docs/screenshots/overview.png)](docs/screenshots/overview.png)
-
-**Mods browser**
-
-[![Mods browser](docs/screenshots/mods.png)](docs/screenshots/mods.png)
-
-**An isolated profile folder**
-
-[![An isolated profile folder](docs/screenshots/instances.png)](docs/screenshots/instances.png)
+| Main menu | Skins | Builds |
+| :---: | :---: | :---: |
+| [![Main menu](docs/screenshots/home.png)](docs/screenshots/home.png) | [![Skins](docs/screenshots/skins.png)](docs/screenshots/skins.png) | [![Builds](docs/screenshots/builds.png)](docs/screenshots/builds.png) |
 
 ## Features
 
