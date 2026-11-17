@@ -13,6 +13,7 @@ from pathlib import Path
 from .. import config
 from ..config import DATA_DIR, ELY_OAUTH_REDIRECT_DEFAULT, MC, app_dir
 from ..logging_setup import log
+from ..net import MIRROR_MODES, set_mirror_mode, set_mirror_notifier
 from ..util import _read_json, open_in_system
 
 
@@ -41,11 +42,26 @@ class BaseApi:
         self.color_mode = mode if mode in ("dark", "light") else "dark"
         language = str(self._saved("language", "en") or "en").strip().lower()
         self.language = language if language in ("en", "ru") else "en"
+        # First-run setup is shown until the user finishes or skips it.
+        self._onboarded = bool(self._saved("onboarded", False))
         self.java_path = str(self._saved("java", "") or "")
         config.JAVA_OVERRIDE = self.java_path
         # Home background: {"file", "name", "kind"} or {} for the panorama.
         background = self._saved("background", {})
         self._background = background if isinstance(background, dict) else {}
+        # DPI bypass: only the folder and preset name, never any credentials.
+        zapret = self._saved("zapret", {})
+        if not isinstance(zapret, dict):
+            zapret = {}
+        self._zapret = zapret
+        self._zapret_path = str(zapret.get("path", "") or "")
+        self._zapret_preset = str(zapret.get("preset", "") or "")
+        self._zapret_auto = zapret.get("auto") is True
+        # Mirror policy: "auto" falls back to BMCLAPI when a host is blocked,
+        # "always" skips the official host, "never" keeps it for the bypass.
+        mirror = str(self._saved("mirror", "auto") or "auto").strip().lower()
+        self.mirror = mirror if mirror in MIRROR_MODES else "auto"
+        set_mirror_mode(self.mirror)
         ms = self._saved("ms", {})
         if not isinstance(ms, dict):
             ms = {}
@@ -82,6 +98,8 @@ class BaseApi:
         # Attributes starting with "_" are skipped by pywebview when it builds
         # the JS bridge, so internal queues/events never get exposed.
         self._events = queue.Queue()
+        # The first automatic mirror fallback shows the two-option prompt.
+        set_mirror_notifier(self._mirror_fallback_event)
         self._log_queue = queue.Queue()
         self.busy = ""
         self._cancel_event = None
@@ -147,6 +165,10 @@ class BaseApi:
         # a stalled page from ballooning memory with queued game log lines.
         if self._events.qsize() < 4000:
             self._events.put(payload)
+
+    def _mirror_fallback_event(self, host, mirror=""):
+        """Ask the page to offer a permanent mirror-or-bypass choice."""
+        self._event("mirror", host=str(host), mirror=str(mirror))
 
     def _status(self, screen, text, error=False):
         self._event("status", screen=screen, text=str(text), error=bool(error))
@@ -391,9 +413,14 @@ class BaseApi:
                 "theme": self.theme,
                 "color_mode": self.color_mode,
                 "language": self.language,
+                "onboarded": bool(self._onboarded),
                 "java": self.java_path,
                 "instance": self.selected_slug,
                 "background": self._background,
+                "mirror": self.mirror,
+                "zapret": {"path": self._zapret_path,
+                           "preset": self._zapret_preset,
+                           "auto": bool(self._zapret_auto)},
                 "ms": {"client_id": self._ms_client_id},
                 "ely": {"oauth": {
                     "client_id": self._ely_oauth_client_id,
@@ -448,6 +475,14 @@ class BaseApi:
             self.language = language
             self._save()
         log.info("Language: %s", language)
+        return {"ok": True, "state": self.state()}
+
+    def complete_onboarding(self):
+        """Remember that the first-run setup was finished (or skipped)."""
+        with self._lock:
+            self._onboarded = True
+            self._save()
+        log.info("First-run setup completed")
         return {"ok": True, "state": self.state()}
 
     def set_java(self, path):

@@ -55,7 +55,7 @@ class MSRequestError(Exception):
         super().__init__(detail)
 
 
-def _http_json(url, payload=None, token=None, timeout=30, form=False):
+def _http_json(url, payload=None, token=None, timeout=60, form=False):
     if payload is None:
         data = None
     elif form:

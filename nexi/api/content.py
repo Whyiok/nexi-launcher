@@ -316,7 +316,7 @@ class ContentApi:
             # The .mrpack has no artwork; the project page has the icon.
             icon_url = ""
             try:
-                project_info = modrinth_get(f"/project/{project}", timeout=10)
+                project_info = modrinth_get(f"/project/{project}", timeout=30)
                 if isinstance(project_info, dict):
                     icon_url = str(project_info.get("icon_url") or "")
             except Exception as exc:

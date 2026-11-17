@@ -103,7 +103,8 @@ const browserStates = new Map();
 const detail = { slug: "", contents: null, loading: false, pane: "mods",
                  request: 0 };
 let iconsKey = "";
-const lb = { label: "Fabric", builds: [], selected: -1, key: "", loading: false, busy: false };
+const lb = { label: "Fabric", builds: [], selected: -1, key: "", loading: false, busy: false,
+             statusText: "", statusError: false, startedAt: 0, ticker: null };
 const logs = {
   pending: "", buffer: [], timer: null, stick: true,
   el: "#log-console",
@@ -354,7 +355,7 @@ function setSeg(selector, value) {
 /* ------------------------------------------- sliding active fill for tabs */
 
 const FILL_CONTAINERS = [
-  "#tabs", "#detail-tabs", "#account-methods", "#skin-seg",
+  "#tabs", "#bypass-tabs", "#detail-tabs", "#account-methods", "#skin-seg",
   "#kind-seg", "#loader-seg", "#mods-seg", "#loaders-seg",
   "#mode-seg", "#lang-seg",
 ];

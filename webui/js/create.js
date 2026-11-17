@@ -2,11 +2,25 @@
 
 /* ---------------------------------------------------------------- create */
 
+/* The Mojang manifest lists versions newest first, so the first release in
+   the list is the latest released version. */
+function latestReleaseId() {
+  const entry = (versions.all || []).find((item) => item.type === "release");
+  return entry ? entry.id : "";
+}
+
+/* A new profile starts on the latest release. The version list can arrive
+   after the create screen is already open, so every load path calls this. */
+function applyDefaultVersion() {
+  if (editSlug || versions.selected) return;
+  versions.selected = latestReleaseId();
+}
+
 function resetCreateMode() {
   editSlug = "";
-  // A fresh profile never inherits a version picked for another profile or
-  // for a previous create, so nothing is preselected when this opens.
-  versions.selected = "";
+  // A new profile starts on the latest released version, so pressing Create
+  // right away gives a current, stable game.
+  versions.selected = latestReleaseId();
   $("#new-name").value = "";
   $("#create-title").textContent = "New profile";
   $("#create-sub").textContent = "Pick any Minecraft version — missing files are downloaded from Mojang.";
@@ -85,6 +99,7 @@ function ensureVersionOptions() {
     versions.installed = new Set(result.installed || []);
     fillVersionSelect();
     fillModsVersionFilter();
+    applyDefaultVersion();
     renderVersions();
   });
 }
@@ -110,6 +125,7 @@ function loadEditBuilds() {
   select.appendChild(loading);
   call("builds", loaderKey, mc).then((result) => {
     if (request !== vedit.req) return;
+    if (result.note) appendCreateLog(result.note);
     const builds = result.builds || [];
     select.replaceChildren();
     if (!builds.length) {
@@ -206,6 +222,10 @@ function loadVersions(force) {
     versions.loaded = true;
     versions.all = result.versions || [];
     versions.installed = new Set(result.installed || []);
+    // First load of a new-profile screen: preselect the latest release.
+    if (!editSlug && !versions.selected) {
+      versions.selected = latestReleaseId();
+    }
     fillModsVersionFilter();
     renderVersions();
     if (result.error) {
@@ -250,8 +270,8 @@ function renderVersions() {
   }).slice(0, 600);
 
   versions.rows = rows;
-  // Never pick a version automatically: the list only highlights what the
-  // user clicked, and Create stays disabled until they pick one.
+  // A new profile starts on the latest release; if a search or the filter
+  // hides it, the selection is dropped like any other hidden row.
   if (versions.selected && !rows.some((row) => row.id === versions.selected)) {
     versions.selected = "";
   }
@@ -312,6 +332,7 @@ function loadBuilds() {
   screenStatus("create", `Looking up ${loaderSel} builds for ${versions.selected}…`);
   call("builds", key, versions.selected).then((result) => {
     if (request !== builds.request) return;
+    if (result.note) appendCreateLog(result.note);
     builds.loading = false;
     builds.list = result.builds || [];
     builds.selected = builds.list.length ? 0 : -1;

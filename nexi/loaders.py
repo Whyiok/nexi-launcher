@@ -8,11 +8,14 @@ import subprocess
 import tempfile
 import urllib.request
 import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
 from .config import MC
 from .java_runtime import java_executable
-from .net import download_file, http_get
+from .net import (download_file, download_with_retry, host_unreachable,
+                  http_get)
+from .util import InstallCancelled
 from .versions import list_versions, load_version, version_meta
 
 
@@ -41,6 +44,12 @@ NEOFORGE_LEGACY_MAVEN = "https://maven.neoforged.net/releases/net/neoforged/forg
 NEOFORGE_LEGACY_METADATA = NEOFORGE_LEGACY_MAVEN + "/maven-metadata.xml"
 
 
+NEOFORGE_OFFICIAL_BASE = "https://maven.neoforged.net/releases/"
+
+
+NEOFORGE_MIRROR_BASE = "https://bmclapi2.bangbang93.com/maven/"
+
+
 LOADER_KEYS = {"Fabric": "fabric", "Forge": "forge", "NeoForge": "neoforge"}
 
 
@@ -59,8 +68,9 @@ def maven_path(coordinate: str) -> Path:
     return Path(*group.split("."), artifact, version, f"{filename}.{extension}")
 
 
-def _maven_versions(url: str):
-    root = ET.fromstring(http_get(url))
+def _maven_versions(url: str, notify=None):
+    # NeoForge/Forge maven answers slowly through a DPI bypass.
+    root = ET.fromstring(http_get(url, timeout=60, on_fallback=notify))
     found = []
     for element in root.iter():
         if element.tag.rsplit("}", 1)[-1] == "version" and element.text:
@@ -99,7 +109,7 @@ def fabric_builds(game_version: str):
     """(value, label) pairs, newest first."""
     url = (f"{FABRIC_META}/versions/loader/"
            f"{urllib.parse.quote(game_version, safe='')}")
-    data = json.loads(http_get(url).decode("utf-8"))
+    data = json.loads(http_get(url, timeout=60).decode("utf-8"))
     builds = []
     for entry in data:
         loader = entry.get("loader") or {}
@@ -115,7 +125,7 @@ def fabric_builds(game_version: str):
 
 def forge_builds(game_version: str):
     try:
-        promotions = json.loads(http_get(FORGE_PROMOTIONS, timeout=20).decode("utf-8"))
+        promotions = json.loads(http_get(FORGE_PROMOTIONS, timeout=60).decode("utf-8"))
     except (OSError, ValueError):
         promotions = {}
     table = promotions.get("promos") or {}
@@ -135,16 +145,16 @@ def forge_builds(game_version: str):
     return [(value, value) for value in versions[:MAX_BUILDS]]
 
 
-def neoforge_builds(game_version: str):
+def neoforge_builds(game_version: str, notify=None):
     if _is_legacy_neoforge(game_version):
         try:
             versions = _versions_of_game(
-                _maven_versions(NEOFORGE_LEGACY_METADATA), game_version)
+                _maven_versions(NEOFORGE_LEGACY_METADATA, notify), game_version)
         except (OSError, ValueError, ET.ParseError):
             return []
         return [(value, value) for value in versions[:MAX_BUILDS]]
     try:
-        all_versions = _maven_versions(NEOFORGE_METADATA)
+        all_versions = _maven_versions(NEOFORGE_METADATA, notify)
     except (OSError, ValueError, ET.ParseError):
         return []
     for prefix in neoforge_prefixes(game_version):
@@ -157,12 +167,18 @@ def neoforge_builds(game_version: str):
     return []
 
 
-def loader_builds(loader_key: str, game_version: str):
+def loader_builds(loader_key: str, game_version: str, notify=None):
     if loader_key == "fabric":
         return fabric_builds(game_version)
     if loader_key == "forge":
         return forge_builds(game_version)
-    return neoforge_builds(game_version)
+
+    def mirror_note(host):
+        if notify is not None:
+            notify(f"{host} is unreachable — the build list came from the "
+                   f"BMCLAPI mirror.")
+
+    return neoforge_builds(game_version, mirror_note)
 
 
 def loader_installer_url(loader_key: str, game_version: str, loader_version: str) -> str:
@@ -176,6 +192,41 @@ def loader_installer_url(loader_key: str, game_version: str, loader_version: str
         return f"{NEOFORGE_LEGACY_MAVEN}/{version}/forge-{version}-installer.jar"
     return (f"{NEOFORGE_MAVEN}/{loader_version}/"
             f"neoforge-{loader_version}-installer.jar")
+
+
+def mirror_neoforge_installer(installer: Path, log) -> bool:
+    """Point the installer's own downloads at BMCLAPI when NeoForge is blocked.
+
+    The installer resolves its libraries from URLs embedded in
+    install_profile.json and version.json. If maven.neoforged.net is blocked,
+    those downloads fail before it can write the profile, so rewrite the two
+    JSON entries to the BMCLAPI mirror. The installer archive is not signed.
+    Returns True when the archive was changed.
+    """
+    temp = installer.with_name(installer.name + ".mirrored")
+    changed = 0
+    try:
+        with zipfile.ZipFile(installer) as source, \
+                zipfile.ZipFile(temp, "w", zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if item.filename in ("install_profile.json", "version.json"):
+                    text = data.decode("utf-8")
+                    if NEOFORGE_OFFICIAL_BASE in text:
+                        changed += text.count(NEOFORGE_OFFICIAL_BASE)
+                        data = text.replace(NEOFORGE_OFFICIAL_BASE,
+                                            NEOFORGE_MIRROR_BASE).encode("utf-8")
+                target.writestr(item, data)
+    except (OSError, zipfile.BadZipFile):
+        temp.unlink(missing_ok=True)
+        raise
+    if not changed:
+        temp.unlink(missing_ok=True)
+        return False
+    temp.replace(installer)
+    log(f"NeoForge maven is blocked — {changed} installer URLs switched "
+        f"to the BMCLAPI mirror.")
+    return True
 
 
 def console_java(version: dict) -> str:
@@ -221,8 +272,10 @@ def ensure_launcher_profiles():
         pass
 
 
-def run_installer(java: str, installer: Path, log) -> None:
+def run_installer(java: str, installer: Path, log, cancel=None) -> None:
     ensure_launcher_profiles()
+    if cancel is not None and cancel.is_set():
+        raise InstallCancelled()
     arguments = [java]
     if platform.system() == "Windows" and "jre-legacy" in str(java).lower():
         # The bundled Java 8 runtime ships an outdated root CA list, so the
@@ -238,6 +291,9 @@ def run_installer(java: str, installer: Path, log) -> None:
     stream = process.stdout
     if stream is not None:
         for raw in stream:
+            if cancel is not None and cancel.is_set():
+                process.terminate()
+                raise InstallCancelled()
             line = raw.decode("utf-8", "replace").rstrip()
             if line:
                 log(line)
@@ -246,12 +302,13 @@ def run_installer(java: str, installer: Path, log) -> None:
         raise RuntimeError(f"installer exited with code {code}")
 
 
-def install_fabric(game_version: str, loader_version: str, log) -> str:
+def install_fabric(game_version: str, loader_version: str, log,
+                   progress=None, cancel=None) -> str:
     url = (f"{FABRIC_META}/versions/loader/"
            f"{urllib.parse.quote(game_version, safe='')}/"
            f"{urllib.parse.quote(loader_version, safe='')}/profile/json")
     log(f"Fetching Fabric {loader_version} profile for {game_version}…")
-    profile = json.loads(http_get(url).decode("utf-8"))
+    profile = json.loads(http_get(url, timeout=60).decode("utf-8"))
     version_id = profile.get("id") or f"fabric-loader-{loader_version}-{game_version}"
     profile["id"] = version_id
     profile.setdefault("inheritsFrom", game_version)
@@ -263,7 +320,12 @@ def install_fabric(game_version: str, loader_version: str, log) -> str:
         json.dumps(profile, indent=2), encoding="utf-8")
     log(f"Wrote versions/{version_id}/{version_id}.json")
 
-    for lib in profile.get("libraries") or []:
+    libraries = profile.get("libraries") or []
+    total = len(libraries)
+    done = 0
+    for lib in libraries:
+        if cancel is not None and cancel.is_set():
+            raise InstallCancelled()
         name = lib.get("name") or ""
         base_url = lib.get("url")
         if not name or not base_url:
@@ -274,7 +336,11 @@ def install_fabric(game_version: str, loader_version: str, log) -> str:
             continue
         log(f"Downloading {target.name}…")
         target.parent.mkdir(parents=True, exist_ok=True)
-        download_file(base_url.rstrip("/") + "/" + relative.as_posix(), target)
+        download_file(base_url.rstrip("/") + "/" + relative.as_posix(), target,
+                      cancel=cancel)
+        done += 1
+        if progress and total:
+            progress(done, total)
     log(f"Fabric profile ready: {version_id}")
     return version_id
 
@@ -291,20 +357,51 @@ def find_loader_profile(loader_key: str, game_version: str, loader_version: str)
 
 
 def install_loader(loader_key: str, game_version: str, loader_version: str,
-                   java: str, log):
-    """Install a loader and return the id of the profile it created."""
-    if loader_key == "fabric":
-        return install_fabric(game_version, loader_version, log)
+                   java: str, log, progress=None, cancel=None):
+    """Install a loader and return the id of the profile it created.
 
+    ``progress(done, total)`` reports determinate downloads; a reset to
+    ``(0, 0)`` tells the page to show its indeterminate "working" animation.
+    """
+    if loader_key == "fabric":
+        return install_fabric(game_version, loader_version, log, progress,
+                              cancel)
+
+    if cancel is not None and cancel.is_set():
+        raise InstallCancelled()
     before = installed_version_ids()
     url = loader_installer_url(loader_key, game_version, loader_version)
     log(f"Downloading {url}")
     temp_root = Path(tempfile.mkdtemp(prefix="mc-loader-"))
     installer = temp_root / "installer.jar"
     try:
-        download_file(url, installer)
+        # Retries and the BMCLAPI fallback cover a blocked maven host.
+        def mirror_notice(host):
+            log(f"{host} is unreachable — switching to the BMCLAPI mirror…")
+
+        from_mirror = download_with_retry(url, installer, cancel=cancel,
+                                          on_progress=progress,
+                                          on_fallback=mirror_notice)
+        if progress:
+            progress(0, 0)
         log(f"Installer saved ({installer.stat().st_size // 1024} KB)")
-        run_installer(java, installer, log)
+        if from_mirror:
+            log("The installer came from the BMCLAPI mirror.")
+        patched = False
+        if loader_key == "neoforge" and (from_mirror or host_unreachable(url)):
+            patched = mirror_neoforge_installer(installer, log)
+        log("Running the installer — it fetches libraries itself, so this "
+            "can take a few minutes…")
+        try:
+            run_installer(java, installer, log, cancel)
+        except RuntimeError:
+            if not patched:
+                raise
+            # BMCLAPI serves some files through flaky redirects; the first
+            # pass can save everything and still report a download failure.
+            log("The installer stopped early; retrying with the files it "
+                "already downloaded…")
+            run_installer(java, installer, log, cancel)
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 

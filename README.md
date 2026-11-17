@@ -12,9 +12,12 @@ build is a single `nexi.exe` produced by PyInstaller.
 
 [**Download the latest release →**](https://github.com/Whyiok/nexi-launcher/releases/latest)
 
-Get `nexi.exe` from the Releases page and run it — no installer or Python
-installation is needed. Windows 10/11 x64 and the Microsoft Edge WebView2
-Runtime are required (Windows 11 includes it).
+Get `nexi.exe` from the Releases page and run it — no Python installation is
+needed. If you prefer an installed copy, download `NexiLauncher-Setup.exe`
+instead: it installs per user into `%LOCALAPPDATA%\Programs\Nexi Launcher`,
+adds Start Menu and (optionally) desktop shortcuts plus an entry in Windows
+Settings → Apps, and never asks for administrator rights. Windows 10/11 x64
+and the Microsoft Edge WebView2 Runtime are required (Windows 11 includes it).
 
 ## Screenshots
 
@@ -111,6 +114,19 @@ python -m PyInstaller "build/Nexi Launcher.spec" `
 
 The result is `_dist\nexi.exe` (onefile, no console window).
 
+### Build the installer
+
+```powershell
+.\build_installer.ps1
+```
+
+This rebuilds `nexi.exe`, then packs it into `_dist\NexiLauncher-Setup.exe`
+(also copied to the project root). The setup is a one-file PyInstaller
+executable as well: it carries `nexi.exe` inside, and a copy of itself becomes
+`Uninstall.exe` in the install folder. It installs per user, so no
+administrator rights are needed, and it also accepts `--silent`,
+`--silent-uninstall` and `--uninstall` on the command line.
+
 ## Project layout
 
 ```
@@ -152,6 +168,8 @@ webui/i18n.js             English/Russian interface dictionary and DOM translato
 webui/app.js              UI logic, talks to Python via window.pywebview.api
 build/Nexi Launcher.spec  PyInstaller spec (bundles the webui folder)
 build.ps1                 convenience build script
+installer/installer.py    per-user setup and uninstaller (Tk UI, silent mode)
+build_installer.ps1       builds nexi.exe and NexiLauncher-Setup.exe
 ```
 
 Each module imports only what it needs; the bridge mixins are combined in

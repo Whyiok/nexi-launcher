@@ -109,7 +109,9 @@ class ProfilesApi:
                 "theme": self.theme,
                 "color_mode": self.color_mode,
                 "language": self.language,
+                "onboarded": bool(getattr(self, "_onboarded", False)),
                 "java": self.java_path,
+                "mirror": self.mirror,
                 "accounts": [self._account_public(account)
                              for account in self._accounts],
                 "active_account": self._active_account_id,
@@ -363,7 +365,7 @@ class ProfilesApi:
         mods_dir = instance_mods_dir(root)
         resolved = {}
         offline = False
-        deadline = time.time() + 8
+        deadline = time.time() + 20
         for mod in data.get("mods", []):
             filename = str(mod.get("filename") or "")
             pid = str(mod.get("project_id") or files.get(filename) or "")
@@ -375,7 +377,7 @@ class ProfilesApi:
                     continue
                 try:
                     version = modrinth_get(
-                        f"/version_file/{sha1}", timeout=6)
+                        f"/version_file/{sha1}", timeout=15)
                 except urllib.error.HTTPError:
                     continue
                 except Exception:
@@ -391,7 +393,7 @@ class ProfilesApi:
                 if offline or time.time() > deadline:
                     continue
                 try:
-                    project = modrinth_get(f"/project/{pid}", timeout=6)
+                    project = modrinth_get(f"/project/{pid}", timeout=15)
                 except urllib.error.HTTPError:
                     continue
                 except Exception:

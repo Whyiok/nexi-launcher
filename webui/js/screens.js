@@ -144,6 +144,11 @@ function setScreen(name) {
   } else if (name === "profiles") {
     renderProfiles();
   } else if (name === "create") {
+    // A new profile starts on the latest release, whether it was opened with
+    // the New button or straight from the tab.
+    if (!editSlug && !versions.selected) {
+      versions.selected = latestReleaseId();
+    }
     if (!versions.loaded && !versions.loading) loadVersions(false);
     // The version list can already be loaded by the profile settings pane,
     // which never renders the create list itself.
@@ -158,6 +163,8 @@ function setScreen(name) {
     fillSettings();
     openLogs();
     openNetwork();
+  } else if (name === "bypass") {
+    openZapret();
   } else if (name === "skin") {
     loadSkin();
   }
@@ -168,13 +175,14 @@ function setScreen(name) {
 }
 
 function renderTabs() {
-  $$("#tabs .tab").forEach((tab) => {
+  $$("#tabs .tab, #bypass-tabs .tab").forEach((tab) => {
     const name = tab.dataset.screen;
     tab.classList.toggle("active", name === screen);
     const locked = ["loaders"].includes(name) && !S.instance;
     tab.disabled = locked;
   });
   updateSegFill($("#tabs"));
+  updateSegFill($("#bypass-tabs"));
 }
 
 function updateScreenHeads() {

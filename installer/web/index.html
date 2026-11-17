@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Nexi Launcher Setup</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-x" viewBox="0 0 16 16">
+      <path d="M4 4l8 8M12 4l-8 8"/>
+    </symbol>
+    <symbol id="i-min" viewBox="0 0 16 16">
+      <path d="M4 8.5h8"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 16 16">
+      <path d="M3.4 8.3l3 3 6.2-6.6"/>
+    </symbol>
+    <symbol id="i-folder" viewBox="0 0 16 16">
+      <path d="M2.5 4.6a1 1 0 0 1 1-1h2.4l1.5 1.8h5.1a1 1 0 0 1 1 1v4.9a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/>
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 16 16">
+      <path d="M8 3v7.2M5.1 7.6L8 10.5l2.9-2.9M3.2 12.8h9.6"/>
+    </symbol>
+    <symbol id="i-shield" viewBox="0 0 16 16">
+      <path d="M8 2.4l4.6 2v3.3c0 2.7-1.9 4.7-4.6 5.7-2.7-1-4.6-3-4.6-5.7V4.4z"/>
+      <path d="M6 8l1.5 1.5L10.3 6.4"/>
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 16 16">
+      <path d="M8 2.9l5.4 9.4H2.6z"/>
+      <path d="M8 6.4v3M8 11.3v.1"/>
+    </symbol>
+    <symbol id="i-info" viewBox="0 0 16 16">
+      <circle cx="8" cy="8" r="5.8"/>
+      <path d="M8 7.3v3.2M8 5.5v.1"/>
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 16 16">
+      <path d="M3.2 4.5h9.6M6.3 4.5V3.1h3.4v1.4M4.6 4.5l.6 8.1h5.6l.6-8.1"/>
+    </symbol>
+  </svg>
+
+  <div class="app">
+    <header class="titlebar">
+      <div class="titlebar-drag pywebview-drag-region">
+        <img class="brand-icon" src="star_icon.svg" alt="" aria-hidden="true">
+        <span class="brand">
+          <span class="brand-main">NEXI</span>
+          <span class="brand-sub" data-i18n="brand">launcher setup</span>
+        </span>
+      </div>
+      <div class="titlebar-controls">
+        <div class="lang-switch" id="lang-switch" role="group" aria-label="Interface language">
+          <button class="lang-btn" id="lang-ru" type="button" data-lang="ru" title="Русский">RU</button>
+          <button class="lang-btn" id="lang-en" type="button" data-lang="en" title="English">EN</button>
+        </div>
+        <button class="titlebar-btn" id="btn-min" type="button" title="Minimize">
+          <svg class="icon" aria-hidden="true"><use href="#i-min"/></svg>
+        </button>
+        <button class="titlebar-btn close" id="btn-close" type="button" title="Close">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="stage">
+      <section class="view" id="view-install">
+        <div class="head">
+          <div class="eyebrow"><span class="dot"></span><span data-i18n="eyebrow_install">NEXI LAUNCHER · SETUP</span></div>
+          <h1 data-i18n="install_title">Nexi Launcher Setup</h1>
+          <p class="sub" data-i18n="install_sub">A Minecraft launcher with isolated builds, mods and several accounts.</p>
+        </div>
+
+        <label class="field-label" for="install-path" data-i18n="folder_label">INSTALL FOLDER</label>
+        <div class="path-row">
+          <input class="input mono" id="install-path" type="text" spellcheck="false" autocomplete="off">
+          <button class="btn ghost tall" id="btn-browse" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>
+            <span data-i18n="browse">Browse…</span>
+          </button>
+        </div>
+
+        <div class="banner warn hidden" id="webview-warning">
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+          <span data-i18n="warn_webview">Microsoft Edge WebView2 Runtime was not found. The launcher needs it.</span>
+          <button class="link" id="btn-webview" type="button" data-i18n="webview_link">Download</button>
+        </div>
+
+        <div class="checks">
+          <label class="check">
+            <input type="checkbox" id="opt-desktop" checked>
+            <span class="box"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>
+            <span data-i18n="desktop">Create a desktop shortcut</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="opt-launch" checked>
+            <span class="box"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>
+            <span data-i18n="launch">Start Nexi Launcher after installing</span>
+          </label>
+        </div>
+
+        <div class="banner error hidden" id="install-error">
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+          <span><strong class="error-title"></strong><span class="error-text"></span></span>
+        </div>
+
+        <div class="progress-block hidden" id="install-progress">
+          <div class="progress"><div class="bar indeterminate" id="install-bar"></div></div>
+          <div class="status" aria-live="polite">
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="install-status"></span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn ghost lg" id="btn-cancel" type="button" data-i18n="cancel">Cancel</button>
+          <button class="btn primary lg" id="btn-install" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+            <span data-i18n="install">Install</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="view hidden" id="view-uninstall">
+        <div class="head">
+          <div class="eyebrow"><span class="dot"></span><span data-i18n="eyebrow_uninstall">NEXI LAUNCHER · REMOVE</span></div>
+          <h1 data-i18n="uninstall_title">Uninstall Nexi Launcher</h1>
+          <p class="sub" data-i18n="uninstall_sub">The launcher and its shortcuts will be removed from this computer.</p>
+        </div>
+
+        <div class="path-box">
+          <div class="field-label" data-i18n="installed_in">INSTALLED IN</div>
+          <code id="uninstall-path"></code>
+        </div>
+
+        <label class="check danger remove-data">
+          <input type="checkbox" id="opt-remove-data">
+          <span class="box"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>
+          <span data-i18n="remove_data">Also delete accounts, settings and builds</span>
+        </label>
+        <p class="hint" data-i18n="remove_data_hint">Accounts and tokens, settings, logs and every build will be deleted permanently.</p>
+
+        <div class="banner error hidden" id="uninstall-error">
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+          <span><strong class="error-title"></strong><span class="error-text"></span></span>
+        </div>
+
+        <div class="progress-block hidden" id="uninstall-progress">
+          <div class="progress"><div class="bar indeterminate" id="uninstall-bar"></div></div>
+          <div class="status" aria-live="polite">
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="uninstall-status"></span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn ghost lg" id="btn-uninstall-cancel" type="button" data-i18n="cancel">Cancel</button>
+          <button class="btn danger solid lg" id="btn-uninstall" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+            <span data-i18n="uninstall">Uninstall</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="view hidden" id="view-done">
+        <div class="done-mark" id="done-mark">
+          <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+        </div>
+        <h1 id="done-title"></h1>
+        <p class="sub" id="done-sub"></p>
+        <code class="done-path" id="done-path"></code>
+        <div class="banner warn hidden" id="done-warnings"></div>
+        <div class="actions">
+          <button class="btn ghost lg hidden" id="btn-done-run" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+            <span data-i18n="run">Start</span>
+          </button>
+          <button class="btn primary lg" id="btn-done-close" type="button" data-i18n="close">Close</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span id="foot-note" data-i18n="footer">Per-user install · no administrator rights needed</span>
+      <span class="version" id="foot-version">v1.3.0</span>
+    </footer>
+  </div>
+
+  <div class="overlay hidden" id="overlay" role="dialog" aria-modal="true">
+    <div class="dialog">
+      <div class="dialog-icon">
+        <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+      </div>
+      <h2 id="overlay-title"></h2>
+      <p class="sub" id="overlay-text"></p>
+      <div class="actions">
+        <button class="btn ghost lg" id="overlay-cancel" type="button" data-i18n="cancel">Cancel</button>
+        <button class="btn primary lg" id="overlay-ok" type="button" data-i18n="running_ok">Close and continue</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

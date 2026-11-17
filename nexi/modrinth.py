@@ -4,10 +4,10 @@ import json
 import urllib.request
 
 from .config import MODRINTH_API, USER_AGENT
-from .net import network_event
+from .net import network_event, note_failed_host
 
 
-def modrinth_get(path: str, params=None, timeout: float = 20):
+def modrinth_get(path: str, params=None, timeout: float = 45):
     url = MODRINTH_API + path
     if params:
         url += "?" + urllib.parse.urlencode(params)
@@ -17,10 +17,12 @@ def modrinth_get(path: str, params=None, timeout: float = 20):
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
+        note_failed_host("api.modrinth.com")
         network_event("error", f"api.modrinth.com: HTTP {exc.code} for {path}")
         raise
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         reason = getattr(exc, "reason", exc)
+        note_failed_host("api.modrinth.com")
         network_event("error", f"api.modrinth.com is unreachable ({reason})")
         raise RuntimeError(
             "Modrinth is unreachable from this network — check the "

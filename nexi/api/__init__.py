@@ -13,6 +13,7 @@ from .home import HomeApi
 from .background import BackgroundApi
 from .launch import LaunchApi
 from .window import WindowApi
+from .zapret import ZapretApi
 
 
 class LauncherApi(
@@ -29,5 +30,6 @@ class LauncherApi(
     BackgroundApi,
     LaunchApi,
     WindowApi,
+    ZapretApi,
 ):
     """State and commands exposed to the page as ``window.pywebview.api``."""

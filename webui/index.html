@@ -131,6 +131,11 @@
     </div>
   </header>
   <header class="topbar">
+    <nav class="tabs bypass-tabs" id="bypass-tabs" aria-label="Bypass">
+      <button class="tab" data-screen="bypass" type="button">
+        <svg class="icon"><use href="#i-world"/></svg><span>Bypass</span>
+      </button>
+    </nav>
     <nav class="tabs" id="tabs" aria-label="Sections">
       <button class="tab" data-screen="home" type="button">
         <svg class="icon"><use href="#i-home"/></svg><span>Home</span>
@@ -1080,6 +1085,16 @@
             <p class="hint net-empty" id="net-empty">Run the check to see which
                game hosts this network can reach.</p>
           </div>
+          <label class="field">
+            <span class="field-label">MIRROR / BYPASS</span>
+            <select class="input" id="mirror-mode">
+              <option value="auto">Automatic — use the mirror only when a host
+                is blocked</option>
+              <option value="always">Always use the BMCLAPI mirror</option>
+              <option value="never">Never use the mirror — rely on the
+                bypass</option>
+            </select>
+          </label>
           <div class="log console settings-log" id="net-console"></div>
           <div class="row-head tight">
             <p class="hint">Every host the launcher tried to download from and
@@ -1110,6 +1125,95 @@
           </div>
           <p class="hint">Profiles never copy files from the shared folder —
              versions, libraries and assets are reused in place.</p>
+        </section>
+      </div>
+    </section>
+
+    <!-- Bypass ---------------------------------------------------------- -->
+    <section class="screen" id="screen-bypass">
+      <div class="screen-head">
+        <div>
+          <h1 class="screen-title">Bypass</h1>
+          <p class="screen-sub">Network bypass (zapret) for blocked Minecraft
+             servers and mod sites. Changes are saved automatically.</p>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <section class="card settings-card wide" id="zapret-card">
+          <div class="card-head">
+            <span class="eyebrow">BYPASS (ZAPRET)</span>
+            <div class="pane-actions">
+              <span class="count" id="zapret-sub">Checking…</span>
+              <button class="btn ghost" id="btn-zapret-refresh" type="button"
+                      title="Check again">
+                <svg class="icon"><use href="#i-refresh"/></svg>Refresh
+              </button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-text">
+              <span class="setting-name">DPI bypass</span>
+              <p class="hint" id="zapret-hint">Checking for an installed copy…</p>
+            </div>
+            <div class="pane-actions">
+              <button class="btn primary" id="btn-zapret-apply" type="button">
+                Enable bypass
+              </button>
+              <button class="btn ghost hidden" id="btn-zapret-stop" type="button">
+                Stop
+              </button>
+              <button class="btn ghost hidden" id="btn-zapret-cancel" type="button">
+                Cancel
+              </button>
+            </div>
+          </div>
+          <div class="path-row">
+            <span class="path-label">Folder</span>
+            <code id="zapret-path">—</code>
+            <button class="link" id="btn-zapret-folder" type="button">Choose…</button>
+            <button class="link" id="btn-zapret-open" type="button">Open</button>
+          </div>
+          <label class="field hidden" id="zapret-preset-row">
+            <span class="field-label">STRATEGY</span>
+            <select class="input" id="zapret-preset"></select>
+          </label>
+          <label class="zapret-check">
+            <input type="checkbox" id="zapret-auto">
+            <span>Turn the bypass on when the launcher starts</span>
+          </label>
+          <div class="setting-row hidden" id="zapret-suggest-row">
+            <div class="setting-text">
+              <span class="setting-name">Something failed to load</span>
+              <p class="hint" id="zapret-suggest-text"></p>
+            </div>
+            <div class="pane-actions">
+              <button class="btn primary" id="btn-zapret-suggest" type="button">
+                Enable bypass and add address
+              </button>
+            </div>
+          </div>
+          <p class="hint zapret-warning" id="zapret-warning">
+            Uses unsigned third-party binaries (WinDivert). Antivirus may flag
+            them, Windows will ask for administrator rights, and the network may
+            briefly drop while the bypass restarts.
+          </p>
+          <div class="progress"><div class="bar" id="zapret-progress"></div></div>
+          <p class="hint" id="zapret-status">Not checked yet.</p>
+          <div class="log console settings-log" id="zapret-console"></div>
+          <div class="row-head tight">
+            <p class="hint">Adds the launcher's hosts to the general list
+               (list-general-user.txt) and turns the bypass on. Existing entries
+               are never duplicated.</p>
+            <div class="pane-actions">
+              <button class="btn ghost" id="btn-zapret-clear" type="button">
+                <svg class="icon"><use href="#i-trash"/></svg>Clear log
+              </button>
+              <button class="btn ghost" id="btn-zapret-site" type="button">
+                Project page
+              </button>
+            </div>
+          </div>
         </section>
       </div>
     </section>
@@ -1249,6 +1353,181 @@
   </figure>
 </div>
 
+<!-- Shown once when a blocked host falls back to a mirror: the user picks a
+     permanent policy (mirror or bypass) or closes it and decides later. -->
+<div class="mirror-modal hidden" id="mirror-modal" role="dialog"
+     aria-modal="true" aria-labelledby="mirror-title">
+  <div class="mirror-backdrop" data-mirror-close></div>
+  <div class="mirror-card">
+    <div class="mirror-head">
+      <span class="eyebrow">MIRROR OR BYPASS</span>
+      <button class="btn ghost mirror-close" id="btn-mirror-close" type="button"
+              aria-label="Dismiss notification">
+        <svg class="icon"><use href="#i-x"/></svg>
+      </button>
+    </div>
+    <h2 class="mirror-title" id="mirror-title">Something is blocked on this
+      network</h2>
+    <p class="mirror-text" id="mirror-text"></p>
+    <p class="hint mirror-detail">The server did not answer directly, so the
+      launcher switched to the BMCLAPI mirror. Choose what it should do from
+      now on — the choice is saved, and you can change it later in
+      Settings → Network.</p>
+    <div class="mirror-choices">
+      <button class="btn mirror-option" id="btn-mirror-always" type="button">
+        <span class="mirror-option-name">Always use the mirror</span>
+        <span class="mirror-option-hint">Downloads go straight to the BMCLAPI
+          mirror. No bypass and no administrator prompt.</span>
+      </button>
+      <button class="btn mirror-option" id="btn-mirror-bypass" type="button">
+        <span class="mirror-option-name">Always use the bypass</span>
+        <span class="mirror-option-hint">Keep the official servers and turn on
+          zapret. The mirror is never used again.</span>
+      </button>
+    </div>
+    <p class="hint mirror-action hidden" id="mirror-action-text"></p>
+    <div class="mirror-foot">
+      <button class="link" id="btn-mirror-auto" type="button">Decide
+        automatically every time</button>
+      <button class="link" id="btn-mirror-later" type="button">Not now</button>
+    </div>
+  </div>
+</div>
+
+<!-- First-run setup. Shown once, before the main screen, until the user
+     finishes it or skips it (the flag lives in settings.json). -->
+<div class="welcome hidden" id="welcome" role="dialog" aria-modal="true"
+     aria-labelledby="welcome-title">
+  <div class="welcome-card">
+    <div class="welcome-head">
+      <img class="welcome-icon" src="star_icon.svg" alt="" aria-hidden="true">
+      <span class="welcome-brand">
+        <span class="welcome-brand-name">NEXI</span>
+        <span class="welcome-brand-sub">launcher setup</span>
+      </span>
+      <button class="link welcome-skip" id="btn-welcome-skip" type="button">
+        Skip setup
+      </button>
+    </div>
+
+    <div class="welcome-body">
+      <section class="welcome-step" data-wstep="intro">
+        <span class="eyebrow">FIRST START</span>
+        <h1 class="welcome-title" id="welcome-title">Welcome to Nexi Launcher</h1>
+        <p class="welcome-sub">A few quick choices and you are ready to play.</p>
+        <ul class="welcome-list">
+          <li>Interface language</li>
+          <li>Theme and colour mode</li>
+          <li>Network bypass for blocked Minecraft servers</li>
+        </ul>
+      </section>
+
+      <section class="welcome-step hidden" data-wstep="language">
+        <span class="eyebrow">LANGUAGE</span>
+        <h1 class="welcome-title">Choose your language</h1>
+        <p class="welcome-sub">The interface changes right away; everything
+          else follows.</p>
+        <div class="welcome-lang" role="radiogroup"
+             aria-label="Interface language">
+          <button class="welcome-lang-btn" type="button" data-wlang="en"
+                  data-i18n-skip>
+            <span class="welcome-lang-name">English</span>
+            <span class="welcome-lang-hint">English interface</span>
+          </button>
+          <button class="welcome-lang-btn" type="button" data-wlang="ru"
+                  data-i18n-skip>
+            <span class="welcome-lang-name">Русский</span>
+            <span class="welcome-lang-hint">Russian interface</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="welcome-step hidden" data-wstep="appearance">
+        <span class="eyebrow">APPEARANCE</span>
+        <h1 class="welcome-title">Make it yours</h1>
+        <p class="welcome-sub">Pick an accent colour and a colour mode.</p>
+        <div class="theme-grid welcome-themes" id="welcome-themes"
+             role="radiogroup" aria-label="Accent colour">
+          <button class="theme-option" type="button" role="radio"
+                  aria-checked="false" data-theme-option="mint">
+            <span class="theme-swatch"></span>
+            <span class="theme-text">
+              <span class="theme-name">Mint</span>
+              <span class="theme-hex">#6EE7B7 · default</span>
+            </span>
+          </button>
+          <button class="theme-option" type="button" role="radio"
+                  aria-checked="false" data-theme-option="orange">
+            <span class="theme-swatch"></span>
+            <span class="theme-text">
+              <span class="theme-name">Soft orange</span>
+              <span class="theme-hex">#FF7A59</span>
+            </span>
+          </button>
+          <button class="theme-option" type="button" role="radio"
+                  aria-checked="false" data-theme-option="indigo">
+            <span class="theme-swatch"></span>
+            <span class="theme-text">
+              <span class="theme-name">Indigo</span>
+              <span class="theme-hex">#5B6CFF</span>
+            </span>
+          </button>
+        </div>
+        <div class="setting-row welcome-mode-row">
+          <div class="setting-text">
+            <span class="setting-name">Colour mode</span>
+            <p class="hint">Dark is the default; light switches to white
+              surfaces.</p>
+          </div>
+          <div class="seg" id="welcome-mode" role="radiogroup"
+               aria-label="Colour mode">
+            <button type="button" data-wmode="dark">Dark</button>
+            <button type="button" data-wmode="light">Light</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="welcome-step hidden" data-wstep="bypass">
+        <span class="eyebrow">BYPASS</span>
+        <h1 class="welcome-title">Network bypass (zapret)</h1>
+        <p class="welcome-sub">Minecraft servers and mod sites are often
+          blocked by the provider. The bypass brings them back.</p>
+        <p class="hint welcome-status" id="welcome-zapret-status">
+          Checking for zapret…
+        </p>
+        <div class="banner warn welcome-warn" id="welcome-zapret-warn">
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+          <span>zapret and WinDivert are third-party unsigned binaries.
+            Windows asks for administrator rights and some antivirus tools
+            flag them. You can skip this step and enable the bypass later in
+            the Bypass tab.</span>
+        </div>
+        <div class="welcome-actions-row">
+          <button class="btn primary" id="btn-welcome-zapret" type="button">
+            Turn the bypass on
+          </button>
+          <button class="btn ghost" id="btn-welcome-zapret-download"
+                  type="button">
+            Download and enable
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div class="welcome-foot">
+      <div class="welcome-dots" id="welcome-dots" aria-hidden="true"></div>
+      <div class="welcome-nav">
+        <button class="btn ghost" id="btn-welcome-back" type="button">
+          Back
+        </button>
+        <button class="btn primary" id="btn-welcome-next" type="button">
+          Get started
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Crashes and failed actions appear as small cards in the lower-right
      corner instead of only as a line in the status bar. -->
 <div class="toast-stack" id="toast-stack" aria-live="assertive"
@@ -1267,8 +1546,11 @@
 <script src="js/loaders.js"></script>
 <script src="js/logs.js"></script>
 <script src="js/network.js"></script>
+<script src="js/zapret.js"></script>
+<script src="js/mirror.js"></script>
 <script src="js/skin.js"></script>
 <script src="js/events.js"></script>
+<script src="js/welcome.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

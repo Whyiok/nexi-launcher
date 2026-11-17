@@ -29,6 +29,8 @@ function fillSettings() {
   fillAccount();
   fillTheme();
   fillBackground();
+  fillZapret();
+  if (typeof renderMirrorMode === "function") renderMirrorMode();
 }
 
 function fillBackground() {

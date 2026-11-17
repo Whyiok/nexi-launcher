@@ -6,19 +6,26 @@ function handleEvent(ev) {
   switch (ev.t) {
     case "status":
       if (ev.screen === "create") screenStatus("create", ev.text, ev.error);
-      else if (ev.screen === "loaders") screenStatus("loaders", ev.text, ev.error);
+      else if (ev.screen === "loaders") setLoaderStatus(ev.text, ev.error);
       else if (ev.screen === "mods") screenStatus("mods", ev.text, ev.error);
+      else if (ev.screen === "zapret") setZapretStatus(ev.text, ev.error);
       else setStatus(ev.text, ev.error);
       break;
     case "log":
       if (ev.channel === "create") appendCreateLog(ev.line);
       else if (ev.channel === "loaders") appendLoaderLog(ev.line);
+      else if (ev.channel === "zapret") appendZapretLog(ev.line);
       break;
     case "progress":
-      setProgress(ev.value, ev.total);
+      if (S.busy === "zapret") setZapretProgress(ev.value, ev.total);
+      else setProgress(ev.value, ev.total);
       break;
     case "busy":
       S.busy = ev.on ? ev.task : "";
+      movingProgress("#loader-progress", S.busy === "loaders");
+      movingProgress("#create-progress",
+        !!S.busy && S.busy !== "loaders" && S.busy !== "zapret");
+      movingProgress("#zapret-progress", S.busy === "zapret");
       syncBusy();
       syncMods();
       syncLoaders();
@@ -26,6 +33,11 @@ function handleEvent(ev) {
     case "refresh":
       refreshState();
       if (typeof maybeReloadHome === "function") maybeReloadHome();
+      break;
+    case "mirror":
+      if (typeof showMirrorPrompt === "function") {
+        showMirrorPrompt(ev.host || "", ev.mirror || "");
+      }
       break;
     case "msauth":
       if (ev.status === "code") {
@@ -107,12 +119,18 @@ function handleEvent(ev) {
 }
 
 function setProgress(done, total) {
+  const loader = S.busy === "loaders" || lb.busy;
   if (!total) {
-    $("#create-progress").style.width = "0";
-    $("#loader-progress").style.width = "0";
+    movingProgress("#create-progress", false);
+    movingProgress("#loader-progress", false);
+    // A phase without a byte count (or a finished download) falls back to the
+    // moving stripe while the task is still running.
+    if (S.busy === "loaders" || lb.busy) movingProgress("#loader-progress", true);
+    else if (S.busy) movingProgress("#create-progress", true);
     return;
   }
-  const bar = S.busy === "loaders" ? $("#loader-progress") : $("#create-progress");
+  const bar = loader ? $("#loader-progress") : $("#create-progress");
+  bar.classList.remove("indeterminate");
   bar.style.width = `${Math.round((done / total) * 100)}%`;
 }
 
@@ -144,4 +162,5 @@ function syncBusy() {
   if (clearIcon) clearIcon.disabled = busy || !S.instance || !S.instance.icon;
   syncVersionEditor();
   syncPlay();
+  syncZapret();
 }

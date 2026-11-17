@@ -15,6 +15,8 @@
     "Profiles": "Сборки",
     "New": "Новая",
     "Skins": "Скины",
+    "Bypass": "Обход",
+    "Network bypass (zapret) for blocked Minecraft servers and mod sites. Changes are saved automatically.": "Обход блокировок (zapret) для серверов Minecraft и сайтов модов. Изменения сохраняются автоматически.",
     "Settings": "Настройки",
     "PROFILES": "СБОРКИ",
     "empty": "пусто",
@@ -308,6 +310,41 @@
     "Fabric maven": "Maven Fabric",
     "Forge maven": "Maven Forge",
     "NeoForge maven": "Maven NeoForge",
+
+    /* Bypass (zapret) */
+    "BYPASS (ZAPRET)": "ОБХОД (ZAPRET)",
+    "DPI bypass": "Обход блокировок DPI",
+    "Checking for an installed copy…": "Проверяем, установлен ли zapret…",
+    "STRATEGY": "СТРАТЕГИЯ",
+    "Enable bypass": "Включить обход",
+    "Apply domains again": "Добавить адреса и включить",
+    "Download & enable": "Скачать и настроить",
+    "Confirm download": "Подтвердить скачивание",
+    "Turn the bypass on when the launcher starts": "Включать обход при запуске лаунчера",
+    "Something failed to load": "Что-то не загрузилось",
+    "Enable bypass and add address": "Включить обход и добавить адрес",
+    /* Mirror / bypass choice */
+    "MIRROR / BYPASS": "ЗЕРКАЛО / ОБХОД",
+    "Automatic — use the mirror only when a host is blocked":
+      "Автоматически — зеркало только когда адрес заблокирован",
+    "Always use the BMCLAPI mirror": "Всегда использовать зеркало BMCLAPI",
+    "Never use the mirror — rely on the bypass":
+      "Не использовать зеркало — полагаться на обход",
+    "MIRROR OR BYPASS": "ЗЕРКАЛО ИЛИ ОБХОД",
+    "Something is blocked on this network": "Часть сети заблокирована",
+    "The server did not answer directly, so the launcher switched to the BMCLAPI mirror. Choose what it should do from now on — the choice is saved, and you can change it later in Settings → Network.":
+      "Сервер не ответил напрямую, поэтому лаунчер переключился на зеркало BMCLAPI. Выберите, что делать дальше: решение сохранится, и его можно изменить в «Настройки → Сеть».",
+    "Always use the mirror": "Всегда использовать зеркало",
+    "Downloads go straight to the BMCLAPI mirror. No bypass and no administrator prompt.":
+      "Скачивание идёт сразу с зеркала BMCLAPI. Без обхода и без запроса прав администратора.",
+    "Always use the bypass": "Всегда использовать обход",
+    "Keep the official servers and turn on zapret. The mirror is never used again.":
+      "Оставить официальные серверы и включить zapret. Зеркало больше не используется.",
+    "Decide automatically every time": "Решать автоматически каждый раз",
+    "Not now": "Не сейчас",
+    "Uses unsigned third-party binaries (WinDivert). Antivirus may flag them, Windows will ask for administrator rights, and the network may briefly drop while the bypass restarts.": "Используются сторонние неподписанные бинарники (WinDivert). Антивирус может на них ругаться, Windows запросит права администратора, а сеть может на несколько секунд прерваться при перезапуске обхода.",
+    "Adds the launcher's hosts to the general list (list-general-user.txt) and turns the bypass on. Existing entries are never duplicated.": "Добавляет адреса лаунчера в общий список (list-general-user.txt) и включает обход. Уже существующие строки не дублируются.",
+    "Not checked yet.": "Проверка не выполнялась.",
     "FOLDERS": "ПАПКИ",
     "Shared files": "Общие файлы",
     "Profiles never copy files from the shared folder — versions, libraries and assets are reused in place.": "Сборки никогда не копируют файлы из общей папки — версии, библиотеки и ресурсы используются на месте.",
@@ -458,6 +495,47 @@
     "Nothing found — try another name or loader": "Ничего не найдено — попробуйте другое название или загрузчик",
     "Profile settings are unchanged.": "Настройки сборки не изменены.",
     "Verification cancelled.": "Проверка отменена.",
+
+    /* First-run setup */
+    "launcher setup": "настройка лаунчера",
+    "Skip setup": "Пропустить настройку",
+    "FIRST START": "ПЕРВЫЙ ЗАПУСК",
+    "Welcome to Nexi Launcher": "Добро пожаловать в Nexi Launcher",
+    "A few quick choices and you are ready to play.": "Пара быстрых настроек — и можно играть.",
+    "Interface language": "Язык интерфейса",
+    "Theme and colour mode": "Тема и режим оформления",
+    "Network bypass for blocked Minecraft servers": "Обход блокировок для серверов Minecraft",
+    "LANGUAGE": "ЯЗЫК",
+    "Choose your language": "Выберите язык",
+    "The interface changes right away; everything else follows.": "Интерфейс переключится сразу, остальное — следом.",
+    "APPEARANCE": "ОФОРМЛЕНИЕ",
+    "Make it yours": "Настройте под себя",
+    "Pick an accent colour and a colour mode.": "Выберите акцентный цвет и режим оформления.",
+    "Accent colour": "Акцентный цвет",
+    "Colour mode": "Режим оформления",
+    "Dark is the default; light switches to white surfaces.": "Тёмный — по умолчанию; светлый переключает на белые поверхности.",
+    "BYPASS": "ОБХОД",
+    "Network bypass (zapret)": "Обход блокировок (zapret)",
+    "Minecraft servers and mod sites are often blocked by the provider. The bypass brings them back.": "Провайдеры часто блокируют серверы Minecraft и сайты модов. Обход возвращает к ним доступ.",
+    "Checking for zapret…": "Ищем zapret…",
+    "zapret and WinDivert are third-party unsigned binaries. Windows asks for administrator rights and some antivirus tools flag them. You can skip this step and enable the bypass later in the Bypass tab.": "zapret и WinDivert — сторонние неподписанные программы. Windows запросит права администратора, а некоторые антивирусы могут на них ругаться. Шаг можно пропустить и включить обход позже на вкладке «Обход».",
+    "Turn the bypass on": "Включить обход",
+    "Download and enable": "Скачать и включить",
+    "Back": "Назад",
+    "Get started": "Начать",
+    "Continue": "Продолжить",
+    "Finish": "Готово",
+    "Setup skipped — everything can be changed in Settings.": "Настройка пропущена — всё можно изменить в «Настройках».",
+    "Ready.": "Готово.",
+    "Could not check for zapret.": "Не удалось проверить zapret.",
+    "zapret is not installed on this computer.": "zapret не установлен на этом компьютере.",
+    "Turning the bypass on… Confirm the Windows administrator prompt.": "Включаем обход… Подтвердите запрос прав администратора Windows.",
+    "Downloading zapret and turning the bypass on… Confirm the Windows administrator prompt.": "Скачиваем zapret и включаем обход… Подтвердите запрос прав администратора Windows.",
+    "Could not run the bypass.": "Не удалось запустить обход.",
+    "The bypass is running. You can change it later in the Bypass tab.": "Обход включён. Изменить его можно позже на вкладке «Обход».",
+    "Cancelled — the bypass was not changed.": "Отменено — обход не изменён.",
+    "zapret is not installed. Use “Download and enable” to install it.": "zapret не установлен. Нажмите «Скачать и включить», чтобы установить его.",
+    "Could not turn the bypass on.": "Не удалось включить обход.",
   };
 
   const ATTRS = ["placeholder", "title", "aria-label"];
@@ -501,6 +579,128 @@
 
   const RULES = [
     [/^Memory for “(.*)”$/, (m) => `Память для «${m[1]}»`],
+    /* Bypass (zapret) */
+    [/^(.+) · service running(?: · (.+))?$/, (m) =>
+      `${m[1]} · служба запущена${m[2] ? ` · ${m[2]}` : ""}`],
+    [/^(.+) · service stopped(?: · (.+))?$/, (m) =>
+      `${m[1]} · служба остановлена${m[2] ? ` · ${m[2]}` : ""}`],
+    [/^(.+) · running(?: · (.+))?$/, (m) =>
+      `${m[1]} · работает${m[2] ? ` · ${m[2]}` : ""}`],
+    [/^(.+) · not running$/, (m) => `${m[1]} · не работает`],
+    [/^Not installed$/, () => "Не установлен"],
+    [/^not found$/, () => "не найден"],
+    [/^zapret found · bypass is running \((.+)\)\.$/, (m) =>
+      `zapret найден · обход включён (${m[1]}).`],
+    [/^zapret found · bypass is running\.$/, () =>
+      "zapret найден · обход включён."],
+    [/^zapret found in (.+) · the bypass is not running\.$/, (m) =>
+      `zapret найден в ${m[1]} · обход не включён.`],
+    [/^Checking…$/, () => "Проверяем…"],
+    [/^zapret was not found\. Downloading puts it in the launcher's data folder and configures the general list automatically\.$/, () =>
+      "zapret не найден. При скачивании он попадёт в папку данных лаунчера, а общий список настроится автоматически."],
+    [/^The zapret service is running, but its folder could not be read\. Choose the folder manually\.$/, () =>
+      "Служба zapret запущена, но её папку прочитать не удалось. Укажите папку вручную."],
+    [/^(\d+) launcher address\(es\) missing from (.+)\.$/, (m) =>
+      `В ${m[2]} не хватает адресов лаунчера: ${m[1]}.`],
+    [/^All launcher addresses are already in (.+)\.$/, (m) =>
+      `Все адреса лаунчера уже есть в ${m[1]}.`],
+    [/^Using (.+)\.$/, (m) => `Используется ${m[1]}.`],
+    [/^Strategy: (.+)\.$/, (m) => `Стратегия: ${m[1]}.`],
+    [/^Click again to download the latest zapret release and configure it\.$/, () =>
+      "Нажмите ещё раз, чтобы скачать свежий релиз zapret и настроить его."],
+    [/^Click again to confirm\.$/, () => "Нажмите ещё раз для подтверждения."],
+    [/^Downloading zapret — confirm the administrator prompt…$/, () =>
+      "Скачиваем zapret — подтвердите запрос прав администратора…"],
+    [/^Applying the list — confirm the administrator prompt…$/, () =>
+      "Применяем список — подтвердите запрос прав администратора…"],
+    [/^Adding the failed address and turning the bypass on — confirm the administrator prompt…$/, () =>
+      "Добавляем адрес, который не загрузился, и включаем обход — подтвердите запрос прав администратора…"],
+    [/^(.+) did not load\. Add (these addresses|this address) to the bypass list and turn the bypass on\?$/, (m) =>
+      `${m[1]} не загрузилось. Добавить ${m[2] === "this address" ? "этот адрес" : "эти адреса"} в список обхода и включить его?`],
+    [/^The bypass will start together with the launcher\.$/, () =>
+      "Обход будет включаться вместе с лаунчером."],
+    [/^The bypass will not start automatically\.$/, () =>
+      "Обход больше не будет включаться автоматически."],
+    /* Mirror / bypass choice */
+    [/^(.+) is blocked on this network\. Choose how the launcher should download from now on\.$/, (m) =>
+      `${m[1]} заблокирован в этой сети. Как лаунчеру скачивать дальше?`],
+    [/^A download server is blocked on this network\. Choose how the launcher should download from now on\.$/, () =>
+      "Сервер загрузки заблокирован в этой сети. Как лаунчеру скачивать дальше?"],
+    [/^The launcher will pick the mirror automatically\.$/, () =>
+      "Лаунчер будет сам выбирать зеркало при необходимости."],
+    [/^The launcher will always use the BMCLAPI mirror\.$/, () =>
+      "Лаунчер всегда будет использовать зеркало BMCLAPI."],
+    [/^The launcher will never use the mirror\.$/, () =>
+      "Лаунчер больше не будет использовать зеркало."],
+    [/^Saving the choice…$/, () => "Сохраняем выбор…"],
+    [/^The choice could not be saved\.$/, () => "Не удалось сохранить выбор."],
+    [/^Checking the bypass…$/, () => "Проверяем обход…"],
+    [/^Turning the bypass on — confirm the administrator prompt…$/, () =>
+      "Включаем обход — подтвердите запрос прав администратора…"],
+    [/^The bypass is on; the mirror will not be used\.$/, () =>
+      "Обход включён; зеркало больше не будет использоваться."],
+    [/^Confirm the zapret download in the Bypass tab to use the bypass\.$/, () =>
+      "Подтвердите скачивание zapret на вкладке «Обход», чтобы использовать обход."],
+    [/^Could not turn the bypass on\.$/, () => "Не удалось включить обход."],
+    [/^Stopping the bypass…$/, () => "Останавливаем обход…"],
+    [/^Looking for zapret…$/, () => "Ищем zapret…"],
+    [/^Downloading zapret…$/, () => "Скачиваем zapret…"],
+    [/^Downloading the latest zapret release from GitHub…$/, () =>
+      "Скачиваем последний релиз zapret с GitHub…"],
+    [/^Turning the bypass on…$/, () => "Включаем обход…"],
+    [/^Applying the list and \(re\)starting the bypass — confirm the Windows administrator prompt…$/, () =>
+      "Применяем список и перезапускаем обход — подтвердите запрос администратора Windows…"],
+    [/^zapret (.+) unpacked\.$/, (m) => `zapret ${m[1]} распакован.`],
+    [/^Added (\d+) address\(es\) to (.+)\.$/, (m) =>
+      `Добавлено адресов в ${m[2]}: ${m[1]}.`],
+    [/^(.+) already contains every launcher address\.$/, (m) =>
+      `В ${m[1]} уже есть все адреса лаунчера.`],
+    [/^Bypass is running \((.+)\); added (\d+) address\(es\)\.$/, (m) =>
+      `Обход включён (${m[1]}); добавлено адресов: ${m[2]}.`],
+    [/^Bypass is running \((.+)\)\.$/, (m) => `Обход включён (${m[1]}).`],
+    [/^Bypass stopped\.$/, () => "Обход остановлен."],
+    [/^Cancelled\.$/, () => "Отменено."],
+    [/^Cancelled\. The elevated step may still finish in the background\.$/, () =>
+      "Отменено. Шаг с правами администратора может ещё завершиться в фоне."],
+    [/^Administrator rights were not granted\.$/, () =>
+      "Права администратора не выданы."],
+    [/^Could not start the elevated helper \(code (\d+)\)\.$/, (m) =>
+      `Не удалось запустить процесс с правами администратора (код ${m[1]}).`],
+    [/^The elevated helper exited without a result\. Run it again; if it keeps failing, check the log\.$/, () =>
+      "Процесс с правами администратора завершился без результата. Запустите ещё раз; если это повторяется, проверьте журнал."],
+    [/^The elevated helper did not finish\. Check whether the Windows prompt is still open\.$/, () =>
+      "Процесс с правами администратора не завершился. Проверьте, не висит ли запрос прав администратора Windows."],
+    [/^Another zapret instance is running from a different folder\. Stop it first\.$/, () =>
+      "Другой экземпляр zapret запущен из другой папки. Сначала остановите его."],
+    [/^The zapret service did not start\.$/, () =>
+      "Служба zapret не запустилась."],
+    [/^Preset not found: (.+)$/, (m) => `Пресет не найден: ${m[1]}`],
+    [/^winws\.exe did not start\. Check the strategy and antivirus\.$/, () =>
+      "winws.exe не запустился. Проверьте стратегию и антивирус."],
+    [/^ERROR: winws\.exe did not start\. Check the strategy and antivirus\.$/, () =>
+      "ОШИБКА: winws.exe не запустился. Проверьте стратегию и антивирус."],
+    [/^ERROR: Another zapret instance is running from a different folder\. Stop it first\.$/, () =>
+      "ОШИБКА: другой экземпляр zapret запущен из другой папки. Сначала остановите его."],
+    [/^ERROR: The zapret service did not start\.$/, () =>
+      "ОШИБКА: служба zapret не запустилась."],
+    [/^ERROR: Preset not found: (.+)$/, (m) => `ОШИБКА: пресет не найден: ${m[1]}`],
+    [/^ERROR: (.+)$/, (m) => `ОШИБКА: ${m[1]}`],
+    [/^list: added (\d+) domain\(s\)$/, (m) =>
+      `список: добавлено адресов: ${m[1]}`],
+    [/^helper started$/, () => "служебный процесс запущен"],
+    [/^list: nothing to add$/, () => "список: добавлять нечего"],
+    [/^service: Running$/, () => "служба: запущена"],
+    [/^service: Stopped$/, () => "служба: остановлена"],
+    [/^service stopped$/, () => "служба остановлена"],
+    [/^service started$/, () => "служба запущена"],
+    [/^stop failed: (.+)$/, (m) => `остановить не удалось: ${m[1]}`],
+    [/^winws stopped$/, () => "winws остановлен"],
+    [/^preset started: (.+)$/, (m) => `стратегия запущена: ${m[1]}`],
+    [/^Cancelling…$/, () => "Отменяем…"],
+    [/^Could not configure zapret: (.+)$/, (m) =>
+      `Не удалось настроить zapret: ${m[1]}`],
+    [/^Could not turn the bypass on\.$/, () => "Не удалось включить обход."],
+    [/^Could not stop the bypass\.$/, () => "Не удалось остановить обход."],
     [/^(.*) — Minecraft (.*) · vanilla$/, (m) =>
       `${m[1]} — Minecraft ${m[2]} · ванильная`],
     [/^Minecraft (.+) · vanilla$/, (m) => `Minecraft ${m[1]} · ванильная`],
@@ -526,6 +726,16 @@
       `Найдено ${m[1]} ${plural(+m[1], "сборка", "сборки", "сборок")} ${m[2]}.`],
     [/^Looking up (.+) builds for (.+)…$/, (m) =>
       `Ищем сборки ${m[1]} для ${m[2]}…`],
+    [/^Looking up (.+) builds for (.+)… \((\d+:\d+)\)$/, (m) =>
+      `Ищем сборки ${m[1]} для ${m[2]}… (${m[3]})`],
+    [/^Installing (.+) for (.+)…$/, (m) =>
+      `Устанавливаем ${m[1]} для ${m[2]}…`],
+    [/^Installing (.+) for (.+)… \((\d+:\d+)\)$/, (m) =>
+      `Устанавливаем ${m[1]} для ${m[2]}… (${m[3]})`],
+    [/^Downloading Minecraft (.+)…$/, (m) =>
+      `Скачиваем Minecraft ${m[1]}…`],
+    [/^Installed (.+) — this profile now runs "(.+)"$/, (m) =>
+      `Установлено: ${m[1]} — эта сборка теперь запускает «${m[2]}»`],
     [/^No (.+) builds for (.+) — try another loader or Refresh\.$/, (m) =>
       `Нет сборок ${m[1]} для ${m[2]} — попробуйте другой загрузчик или «Обновить».`],
     [/^No (.+) builds for (.+) — try another loader\.$/, (m) =>

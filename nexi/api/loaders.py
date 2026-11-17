@@ -57,7 +57,9 @@ class LoadersApi:
                 log(f"WARNING: Java could not be prepared automatically: {exc}")
             java = console_java_for(base)
             log(f"Java: {java}")
-            profile = install_loader(loader_key, base, loader_version, java, log)
+            profile = install_loader(loader_key, base, loader_version, java, log,
+                                     progress=self._progress,
+                                     cancel=self._cancel_event)
             if not profile:
                 raise RuntimeError(
                     "installer finished, but no new profile appeared")

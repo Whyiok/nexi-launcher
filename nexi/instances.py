@@ -235,7 +235,7 @@ def download_profile_icon(root, url: str) -> str:
     part = target.with_name(target.name + ".part")
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with urllib.request.urlopen(request, timeout=30) as response, \
+        with urllib.request.urlopen(request, timeout=60) as response, \
                 part.open("wb") as handle:
             shutil.copyfileobj(response, handle)
         if part.stat().st_size > ICON_MAX_BYTES:

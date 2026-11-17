@@ -84,7 +84,7 @@ function bind() {
       call("window_resize", node.dataset.windowResize);
     });
   });
-  $("#tabs").addEventListener("click", (event) => {
+  $(".topbar").addEventListener("click", (event) => {
     const tab = event.target.closest(".tab");
     if (tab && !tab.disabled) {
       if (editSlug) resetCreateMode();
@@ -411,6 +411,9 @@ function bind() {
     setStatus("Network log cleared.");
   });
 
+  bindZapret();
+  bindMirror();
+
   $("#btn-open-game-log-folder").addEventListener("click", () =>
     call("open_instance", "logs"));
   $("#btn-clear-game-logs").addEventListener("click", () =>
@@ -449,7 +452,12 @@ function bind() {
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && screen !== "profiles") setScreen("profiles");
+    if (event.key !== "Escape") return;
+    if (typeof mirrorPrompt !== "undefined" && mirrorPrompt.open) {
+      closeMirrorPrompt();
+      return;
+    }
+    if (screen !== "profiles") setScreen("profiles");
   });
 
   window.__go = setScreen;
@@ -573,6 +581,7 @@ async function boot() {
   await refreshState();
   queueMaximizedSync();
   setScreen("home");
+  if (typeof maybeShowWelcome === "function") maybeShowWelcome();
   setInterval(pollOnce, 160);
   if (!S.instances.length) {
     setStatus("Create a profile to get started.");

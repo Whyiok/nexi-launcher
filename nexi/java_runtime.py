@@ -130,7 +130,7 @@ def _java_runtime_manifest():
     errors = []
     for url in JAVA_RUNTIME_MANIFEST_URLS:
         try:
-            data = json.loads(http_get(url, timeout=60).decode("utf-8"))
+            data = json.loads(http_get(url, timeout=120).decode("utf-8"))
         except Exception as exc:
             errors.append(f"{url}: {exc}")
             continue
@@ -158,7 +158,7 @@ def install_java_runtime(component: str, log=lambda _text: None,
         f"This happens once per Java version.")
     if cancel is not None and cancel.is_set():
         raise InstallCancelled()
-    data = json.loads(http_get(manifest_url, timeout=60).decode("utf-8"))
+    data = json.loads(http_get(manifest_url, timeout=120).decode("utf-8"))
     root = MC / "runtime" / component
     root.mkdir(parents=True, exist_ok=True)
     root_resolved = root.resolve()

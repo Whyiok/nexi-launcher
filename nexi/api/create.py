@@ -53,12 +53,15 @@ class CreateApi:
         return {"versions": entries, "installed": installed, "error": error}
 
     def builds(self, loader_key, game_version):
+        notes = []
         try:
-            pairs = loader_builds(str(loader_key), str(game_version))
+            pairs = loader_builds(str(loader_key), str(game_version),
+                                  notes.append)
         except Exception as exc:
-            return {"builds": [], "error": str(exc)}
+            return {"builds": [], "error": str(exc), "note": ""}
         return {"builds": [{"version": value, "label": label}
-                           for value, label in pairs], "error": ""}
+                           for value, label in pairs], "error": "",
+                "note": notes[0] if notes else ""}
 
     def create(self, name, version_id, loader_key=None, loader_version=None):
         version_id = str(version_id or "").strip()
@@ -115,7 +118,9 @@ class CreateApi:
                 java = console_java_for(version_id)
                 log(f"Java: {java}")
                 profile = install_loader(loader_key, version_id,
-                                         loader_version, java, log)
+                                         loader_version, java, log,
+                                         progress=self._progress,
+                                         cancel=cancel)
             except Exception as exc:
                 message = (f'Profile "{instance["name"]}" was created, but '
                            f'the loader did not install: {exc}. You can add '
@@ -264,7 +269,9 @@ class CreateApi:
                     java = console_java_for(version_id)
                     log(f"Java: {java}")
                     profile = install_loader(loader_key, version_id,
-                                             loader_version, java, log)
+                                             loader_version, java, log,
+                                             progress=self._progress,
+                                             cancel=cancel)
                 if not profile:
                     raise RuntimeError(
                         "installer finished, but no new profile appeared")
@@ -533,7 +540,9 @@ class CreateApi:
                         java = console_java_for(base)
                         log(f"Java: {java}")
                         profile = install_loader(pack_loader, base,
-                                                 pack_loader_version, java, log)
+                                                 pack_loader_version, java, log,
+                                                 progress=self._progress,
+                                                 cancel=cancel)
                     if not profile:
                         raise RuntimeError(
                             "installer finished, but no new profile appeared")

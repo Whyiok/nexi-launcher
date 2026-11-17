@@ -4,7 +4,11 @@ from pathlib import Path
 
 from ..config import LOG_FILE, MAX_LOG_BACKLOG
 from ..instances import instance_log_file
-from ..net import NETWORK_LOG, _network_log_lock, network_check
+from ..logging_setup import log
+from ..net import (
+    MIRROR_MODES, NETWORK_LOG, _network_log_lock, mirror_mode, network_check,
+    set_mirror_mode,
+)
 
 
 class DiagnosticsApi:
@@ -114,3 +118,18 @@ class DiagnosticsApi:
             return network_check()
         except Exception as exc:  # never let a probe kill the settings screen
             return {"results": [], "blocked": [], "error": str(exc)}
+
+    def mirror_get(self):
+        return {"ok": True, "mode": mirror_mode()}
+
+    def mirror_set_mode(self, mode):
+        """Persist the standing mirror choice: auto, always or never."""
+        mode = str(mode or "").strip().lower()
+        if mode not in MIRROR_MODES:
+            return {"ok": False, "error": "Unknown mirror mode."}
+        with self._lock:
+            self.mirror = mode
+            self._save()
+        set_mirror_mode(mode)
+        log.info("Mirror mode: %s", mode)
+        return {"ok": True, "mode": mode, "state": self.state()}

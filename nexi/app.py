@@ -2,6 +2,7 @@
 
 import os
 import sys
+import threading
 from pathlib import Path
 
 from . import config
@@ -45,8 +46,17 @@ def main():
     )
     window.events.closing += api.on_close
 
+    def start_bypass():
+        # Runs in its own thread: the UAC prompt must not block the window.
+        try:
+            api.zapret_autostart()
+        except Exception:
+            log.exception("main: zapret autostart failed")
+
     def on_loaded():
         log.info("main: page loaded, bridge ready")
+        threading.Thread(target=start_bypass, name="zapret-autostart",
+                         daemon=True).start()
 
     window.events.loaded += on_loaded
     log.info("main: starting webview (gui=edgechromium, debug=%s)",
