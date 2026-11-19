@@ -7,7 +7,7 @@
  * Settings screen, so the result is indistinguishable from a manual setup.
  * The final step calls complete_onboarding() and never appears again. */
 
-const WELCOME_STEPS = ["intro", "language", "appearance", "bypass"];
+const WELCOME_STEPS = ["language", "appearance", "bypass"];
 let welcomeStep = 0;
 let welcomeBound = false;
 let welcomeZapretBusy = false;
@@ -44,7 +44,6 @@ function hideWelcome() {
 
 function welcomeNextLabel() {
   if (welcomeStep === WELCOME_STEPS.length - 1) return "Finish";
-  if (welcomeStep === 0) return "Get started";
   return "Continue";
 }
 

@@ -6,6 +6,10 @@ const skin = {
   data: "", variant: "classic", type: "", account: "", busy: false, seq: 0,
 };
 
+const skinHistory = {
+  items: [], seq: 0, busy: false, confirm: false, timer: null,
+};
+
 function setSkinVariantButtons(variant) {
   $$("#skin-seg button").forEach((button) => {
     button.classList.toggle("on", button.dataset.skinVariant === variant);
@@ -29,13 +33,14 @@ const skinView = {
   pitch: 0,
   targetYaw: 0,
   targetPitch: 0,
-  bodyYaw: 0.16,
+  bodyYaw: 0,
   bodyPitch: 0,
-  targetBodyYaw: 0.16,
+  targetBodyYaw: 0,
   targetBodyPitch: 0,
   dragging: false,
   lastX: 0,
   lastY: 0,
+  idleTimer: 0,
   raf: 0,
 };
 
@@ -269,8 +274,47 @@ function stopSkinView() {
   skinView.dragging = false;
   skinView.targetYaw = 0;
   skinView.targetPitch = 0;
+  skinView.targetBodyYaw = 0;
+  skinView.targetBodyPitch = 0;
+  cancelSkinSpinReset();
   const canvas = $("#skin-canvas");
   if (canvas) canvas.classList.remove("dragging");
+}
+
+/* A model left turned for a while goes back to its front view, so the skin
+   screen always settles on the same pose. */
+const SKIN_SPIN_IDLE_MS = 5000;
+
+function cancelSkinSpinReset() {
+  if (skinView.idleTimer) window.clearTimeout(skinView.idleTimer);
+  skinView.idleTimer = 0;
+}
+
+function scheduleSkinSpinReset() {
+  cancelSkinSpinReset();
+  skinView.idleTimer = window.setTimeout(() => {
+    skinView.idleTimer = 0;
+    if (skinView.dragging) {
+      scheduleSkinSpinReset();
+      return;
+    }
+    if (!skinView.targetBodyYaw && !skinView.targetBodyPitch) return;
+    skinView.targetBodyYaw = 0;
+    skinView.targetBodyPitch = 0;
+    kickSkinView();
+  }, SKIN_SPIN_IDLE_MS);
+}
+
+/* Where the head sits when the model stands still (yaw/pitch = 0). The renderer
+   draws the head centre 12 skin pixels above the canvas middle, so distances
+   are measured from that point: a pointer exactly over the resting head looks
+   straight ahead. */
+function skinHeadAnchor(rect) {
+  const scale = Math.min(rect.width / 19, rect.height / 35);
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2 - 12 * scale,
+  };
 }
 
 /* The head follows the cursor anywhere in the window. */
@@ -280,10 +324,9 @@ function trackSkinPointer(event) {
   if (!canvas || !skinView.ready) return;
   const rect = canvas.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
-  const nx = (event.clientX - rect.left - rect.width / 2)
-    / Math.max(1, window.innerWidth / 2);
-  const ny = (event.clientY - rect.top - rect.height / 2)
-    / Math.max(1, window.innerHeight / 2);
+  const anchor = skinHeadAnchor(rect);
+  const nx = (event.clientX - anchor.x) / (rect.width / 2);
+  const ny = (event.clientY - anchor.y) / (rect.height / 2);
   /* The head follows the cursor in every direction. */
   skinView.targetYaw = Math.max(-1, Math.min(1, nx)) * 0.9;
   skinView.targetPitch = Math.max(-1, Math.min(1, ny)) * 0.55;
@@ -295,6 +338,7 @@ function skinDragStart(event) {
   skinView.dragging = true;
   skinView.lastX = event.clientX;
   skinView.lastY = event.clientY;
+  cancelSkinSpinReset();
   event.currentTarget.classList.add("dragging");
   if (event.currentTarget.setPointerCapture) {
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -309,12 +353,16 @@ function skinDragMove(event) {
   /* Dragging spins the model left/right only. */
   skinView.targetBodyYaw += dx * 0.012;
   skinView.targetBodyPitch = 0;
+  scheduleSkinSpinReset();
   kickSkinView();
 }
 
 function skinDragEnd(event) {
   if (!skinView.dragging) return;
   skinView.dragging = false;
+  if (skinView.targetBodyYaw || skinView.targetBodyPitch) {
+    scheduleSkinSpinReset();
+  }
   event.currentTarget.classList.remove("dragging");
   if (event.currentTarget.releasePointerCapture) {
     try {
@@ -425,6 +473,7 @@ async function loadSkin() {
     $("#btn-skin-apply").disabled = true;
     $("#btn-skin-choose").disabled = true;
     $("#skin-ely-link").classList.add("hidden");
+    loadSkinHistory(false);
     return;
   }
   skin.data = result.skin || "";
@@ -464,6 +513,7 @@ async function loadSkin() {
   $("#btn-skin-apply").disabled = !editable || !skin.data;
   $("#btn-skin-choose").disabled = !editable;
   $("#skin-ely-link").classList.toggle("hidden", !isEly);
+  loadSkinHistory(editable);
 }
 
 async function chooseSkin() {
@@ -522,4 +572,149 @@ async function applySkin() {
   }
   setStatus(result.message || "Skin applied.");
   await loadSkin();
+}
+
+/* ------------------------------------------------------------ skin history */
+
+function skinHistoryDate(seconds) {
+  if (!seconds) return "";
+  const date = new Date(seconds * 1000);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString();
+}
+
+/* A head crop of the 64×64 texture, drawn sharply into a small canvas. */
+function skinFaceCanvas(dataUrl) {
+  const canvas = document.createElement("canvas");
+  const size = 96;
+  canvas.width = size;
+  canvas.height = size;
+  canvas.className = "skin-history-face";
+  canvas.setAttribute("aria-hidden", "true");
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  const img = new Image();
+  img.onload = () => {
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, size, size);
+    ctx.drawImage(img, 8, 8, 8, 8, 0, 0, size, size);
+  };
+  img.src = dataUrl;
+  return canvas;
+}
+
+function resetSkinHistoryConfirm() {
+  skinHistory.confirm = false;
+  if (skinHistory.timer) {
+    window.clearTimeout(skinHistory.timer);
+    skinHistory.timer = null;
+  }
+  const clear = $("#btn-skin-history-clear");
+  if (clear) clear.textContent = "Clear";
+}
+
+function renderSkinHistory() {
+  const grid = $("#skin-history-grid");
+  const empty = $("#skin-history-empty");
+  if (!grid || !empty) return;
+  grid.replaceChildren();
+  grid.classList.toggle("hidden", skinHistory.items.length === 0);
+  empty.classList.toggle("hidden", skinHistory.items.length > 0);
+  for (const item of skinHistory.items) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "skin-history-item" + (item.active ? " active" : "");
+    button.dataset.hash = item.hash;
+    const label = [item.source, skinHistoryDate(item.added)]
+      .filter(Boolean).join(" · ");
+    button.title = label || "Skin";
+    button.setAttribute("aria-label", label || "Skin");
+    button.appendChild(skinFaceCanvas(item.skin));
+    if (item.active) {
+      const mark = document.createElement("span");
+      mark.className = "skin-history-active";
+      mark.setAttribute("aria-hidden", "true");
+      button.appendChild(mark);
+    }
+    button.addEventListener("click", () => useSkinHistory(item.hash));
+    grid.appendChild(button);
+  }
+}
+
+async function loadSkinHistory(enabled) {
+  const box = $("#skin-history");
+  if (!box) return;
+  resetSkinHistoryConfirm();
+  box.classList.toggle("hidden", !enabled);
+  const seq = ++skinHistory.seq;
+  if (!enabled) {
+    skinHistory.items = [];
+    renderSkinHistory();
+    return;
+  }
+  let result = null;
+  try {
+    result = await call("skin_history", skin.account);
+  } catch (_) {
+    result = null;
+  }
+  if (seq !== skinHistory.seq) return;
+  skinHistory.items = result && result.ok ? result.items || [] : [];
+  renderSkinHistory();
+}
+
+async function useSkinHistory(hash) {
+  if (skinHistory.busy || !hash) return;
+  skinHistory.busy = true;
+  skinHistory.confirm = false;
+  const grid = $("#skin-history-grid");
+  if (grid) grid.classList.add("busy");
+  let result = null;
+  try {
+    result = await call("skin_history_use", hash, skin.account);
+  } catch (_) {
+    result = null;
+  } finally {
+    skinHistory.busy = false;
+  }
+  if (grid) grid.classList.remove("busy");
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not use that skin.", true);
+    return;
+  }
+  setStatus("Skin loaded from history. Press “Apply to account” to send it.");
+  await loadSkin();
+}
+
+async function clearSkinHistory() {
+  if (skinHistory.busy) return;
+  const button = $("#btn-skin-history-clear");
+  if (!button) return;
+  if (!skinHistory.confirm) {
+    skinHistory.confirm = true;
+    button.textContent = "Confirm clear";
+    if (skinHistory.timer) window.clearTimeout(skinHistory.timer);
+    skinHistory.timer = window.setTimeout(resetSkinHistoryConfirm, 6000);
+    return;
+  }
+  resetSkinHistoryConfirm();
+  skinHistory.busy = true;
+  button.disabled = true;
+  let result = null;
+  try {
+    result = await call("skin_history_clear", skin.account);
+  } catch (_) {
+    result = null;
+  } finally {
+    skinHistory.busy = false;
+    button.disabled = false;
+  }
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not clear the skin history.",
+      true);
+    return;
+  }
+  skinHistory.items = [];
+  renderSkinHistory();
+  setStatus("Skin history cleared.");
 }

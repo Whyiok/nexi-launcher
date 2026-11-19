@@ -1,8 +1,12 @@
 """Skin preview, upload and variant switching."""
 
 import base64
+import hashlib
+import json
 import os
+import re
 import subprocess
+import time
 from pathlib import Path
 
 from ..config import ELY_SKIN_SITE, SKINS_DIR
@@ -12,6 +16,10 @@ from ..skin_images import (
     _default_skin_png, _ely_skin_png, _skin_dimensions, _upload_skin,
 )
 from ..util import open_in_system
+
+SKIN_HISTORY_LIMIT = 24
+HISTORY_DIR = SKINS_DIR / "history"
+_HISTORY_HASH = re.compile(r"^[0-9a-f]{16}$")
 
 
 class SkinsApi:
@@ -72,6 +80,181 @@ class SkinsApi:
     def skin_state(self, account_id=""):
         return self._skin_payload(account_id)
 
+    # ------------------------------------------------------- skin history
+    #
+    # Every skin the launcher saves is also copied into
+    # ``%APPDATA%\NexiLauncher\skins\history`` with a small JSON index, so a
+    # previous skin can be restored with one click. The files are plain PNGs
+    # of the account's own skins; nothing here ever leaves the computer.
+
+    def _history_index_path(self):
+        return HISTORY_DIR / "index.json"
+
+    def _history_index(self):
+        try:
+            parsed = json.loads(
+                self._history_index_path().read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        items = parsed.get("items") if isinstance(parsed, dict) else None
+        if not isinstance(items, list):
+            return []
+        clean = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            digest = str(item.get("hash") or "")
+            if not _HISTORY_HASH.match(digest):
+                continue
+            clean.append({
+                "hash": digest,
+                "variant": "slim" if item.get("variant") == "slim"
+                           else "classic",
+                "source": str(item.get("source") or ""),
+                "added": int(item.get("added") or 0),
+            })
+        return clean
+
+    def _history_write(self, items):
+        try:
+            HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+            self._history_index_path().write_text(
+                json.dumps({"version": 1, "items": items},
+                           ensure_ascii=False, indent=2),
+                encoding="utf-8")
+        except OSError as exc:
+            log.warning("Could not write the skin history index: %s", exc)
+
+    def _history_add(self, data, variant, source):
+        """Keep ``data`` in the history; returns its id or an empty string."""
+        digest = hashlib.sha256(data).hexdigest()[:16]
+        items = [item for item in self._history_index()
+                 if item["hash"] != digest]
+        try:
+            HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+            (HISTORY_DIR / f"{digest}.png").write_bytes(data)
+        except OSError as exc:
+            log.warning("Could not keep the skin in history: %s", exc)
+            return ""
+        items.insert(0, {
+            "hash": digest,
+            "variant": "slim" if variant == "slim" else "classic",
+            "source": str(source or ""),
+            "added": int(time.time()),
+        })
+        for extra in items[SKIN_HISTORY_LIMIT:]:
+            try:
+                (HISTORY_DIR / f"{extra['hash']}.png").unlink()
+            except OSError:
+                pass
+        del items[SKIN_HISTORY_LIMIT:]
+        self._history_write(items)
+        return digest
+
+    def _history_seed(self):
+        """One-time import of skins picked before the history existed."""
+        if self._history_index_path().exists():
+            return
+        for account in getattr(self, "_accounts", None) or []:
+            path = self._skin_path(account)
+            try:
+                data = path.read_bytes()
+            except OSError:
+                continue
+            self._history_add(data, account.get("skin_variant", "classic"),
+                              account.get("name", ""))
+        # An empty index marks the seed as done even when there was nothing
+        # to import.
+        self._history_write(self._history_index())
+
+    def skin_history(self, account_id=""):
+        """Items for the skin history row, newest first."""
+        account = self._skin_account(account_id)
+        if account is None:
+            return {"ok": False, "items": [],
+                    "error": "Add an account in Settings first."}
+        self._history_seed()
+        current_hash = ""
+        path = self._skin_path(account)
+        try:
+            if path.is_file():
+                current_hash = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+        except OSError:
+            current_hash = ""
+        items = []
+        missing = False
+        for entry in self._history_index():
+            try:
+                data = (HISTORY_DIR / f"{entry['hash']}.png").read_bytes()
+            except OSError:
+                missing = True
+                continue
+            items.append({
+                "hash": entry["hash"],
+                "variant": entry["variant"],
+                "source": entry["source"],
+                "added": entry["added"],
+                "active": entry["hash"] == current_hash,
+                "skin": "data:image/png;base64,"
+                        + base64.b64encode(data).decode("ascii"),
+            })
+        if missing:
+            self._history_write([{
+                "hash": item["hash"],
+                "variant": item["variant"],
+                "source": item["source"],
+                "added": item["added"],
+            } for item in items])
+        return {"ok": True, "items": items, "limit": SKIN_HISTORY_LIMIT}
+
+    def skin_history_use(self, digest="", account_id=""):
+        """Make a history entry the chosen skin of the account again."""
+        account = self._skin_account(account_id)
+        if account is None:
+            return {"ok": False,
+                    "error": "Add an account in Settings first."}
+        if account["type"] != "microsoft":
+            return {"ok": False,
+                    "error": "Skins can only be applied to a Microsoft "
+                             "account."}
+        digest = str(digest or "").strip().lower()
+        if not _HISTORY_HASH.match(digest):
+            return {"ok": False, "error": "That skin is not in the history."}
+        path = HISTORY_DIR / f"{digest}.png"
+        try:
+            data = path.read_bytes()
+        except OSError:
+            return {"ok": False,
+                    "error": "That skin is no longer in the history."}
+        if _skin_dimensions(data) not in ((64, 64), (64, 32)):
+            return {"ok": False,
+                    "error": "The saved skin file is not a Minecraft skin."}
+        try:
+            SKINS_DIR.mkdir(parents=True, exist_ok=True)
+            self._skin_path(account).write_bytes(data)
+        except OSError as exc:
+            return {"ok": False, "error": f"Could not save the skin: {exc}"}
+        entry = next((item for item in self._history_index()
+                      if item["hash"] == digest), None)
+        if entry is not None:
+            with self._lock:
+                account["skin_variant"] = entry["variant"]
+                self._save()
+        log.info("Skin restored from history for account %s", account["name"])
+        return self._skin_payload(account["id"])
+
+    def skin_history_clear(self, account_id=""):
+        """Delete every history entry; the account's current skin is kept."""
+        try:
+            for path in HISTORY_DIR.glob("*.png"):
+                path.unlink()
+        except OSError as exc:
+            return {"ok": False,
+                    "error": f"Could not clear the skin history: {exc}"}
+        self._history_write([])
+        log.info("Skin history cleared")
+        return {"ok": True, "items": []}
+
     def skin_pick(self, account_id=""):
         """Pick a PNG skin file and keep a copy for the chosen account."""
         account = self._skin_account(account_id)
@@ -118,6 +301,8 @@ class SkinsApi:
             self._skin_path(account).write_bytes(data)
         except OSError as exc:
             return {"ok": False, "error": f"Could not save the skin: {exc}"}
+        self._history_add(data, account.get("skin_variant", "classic"),
+                          account.get("name", ""))
         log.info("Skin selected for account %s", account["name"])
         return self._skin_payload(account["id"])
 

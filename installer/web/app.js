@@ -10,8 +10,34 @@
       uninstall_title: "Удаление Nexi Launcher",
       eyebrow_install: "Nexi Launcher · установка",
       eyebrow_uninstall: "Nexi Launcher · удаление",
+      eyebrow_existing: "Nexi Launcher · уже установлен",
       install_title: "Установка Nexi Launcher",
       install_sub: "Лаунчер Minecraft с изолированными сборками, модами и несколькими аккаунтами.",
+      existing_title: "Nexi Launcher уже установлен",
+      existing_sub: "Выберите, что сделать с установленной копией. Аккаунты, настройки и сборки сохраняются, если не удалить их отдельно.",
+      choice_update: "Обновить",
+      choice_update_sub: "Установить новую версию поверх старой. Аккаунты, настройки и сборки сохранятся.",
+      choice_update_none: "Обновлений нет",
+      choice_update_none_sub: "Установлена последняя версия.",
+      choice_reinstall: "Переустановить",
+      choice_reinstall_sub: "Заменить файлы лаунчера на месте. Аккаунты, настройки и сборки сохранятся.",
+      choice_remove: "Удалить",
+      choice_remove_sub: "Удалить лаунчер и ярлыки. Данные сохранятся, если не отметить удаление.",
+      version_line: "Установлена {installed} · установщик {setup}",
+      latest_note: "Установлена последняя версия ({version}).",
+      update_button: "Обновить",
+      reinstall_button: "Переустановить",
+      update_title: "Обновление Nexi Launcher",
+      update_sub: "Новая версия установится поверх текущей. Аккаунты, настройки и сборки сохранятся.",
+      reinstall_title: "Переустановка Nexi Launcher",
+      reinstall_sub: "Файлы лаунчера будут заменены. Аккаунты, настройки и сборки сохранятся.",
+      update_note: "Аккаунты, настройки и сборки не затрагиваются.",
+      reinstall_note: "Аккаунты, настройки и сборки не затрагиваются.",
+      back: "Назад",
+      updated_title: "Обновление завершено",
+      updated_sub: "Nexi Launcher обновлён. Аккаунты, настройки и сборки сохранены.",
+      reinstalled_title: "Переустановка завершена",
+      reinstalled_sub: "Nexi Launcher установлен заново. Аккаунты, настройки и сборки сохранены.",
       folder_label: "Папка установки",
       browse: "Обзор…",
       desktop: "Создать ярлык на рабочем столе",
@@ -60,8 +86,34 @@
       uninstall_title: "Uninstall Nexi Launcher",
       eyebrow_install: "Nexi Launcher · setup",
       eyebrow_uninstall: "Nexi Launcher · remove",
+      eyebrow_existing: "Nexi Launcher · installed",
       install_title: "Nexi Launcher Setup",
       install_sub: "A Minecraft launcher with isolated builds, mods and several accounts.",
+      existing_title: "Nexi Launcher is already installed",
+      existing_sub: "Choose what to do with the installed copy. Accounts, settings and builds are kept unless you delete them.",
+      choice_update: "Update",
+      choice_update_sub: "Install the newer version over the current one. Accounts, settings and builds are kept.",
+      choice_update_none: "Up to date",
+      choice_update_none_sub: "The latest version is already installed.",
+      choice_reinstall: "Reinstall",
+      choice_reinstall_sub: "Replace the launcher files in place. Accounts, settings and builds are kept.",
+      choice_remove: "Uninstall",
+      choice_remove_sub: "Remove the launcher and its shortcuts. Your data is kept unless you ask to delete it.",
+      version_line: "Installed {installed} · setup {setup}",
+      latest_note: "The latest version ({version}) is already installed.",
+      update_button: "Update",
+      reinstall_button: "Reinstall",
+      update_title: "Update Nexi Launcher",
+      update_sub: "The newer version is installed over the current one. Accounts, settings and builds are kept.",
+      reinstall_title: "Reinstall Nexi Launcher",
+      reinstall_sub: "The launcher files are replaced. Accounts, settings and builds are kept.",
+      update_note: "Accounts, settings and builds are not touched.",
+      reinstall_note: "Accounts, settings and builds are not touched.",
+      back: "Back",
+      updated_title: "Update complete",
+      updated_sub: "Nexi Launcher has been updated. Accounts, settings and builds were kept.",
+      reinstalled_title: "Reinstall complete",
+      reinstalled_sub: "Nexi Launcher was installed again. Accounts, settings and builds were kept.",
       folder_label: "Install folder",
       browse: "Browse…",
       desktop: "Create a desktop shortcut",
@@ -109,12 +161,15 @@
   const hash = location.hash || "";
   let LANG = /(?:^|[#&])lang=ru(?:&|$)/.test(hash) ? "ru" : "en";
   const MODE = /(?:^|[#&])mode=uninstall(?:&|$)/.test(hash) ? "uninstall" : "install";
+  let VIEW = MODE;
   let t = I18N[LANG];
 
   const S = {
     state: null,
     busy: false,
     action: null,
+    installMode: "",
+    cameFromExisting: false,
     timer: null,
     donePath: "",
     booted: false,
@@ -145,6 +200,64 @@
 
   /* ------------------------------------------------------------------ text */
 
+  function versionLabel(value) {
+    const text = String(value || "").trim();
+    return text ? "v" + text.replace(/^v/i, "") : "—";
+  }
+
+  function pageTitle() {
+    if (VIEW === "uninstall") return t.uninstall_title;
+    if (S.installMode === "update") return t.update_title;
+    if (S.installMode === "reinstall") return t.reinstall_title;
+    return t.setup_title;
+  }
+
+  function installButtonLabel() {
+    if (S.installMode === "update") return t.update_button;
+    if (S.installMode === "reinstall") return t.reinstall_button;
+    return t.install;
+  }
+
+  function applyInstallText() {
+    const mode = S.installMode;
+    const eyebrow = $("#install-eyebrow");
+    const title = $("#install-title");
+    const sub = $("#install-sub");
+    const note = $("#install-note");
+    const noteText = $("#install-note-text");
+    if (mode === "update") {
+      eyebrow.textContent = t.eyebrow_existing;
+      title.textContent = t.update_title;
+      sub.textContent = t.update_sub;
+      noteText.textContent = t.update_note;
+      show(note);
+    } else if (mode === "reinstall") {
+      eyebrow.textContent = t.eyebrow_existing;
+      title.textContent = t.reinstall_title;
+      sub.textContent = t.reinstall_sub;
+      noteText.textContent = t.reinstall_note;
+      show(note);
+    } else {
+      eyebrow.textContent = t.eyebrow_install;
+      title.textContent = t.install_title;
+      sub.textContent = t.install_sub;
+      hide(note);
+    }
+    const pathInput = $("#install-path");
+    const browse = $("#btn-browse");
+    const fixed = mode === "update";
+    if (pathInput) pathInput.disabled = fixed || S.busy;
+    if (browse) browse.disabled = fixed || S.busy;
+    const label = $("#btn-install span");
+    if (label && !S.busy) label.textContent = installButtonLabel();
+    const back = $("#btn-back");
+    if (back) {
+      back.classList.toggle("hidden",
+        !S.cameFromExisting || !!S.busy);
+      back.textContent = t.back;
+    }
+  }
+
   function paintLang() {
     document.querySelectorAll(".lang-btn").forEach((btn) => {
       const active = btn.getAttribute("data-lang") === LANG;
@@ -173,17 +286,19 @@
 
   function applyText() {
     document.documentElement.lang = LANG;
-    document.title = MODE === "install" ? t.setup_title : t.uninstall_title;
+    document.title = pageTitle();
     document.querySelectorAll("[data-i18n]").forEach((element) => {
       const key = element.getAttribute("data-i18n");
       if (Object.prototype.hasOwnProperty.call(t, key)) {
         element.textContent = t[key];
       }
     });
+    applyInstallText();
     $("#btn-min").title = t.minimize;
     $("#btn-close").title = t.close_window;
-    $("#foot-note").textContent = MODE === "install" ? t.footer : t.footer_uninstall;
-    const version = S.state && S.state.version ? S.state.version : "1.3.0";
+    $("#foot-note").textContent = VIEW === "uninstall"
+      ? t.footer_uninstall : t.footer;
+    const version = S.state && S.state.version ? S.state.version : "1.5.0";
     $("#foot-version").textContent = "v" + version;
     paintLang();
   }
@@ -200,10 +315,30 @@
     show(view);
   }
 
+  function showExisting(state) {
+    S.installMode = "";
+    S.cameFromExisting = false;
+    $("#existing-path").textContent = state.path || "";
+    const installed = state.installed_version || "";
+    $("#existing-version").textContent = t.version_line
+      .replace("{installed}", versionLabel(installed))
+      .replace("{setup}", versionLabel(state.version));
+    const update = $("#btn-choice-update");
+    const canUpdate = !!state.can_update;
+    update.disabled = !canUpdate;
+    update.classList.toggle("primary", canUpdate);
+    update.classList.toggle("muted", !canUpdate);
+    $("#choice-update-title").textContent =
+      canUpdate ? t.choice_update : t.choice_update_none;
+    $("#choice-update-sub").textContent =
+      canUpdate ? t.choice_update_sub : t.choice_update_none_sub;
+    showView("existing");
+  }
+
   function render(state) {
     S.state = state;
     applyText();
-    if (MODE === "uninstall") {
+    if (VIEW === "uninstall") {
       if (!state.installed) {
         showDone({
           title: t.not_installed,
@@ -218,10 +353,48 @@
       showView("uninstall");
       return;
     }
-    $("#install-path").value = state.path || "";
+    if (state.installed && !S.installMode) {
+      showExisting(state);
+      return;
+    }
+    if (!S.installMode) $("#install-path").value = state.path || "";
     if (state.webview2) hide($("#webview-warning"));
     else show($("#webview-warning"));
     showView("install");
+    applyInstallText();
+  }
+
+  function chooseInstall(mode) {
+    if (S.busy) return;
+    S.installMode = mode;
+    S.cameFromExisting = !!S.state && !!S.state.installed;
+    VIEW = "install";
+    if (S.state) $("#install-path").value = S.state.path || "";
+    hide($("#install-error"));
+    hideProgress();
+    applyText();
+    showView("install");
+  }
+
+  function backToExisting() {
+    if (S.busy) return;
+    S.installMode = "";
+    S.cameFromExisting = false;
+    hide($("#install-error"));
+    hideProgress();
+    if (S.state) render(S.state);
+  }
+
+  function chooseRemove() {
+    if (S.busy) return;
+    S.installMode = "";
+    S.cameFromExisting = false;
+    VIEW = "uninstall";
+    applyText();
+    if (S.state) {
+      $("#uninstall-path").textContent = S.state.path || "";
+      showView("uninstall");
+    }
   }
 
   /* -------------------------------------------------------------- bindings */
@@ -239,6 +412,11 @@
     $("#btn-cancel").addEventListener("click", requestClose);
     $("#btn-uninstall-cancel").addEventListener("click", requestClose);
     $("#btn-done-close").addEventListener("click", requestClose);
+    $("#btn-existing-cancel").addEventListener("click", requestClose);
+    $("#btn-back").addEventListener("click", backToExisting);
+    $("#btn-choice-update").addEventListener("click", () => chooseInstall("update"));
+    $("#btn-choice-reinstall").addEventListener("click", () => chooseInstall("reinstall"));
+    $("#btn-choice-remove").addEventListener("click", chooseRemove);
     $("#btn-browse").addEventListener("click", browse);
     $("#btn-webview").addEventListener("click", () => {
       call("open_webview2").catch(() => {});
@@ -289,11 +467,15 @@
   /* ---------------------------------------------------------------- busy UI */
 
   function setFormDisabled(disabled) {
-    const targets = MODE === "install"
-      ? ["#install-path", "#btn-browse", "#opt-desktop", "#opt-launch",
-         "#btn-cancel", "#btn-install"]
-      : ["#opt-remove-data", "#btn-uninstall-cancel", "#btn-uninstall"];
+    const targets = VIEW === "uninstall"
+      ? ["#opt-remove-data", "#btn-uninstall-cancel", "#btn-uninstall"]
+      : ["#install-path", "#btn-browse", "#opt-desktop", "#opt-launch",
+         "#btn-cancel", "#btn-install", "#btn-back"];
     targets.forEach((selector) => setDisabled(selector, disabled));
+    if (VIEW !== "uninstall" && S.installMode === "update") {
+      setDisabled("#install-path", true);
+      setDisabled("#btn-browse", true);
+    }
     setDisabled("#btn-close", disabled);
   }
 
@@ -318,8 +500,9 @@
     S.busy = false;
     S.action = null;
     setFormDisabled(false);
-    $("#btn-install span").textContent = t.install;
+    $("#btn-install span").textContent = installButtonLabel();
     $("#btn-uninstall span").textContent = t.uninstall;
+    applyInstallText();
   }
 
   function hideProgress() {
@@ -347,7 +530,7 @@
   }
 
   function showError(message) {
-    const install = MODE === "install";
+    const install = VIEW !== "uninstall";
     const banner = install ? $("#install-error") : $("#uninstall-error");
     banner.querySelector(".error-title").textContent =
       install ? t.error_title : t.uninstall_error_title;
@@ -489,8 +672,8 @@
   function closeOverlay(confirmed) {
     hide($("#overlay"));
     if (!confirmed) return;
-    if (MODE === "install") startInstall(true);
-    else startUninstall(true);
+    if (VIEW === "uninstall") startUninstall(true);
+    else startInstall(true);
   }
 
   /* ------------------------------------------------------------------ done */
@@ -526,9 +709,13 @@
   }
 
   function showInstallDone(event) {
+    const updated = S.installMode === "update";
+    const reinstalled = S.installMode === "reinstall";
     showDone({
-      title: t.done_title,
-      sub: t.done_sub,
+      title: updated ? t.updated_title
+        : reinstalled ? t.reinstalled_title : t.done_title,
+      sub: updated ? t.updated_sub
+        : reinstalled ? t.reinstalled_sub : t.done_sub,
       path: event.path || (S.state && S.state.path) || "",
       run: !event.launched,
       warnings: event.warnings || [],
@@ -573,7 +760,7 @@
   }
 
   function failBridge() {
-    showView(MODE === "install" ? "install" : "uninstall");
+    showView(VIEW === "uninstall" ? "uninstall" : "install");
     showError(t.err_bridge);
     setDisabled("#btn-install", true);
     setDisabled("#btn-uninstall", true);

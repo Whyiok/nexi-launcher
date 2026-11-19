@@ -131,11 +131,17 @@
     </div>
   </header>
   <header class="topbar">
-    <nav class="tabs bypass-tabs" id="bypass-tabs" aria-label="Bypass">
-      <button class="tab" data-screen="bypass" type="button">
-        <svg class="icon"><use href="#i-world"/></svg><span>Bypass</span>
+    <div class="topbar-left">
+      <nav class="tabs bypass-tabs" id="bypass-tabs" aria-label="Bypass">
+        <button class="tab" data-screen="bypass" type="button">
+          <svg class="icon"><use href="#i-world"/></svg><span>Bypass</span>
+        </button>
+      </nav>
+      <button class="topbar-update" id="btn-title-update" type="button"
+              title="Check for updates" aria-label="Check for updates">
+        <svg class="icon"><use href="#i-refresh"/></svg><span>Update</span>
       </button>
-    </nav>
+    </div>
     <nav class="tabs" id="tabs" aria-label="Sections">
       <button class="tab" data-screen="home" type="button">
         <svg class="icon"><use href="#i-home"/></svg><span>Home</span>
@@ -1126,6 +1132,35 @@
           <p class="hint">Profiles never copy files from the shared folder —
              versions, libraries and assets are reused in place.</p>
         </section>
+
+        <section class="card settings-card wide" id="update-card">
+          <div class="card-head">
+            <span class="eyebrow">LAUNCHER UPDATE</span>
+            <span class="count" id="update-sub">Not checked</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-text">
+              <span class="setting-name">Nexi Launcher
+                <span id="launcher-version">…</span></span>
+              <p class="hint" id="update-hint">Check GitHub for a newer release. Accounts, settings and profiles are kept when you update.</p>
+            </div>
+            <div class="pane-actions">
+              <button class="btn ghost" id="btn-update-check" type="button">
+                <svg class="icon"><use href="#i-refresh"/></svg>Check for updates
+              </button>
+              <button class="btn ghost hidden" id="btn-update-cancel"
+                      type="button">Cancel</button>
+              <button class="btn primary hidden" id="btn-update-install"
+                      type="button">
+                <svg class="icon"><use href="#i-import"/></svg><span>Update</span>
+              </button>
+            </div>
+          </div>
+          <div class="progress hidden" id="update-progress-wrap">
+            <div class="bar" id="update-progress"></div>
+          </div>
+          <p class="hint update-status" id="update-status"></p>
+        </section>
       </div>
     </section>
 
@@ -1239,8 +1274,8 @@
         <div class="skin-preview">
           <canvas id="skin-canvas" width="260" height="340"
                   aria-label="3D skin preview"></canvas>
-          <p class="hint skin-hint">Move the cursor to turn the head in any
-            direction; drag the model sideways to spin it.</p>
+          <p class="hint skin-hint">The head follows the cursor; drag the model
+            sideways to spin it.</p>
         </div>
         <div class="card settings-card skin-side">
           <div>
@@ -1269,6 +1304,19 @@
              href="https://ely.by/skins" target="_blank" rel="noreferrer">
             Change skin on ely.by →
           </a>
+          <div class="skin-history hidden" id="skin-history">
+            <div class="skin-history-head">
+              <span class="field-label">SKIN HISTORY</span>
+              <button class="link skin-history-clear"
+                      id="btn-skin-history-clear" type="button">
+                Clear
+              </button>
+            </div>
+            <div class="skin-history-grid" id="skin-history-grid"></div>
+            <p class="hint skin-history-empty hidden" id="skin-history-empty">
+              Skins you pick are kept here so you can switch back.
+            </p>
+          </div>
         </div>
       </div>
     </section>
@@ -1411,20 +1459,9 @@
     </div>
 
     <div class="welcome-body">
-      <section class="welcome-step" data-wstep="intro">
-        <span class="eyebrow">FIRST START</span>
-        <h1 class="welcome-title" id="welcome-title">Welcome to Nexi Launcher</h1>
-        <p class="welcome-sub">A few quick choices and you are ready to play.</p>
-        <ul class="welcome-list">
-          <li>Interface language</li>
-          <li>Theme and colour mode</li>
-          <li>Network bypass for blocked Minecraft servers</li>
-        </ul>
-      </section>
-
-      <section class="welcome-step hidden" data-wstep="language">
+      <section class="welcome-step" data-wstep="language">
         <span class="eyebrow">LANGUAGE</span>
-        <h1 class="welcome-title">Choose your language</h1>
+        <h1 class="welcome-title" id="welcome-title">Choose your language</h1>
         <p class="welcome-sub">The interface changes right away; everything
           else follows.</p>
         <div class="welcome-lang" role="radiogroup"
@@ -1521,7 +1558,7 @@
           Back
         </button>
         <button class="btn primary" id="btn-welcome-next" type="button">
-          Get started
+          Continue
         </button>
       </div>
     </div>
@@ -1548,6 +1585,7 @@
 <script src="js/network.js"></script>
 <script src="js/zapret.js"></script>
 <script src="js/mirror.js"></script>
+<script src="js/update.js"></script>
 <script src="js/skin.js"></script>
 <script src="js/events.js"></script>
 <script src="js/welcome.js"></script>

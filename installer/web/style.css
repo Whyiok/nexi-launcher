@@ -547,6 +547,87 @@ svg.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
   margin-top: 26px;
 }
 
+/* Installed copy: update / reinstall / uninstall -------------------------- */
+
+.version-line {
+  margin-top: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: background .14s var(--ease), border-color .14s var(--ease),
+              opacity .14s var(--ease), transform .08s var(--ease);
+}
+.choice:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--line-strong);
+}
+.choice:active:not(:disabled) { transform: scale(.99); }
+.choice:disabled { opacity: .5; cursor: default; }
+.choice.primary {
+  border-color: rgba(var(--accent-rgb), .38);
+  background: rgba(var(--accent-rgb), .07);
+}
+.choice.primary:hover:not(:disabled) {
+  border-color: rgba(var(--accent-rgb), .6);
+  background: rgba(var(--accent-rgb), .11);
+}
+.choice.muted .choice-title { color: var(--dim); }
+
+.choice-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--surface-3);
+  color: var(--dim);
+}
+.choice.primary .choice-icon {
+  background: rgba(var(--accent-rgb), .14);
+  color: var(--accent);
+}
+.choice.danger .choice-icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.choice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.choice-title { font-size: 13px; font-weight: 600; }
+.choice-sub {
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.38;
+}
+
+#btn-back { margin-right: auto; }
+
 /* Uninstall specifics ---------------------------------------------------- */
 
 .path-box {

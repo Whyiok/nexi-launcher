@@ -85,7 +85,7 @@ function bind() {
     });
   });
   $(".topbar").addEventListener("click", (event) => {
-    const tab = event.target.closest(".tab");
+    const tab = event.target.closest(".tab[data-screen]");
     if (tab && !tab.disabled) {
       if (editSlug) resetCreateMode();
       setScreen(tab.dataset.screen);
@@ -413,6 +413,7 @@ function bind() {
 
   bindZapret();
   bindMirror();
+  if (typeof bindUpdate === "function") bindUpdate();
 
   $("#btn-open-game-log-folder").addEventListener("click", () =>
     call("open_instance", "logs"));
@@ -450,6 +451,7 @@ function bind() {
     const button = event.target.closest("button[data-skin-variant]");
     if (button) changeSkinVariant(button.dataset.skinVariant);
   });
+  $("#btn-skin-history-clear").addEventListener("click", clearSkinHistory);
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;

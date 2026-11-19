@@ -6,6 +6,7 @@ import platform
 import shutil
 import subprocess
 import tempfile
+import time
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
@@ -14,7 +15,7 @@ from pathlib import Path
 from .config import MC
 from .java_runtime import java_executable
 from .net import (download_file, download_with_retry, host_unreachable,
-                  http_get)
+                  http_get, mirror_mode)
 from .util import InstallCancelled
 from .versions import list_versions, load_version, version_meta
 
@@ -48,6 +49,21 @@ NEOFORGE_OFFICIAL_BASE = "https://maven.neoforged.net/releases/"
 
 
 NEOFORGE_MIRROR_BASE = "https://bmclapi2.bangbang93.com/maven/"
+
+
+# Prism Launcher publishes the same loader builds through its own meta host.
+# Pulling the list from there keeps NeoForge usable when the NeoForge maven is
+# blocked and the BMCLAPI mirror is turned off in Settings → Network.
+PRISM_META = "https://meta.prismlauncher.org/v1"
+
+
+PRISM_NEOFORGE_INDEX = PRISM_META + "/net.neoforged/index.json"
+
+
+PRISM_CACHE_SECONDS = 600
+
+
+_prism_cache = {"at": 0.0, "entries": None}
 
 
 LOADER_KEYS = {"Fabric": "fabric", "Forge": "forge", "NeoForge": "neoforge"}
@@ -105,6 +121,37 @@ def neoforge_prefixes(game_version: str):
     return [base + "."]
 
 
+def prism_neoforge_builds(game_version: str):
+    """NeoForge builds from Prism Launcher's meta server, newest first.
+
+    The index lists every build with the Minecraft version it targets, so no
+    prefix guessing is needed. It is about 800 KB, hence the short cache: the
+    page asks for the list again on every Refresh.
+    """
+    now = time.time()
+    entries = _prism_cache["entries"]
+    if entries is None or now - _prism_cache["at"] > PRISM_CACHE_SECONDS:
+        data = json.loads(
+            http_get(PRISM_NEOFORGE_INDEX, timeout=30).decode("utf-8"))
+        entries = list(data.get("versions") or [])
+        if not entries:
+            raise ValueError("the Prism NeoForge index is empty")
+        _prism_cache["entries"] = entries
+        _prism_cache["at"] = now
+    found = []
+    for entry in entries:
+        requires = entry.get("requires") or []
+        if not any(item.get("uid") == "net.minecraft"
+                   and str(item.get("equals") or "") == game_version
+                   for item in requires):
+            continue
+        version = str(entry.get("version") or "").strip()
+        if version:
+            found.append((version, version))
+    stable = [pair for pair in found if "-beta" not in pair[0].lower()]
+    return (stable or found)[:MAX_BUILDS]
+
+
 def fabric_builds(game_version: str):
     """(value, label) pairs, newest first."""
     url = (f"{FABRIC_META}/versions/loader/"
@@ -146,24 +193,57 @@ def forge_builds(game_version: str):
 
 
 def neoforge_builds(game_version: str, notify=None):
-    if _is_legacy_neoforge(game_version):
+    # With the mirror turned off there is no BMCLAPI list to match the
+    # installers against, so Prism's meta index supplies the versions even
+    # when maven.neoforged.net is blocked. With the mirror on, the list comes
+    # from the same place the installer will come from, so every version shown
+    # can actually be downloaded.
+    prism = []
+    prism_tried = False
+    if mirror_mode() == "never":
+        prism_tried = True
         try:
+            prism = prism_neoforge_builds(game_version)
+        except (OSError, ValueError, ET.ParseError):
+            prism = []
+        if prism:
+            return prism
+
+    legacy = _is_legacy_neoforge(game_version)
+    error = None
+    pairs = []
+    try:
+        if legacy:
             versions = _versions_of_game(
                 _maven_versions(NEOFORGE_LEGACY_METADATA, notify), game_version)
+            pairs = [(value, value) for value in versions[:MAX_BUILDS]]
+        else:
+            all_versions = _maven_versions(NEOFORGE_METADATA, notify)
+            for prefix in neoforge_prefixes(game_version):
+                matching = [v for v in all_versions if v.startswith(prefix)]
+                if not matching:
+                    continue
+                stable = [v for v in matching if "-beta" not in v.lower()]
+                pairs = [(value, value) for value in
+                         list(reversed(stable or matching))[:MAX_BUILDS]]
+                break
+    except (OSError, ValueError, ET.ParseError) as exc:
+        error = exc
+    if pairs:
+        return pairs
+    if error is not None and not prism_tried:
+        try:
+            prism = prism_neoforge_builds(game_version)
         except (OSError, ValueError, ET.ParseError):
-            return []
-        return [(value, value) for value in versions[:MAX_BUILDS]]
-    try:
-        all_versions = _maven_versions(NEOFORGE_METADATA, notify)
-    except (OSError, ValueError, ET.ParseError):
-        return []
-    for prefix in neoforge_prefixes(game_version):
-        matching = [v for v in all_versions if v.startswith(prefix)]
-        if not matching:
-            continue
-        stable = [v for v in matching if "-beta" not in v.lower()]
-        chosen = list(reversed(stable or matching))[:MAX_BUILDS]
-        return [(value, value) for value in chosen]
+            prism = []
+    if prism:
+        return prism
+    if isinstance(error, OSError):
+        raise RuntimeError(
+            "maven.neoforged.net is unreachable; set Settings → Network → "
+            "Mirror to Auto, or add the host to the bypass in the Bypass tab.")
+    if error is not None:
+        raise RuntimeError(f"The NeoForge build list could not be read: {error}")
     return []
 
 
@@ -379,9 +459,19 @@ def install_loader(loader_key: str, game_version: str, loader_version: str,
         def mirror_notice(host):
             log(f"{host} is unreachable — switching to the BMCLAPI mirror…")
 
-        from_mirror = download_with_retry(url, installer, cancel=cancel,
-                                          on_progress=progress,
-                                          on_fallback=mirror_notice)
+        try:
+            from_mirror = download_with_retry(url, installer, cancel=cancel,
+                                              on_progress=progress,
+                                              on_fallback=mirror_notice)
+        except InstallCancelled:
+            raise
+        except Exception as exc:
+            if loader_key == "neoforge" and host_unreachable(url):
+                raise RuntimeError(
+                    "maven.neoforged.net is unreachable; set Settings → "
+                    "Network → Mirror to Auto, or add the host to the bypass "
+                    "in the Bypass tab.") from exc
+            raise
         if progress:
             progress(0, 0)
         log(f"Installer saved ({installer.stat().st_size // 1024} KB)")

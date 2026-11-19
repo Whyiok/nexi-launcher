@@ -30,6 +30,7 @@ function fillSettings() {
   fillTheme();
   fillBackground();
   fillZapret();
+  if (typeof fillUpdate === "function") fillUpdate();
   if (typeof renderMirrorMode === "function") renderMirrorMode();
 }
 

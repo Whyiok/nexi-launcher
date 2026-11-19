@@ -9,6 +9,7 @@ function handleEvent(ev) {
       else if (ev.screen === "loaders") setLoaderStatus(ev.text, ev.error);
       else if (ev.screen === "mods") screenStatus("mods", ev.text, ev.error);
       else if (ev.screen === "zapret") setZapretStatus(ev.text, ev.error);
+      else if (ev.screen === "update") setUpdateStatus(ev.text, ev.error);
       else setStatus(ev.text, ev.error);
       break;
     case "log":
@@ -18,14 +19,18 @@ function handleEvent(ev) {
       break;
     case "progress":
       if (S.busy === "zapret") setZapretProgress(ev.value, ev.total);
+      else if (S.busy === "update") setUpdateProgress(ev.value, ev.total);
       else setProgress(ev.value, ev.total);
       break;
     case "busy":
       S.busy = ev.on ? ev.task : "";
       movingProgress("#loader-progress", S.busy === "loaders");
       movingProgress("#create-progress",
-        !!S.busy && S.busy !== "loaders" && S.busy !== "zapret");
+        !!S.busy && S.busy !== "loaders" && S.busy !== "zapret"
+        && S.busy !== "update");
       movingProgress("#zapret-progress", S.busy === "zapret");
+      if (S.busy === "update") setUpdateProgress(0, 0);
+      else if (!S.busy) hideUpdateProgress();
       syncBusy();
       syncMods();
       syncLoaders();
@@ -163,4 +168,5 @@ function syncBusy() {
   syncVersionEditor();
   syncPlay();
   syncZapret();
+  if (typeof syncUpdate === "function") syncUpdate();
 }

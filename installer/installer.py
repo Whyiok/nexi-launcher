@@ -28,6 +28,7 @@ import ctypes
 import logging
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
@@ -39,7 +40,7 @@ import winreg
 from pathlib import Path
 
 APP_NAME = "Nexi Launcher"
-VERSION = "1.3.0"
+VERSION = "1.5.0"
 EXE_NAME = "nexi.exe"
 UNINSTALLER_NAME = "Uninstall.exe"
 UNINSTALL_KEY = (r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
@@ -150,6 +151,34 @@ def registered_dir() -> str:
             return str(value)
     except OSError:
         return ""
+
+
+def registered_version() -> str:
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY) as key:
+            value = winreg.QueryValueEx(key, "DisplayVersion")[0]
+            return str(value)
+    except OSError:
+        return ""
+
+
+def _version_tuple(value: str) -> tuple:
+    match = re.match(r"^\s*[vV]?(\d+(?:\.\d+)*)", str(value or ""))
+    if not match:
+        return ()
+    return tuple(int(part) for part in match.group(1).split("."))
+
+
+def _can_update(installed_version: str) -> bool:
+    """True when this setup is newer than the registered installation."""
+    current = _version_tuple(VERSION)
+    installed = _version_tuple(installed_version)
+    if not installed:
+        return True
+    width = max(len(current), len(installed))
+    current += (0,) * (width - len(current))
+    installed += (0,) * (width - len(installed))
+    return current > installed
 
 
 def _guess_install_dir() -> str:
@@ -698,13 +727,17 @@ class SetupApi:
             target = (registered_dir() or _guess_install_dir()
                       or str(default_dir()))
         self._target = target
+        installed = _is_installed(Path(target))
+        installed_version = registered_version()
         return {
             "mode": self.mode,
             "language": self.language,
             "version": VERSION,
             "path": target,
-            "installed": (_is_installed(Path(target))
-                          if self.mode == "uninstall" else False),
+            "installed": installed,
+            "installed_version": installed_version,
+            "can_update": bool(installed
+                               and _can_update(installed_version)),
             "webview2": webview2_installed(),
             "data_path": str(app_data_dir()),
         }

@@ -23,6 +23,7 @@ from ..modpacks import _zip_member_target
 from ..modrinth import modrinth_get
 from ..ms_auth import MS_CLIENT_ID_DEFAULT
 from ..util import copy_image_to_clipboard, open_in_system
+from ..version import VERSION
 from ..versions import (
     detect_loader, game_version_of, load_version, version_meta,
 )
@@ -141,6 +142,7 @@ class ProfilesApi:
                 "busy": self.busy,
                 "launching": bool(self._launching),
                 "launching_slugs": sorted(self._launching),
+                "version": VERSION,
                 "game_running": bool(running),
                 "game_instance": (self.selected_slug
                                   if self.selected_slug in running else ""),

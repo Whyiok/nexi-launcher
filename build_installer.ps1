@@ -11,6 +11,8 @@ python -m PyInstaller "build/Nexi Launcher.spec" `
     --distpath _dist --workpath _build_tmp --noconfirm
 if ($LASTEXITCODE -ne 0) { throw "Launcher build failed with exit code $LASTEXITCODE" }
 
+Copy-Item "_dist/nexi.exe" "nexi.exe" -Force
+
 # Absolute sources: the generated spec is written to _installer_tmp, and
 # PyInstaller resolves relative --add-data paths against the spec's folder.
 $root = $PSScriptRoot

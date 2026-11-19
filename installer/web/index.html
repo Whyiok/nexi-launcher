@@ -65,11 +65,58 @@
     </header>
 
     <main class="stage">
+      <section class="view hidden" id="view-existing">
+        <div class="head">
+          <div class="eyebrow"><span class="dot"></span><span data-i18n="eyebrow_existing">NEXI LAUNCHER · INSTALLED</span></div>
+          <h1 data-i18n="existing_title">Nexi Launcher is already installed</h1>
+          <p class="sub" data-i18n="existing_sub">Choose what to do with the installed copy. Accounts, settings and builds are kept unless you delete them.</p>
+        </div>
+
+        <div class="path-box">
+          <div class="field-label" data-i18n="installed_in">INSTALLED IN</div>
+          <code id="existing-path"></code>
+          <div class="version-line" id="existing-version"></div>
+        </div>
+
+        <div class="choice-list">
+          <button class="choice primary" id="btn-choice-update" type="button">
+            <span class="choice-icon"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg></span>
+            <span class="choice-text">
+              <span class="choice-title" id="choice-update-title"></span>
+              <span class="choice-sub" id="choice-update-sub"></span>
+            </span>
+          </button>
+          <button class="choice" id="btn-choice-reinstall" type="button">
+            <span class="choice-icon"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>
+            <span class="choice-text">
+              <span class="choice-title" data-i18n="choice_reinstall">Reinstall</span>
+              <span class="choice-sub" data-i18n="choice_reinstall_sub">Replace the launcher files in place. Accounts, settings and builds are kept.</span>
+            </span>
+          </button>
+          <button class="choice danger" id="btn-choice-remove" type="button">
+            <span class="choice-icon"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></span>
+            <span class="choice-text">
+              <span class="choice-title" data-i18n="choice_remove">Uninstall</span>
+              <span class="choice-sub" data-i18n="choice_remove_sub">Remove the launcher and its shortcuts. Your data is kept unless you ask to delete it.</span>
+            </span>
+          </button>
+        </div>
+
+        <div class="actions">
+          <button class="btn ghost lg" id="btn-existing-cancel" type="button" data-i18n="cancel">Cancel</button>
+        </div>
+      </section>
+
       <section class="view" id="view-install">
         <div class="head">
-          <div class="eyebrow"><span class="dot"></span><span data-i18n="eyebrow_install">NEXI LAUNCHER · SETUP</span></div>
-          <h1 data-i18n="install_title">Nexi Launcher Setup</h1>
-          <p class="sub" data-i18n="install_sub">A Minecraft launcher with isolated builds, mods and several accounts.</p>
+          <div class="eyebrow"><span class="dot"></span><span id="install-eyebrow" data-i18n="eyebrow_install">NEXI LAUNCHER · SETUP</span></div>
+          <h1 id="install-title" data-i18n="install_title">Nexi Launcher Setup</h1>
+          <p class="sub" id="install-sub" data-i18n="install_sub">A Minecraft launcher with isolated builds, mods and several accounts.</p>
+        </div>
+
+        <div class="banner warn hidden" id="install-note">
+          <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
+          <span id="install-note-text"></span>
         </div>
 
         <label class="field-label" for="install-path" data-i18n="folder_label">INSTALL FOLDER</label>
@@ -114,6 +161,7 @@
         </div>
 
         <div class="actions">
+          <button class="btn ghost lg hidden" id="btn-back" type="button" data-i18n="back">Back</button>
           <button class="btn ghost lg" id="btn-cancel" type="button" data-i18n="cancel">Cancel</button>
           <button class="btn primary lg" id="btn-install" type="button">
             <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
@@ -184,7 +232,7 @@
     <footer class="foot">
       <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
       <span id="foot-note" data-i18n="footer">Per-user install · no administrator rights needed</span>
-      <span class="version" id="foot-version">v1.3.0</span>
+      <span class="version" id="foot-version">v1.5.0</span>
     </footer>
   </div>
 

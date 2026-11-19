@@ -61,7 +61,7 @@ class CreateApi:
             return {"builds": [], "error": str(exc), "note": ""}
         return {"builds": [{"version": value, "label": label}
                            for value, label in pairs], "error": "",
-                "note": notes[0] if notes else ""}
+                "note": notes[-1] if notes else ""}
 
     def create(self, name, version_id, loader_key=None, loader_version=None):
         version_id = str(version_id or "").strip()

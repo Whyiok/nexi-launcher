@@ -345,6 +345,17 @@
     "Uses unsigned third-party binaries (WinDivert). Antivirus may flag them, Windows will ask for administrator rights, and the network may briefly drop while the bypass restarts.": "Используются сторонние неподписанные бинарники (WinDivert). Антивирус может на них ругаться, Windows запросит права администратора, а сеть может на несколько секунд прерваться при перезапуске обхода.",
     "Adds the launcher's hosts to the general list (list-general-user.txt) and turns the bypass on. Existing entries are never duplicated.": "Добавляет адреса лаунчера в общий список (list-general-user.txt) и включает обход. Уже существующие строки не дублируются.",
     "Not checked yet.": "Проверка не выполнялась.",
+    "LAUNCHER UPDATE": "ОБНОВЛЕНИЕ ЛАУНЧЕРА",
+    "Not checked": "Не проверялось",
+    "Up to date": "Последняя версия",
+    "Check for updates": "Проверить обновления",
+    "Confirm update": "Подтвердить обновление",
+    "Restarting…": "Перезапуск…",
+    "Check GitHub for a newer release. Accounts, settings and profiles are kept when you update.": "Проверить на GitHub новую версию. При обновлении аккаунты, настройки и сборки сохраняются.",
+    "You are running the latest version.": "У вас последняя версия.",
+    "Update downloaded. The launcher will close and restart.": "Обновление скачано. Лаунчер закроется и перезапустится.",
+    "Update cancelled.": "Обновление отменено.",
+    "Could not check for updates.": "Не удалось проверить обновления.",
     "FOLDERS": "ПАПКИ",
     "Shared files": "Общие файлы",
     "Profiles never copy files from the shared folder — versions, libraries and assets are reused in place.": "Сборки никогда не копируют файлы из общей папки — версии, библиотеки и ресурсы используются на месте.",
@@ -356,7 +367,7 @@
     "Sign in to manage your skin.": "Войдите, чтобы управлять скином.",
     "Choose PNG…": "Выбрать PNG…",
     "Apply to account": "Применить к аккаунту",
-    "Move the cursor to turn the head in any direction; drag the model sideways to spin it.": "Двигайте курсором, чтобы поворачивать голову во все стороны; тяните модель вбок, чтобы вращать её.",
+    "The head follows the cursor; drag the model sideways to spin it.": "Голова следует за курсором; тяните модель вбок, чтобы вращать её.",
     "MODEL": "МОДЕЛЬ",
     "Classic": "Классическая",
     "Slim": "Тонкая",
@@ -376,6 +387,13 @@
     "Current skin loaded from ely.by": "Текущий скин загружен с ely.by",
     "Built-in default skin — choose a PNG to replace it.": "Встроенный скин по умолчанию — выберите PNG, чтобы заменить его.",
     "No skin chosen yet": "Скин ещё не выбран",
+    "SKIN HISTORY": "ИСТОРИЯ СКИНОВ",
+    "Skins you pick are kept here so you can switch back.": "Выбранные скины хранятся здесь — к любому можно вернуться.",
+    "Skin loaded from history. Press “Apply to account” to send it.": "Скин взят из истории. Нажмите «Применить к аккаунту», чтобы отправить его.",
+    "Could not use that skin.": "Не удалось использовать этот скин.",
+    "Confirm clear": "Подтвердить очистку",
+    "Skin history cleared.": "История скинов очищена.",
+    "Could not clear the skin history.": "Не удалось очистить историю скинов.",
     "offline mode · mojang + modrinth": "оффлайн-режим · mojang + modrinth",
 
     /* Empty-state and misc UI */
@@ -579,6 +597,27 @@
 
   const RULES = [
     [/^Memory for “(.*)”$/, (m) => `Память для «${m[1]}»`],
+    /* Launcher update */
+    [/^Not checked$/, () => "Не проверялось"],
+    [/^Up to date$/, () => "Последняя версия"],
+    [/^Updating…$/, () => "Обновляем…"],
+    [/^Updating… (\d+)%$/, (m) => `Обновляем… ${m[1]}%`],
+    [/^Restarting…$/, () => "Перезапуск…"],
+    [/^(v[\d.]+) available$/, (m) => `Доступна ${m[1]}`],
+    [/^Update to (v[\d.]+)$/, (m) => `Обновить до ${m[1]}`],
+    [/^You are running the latest version \((.+)\)\.$/, (m) =>
+      `У вас последняя версия (${m[1]}).`],
+    [/^Nexi Launcher (v[\d.]+) is available\.$/, (m) =>
+      `Доступна Nexi Launcher ${m[1]}.`],
+    [/^Nexi Launcher (v[\d.]+) is available\. Press Update to install it — the launcher will restart, and accounts, settings and profiles are kept\.$/, (m) =>
+      `Доступна Nexi Launcher ${m[1]}. Нажмите «Обновить» — лаунчер перезапустится, аккаунты, настройки и сборки сохранятся.`],
+    [/^Click Update again to download Nexi Launcher (v[\d.]+) and restart the launcher\.$/, (m) =>
+      `Нажмите «Обновить» ещё раз, чтобы скачать Nexi Launcher ${m[1]} и перезапустить лаунчер.`],
+    [/^Downloading Nexi Launcher (v[\d.]+)…$/, (m) =>
+      `Скачиваем Nexi Launcher ${m[1]}…`],
+    [/^Could not check for updates: (.+)$/, (m) =>
+      `Не удалось проверить обновления: ${m[1]}`],
+    [/^Update failed\.$/, () => "Не удалось обновить."],
     /* Bypass (zapret) */
     [/^(.+) · service running(?: · (.+))?$/, (m) =>
       `${m[1]} · служба запущена${m[2] ? ` · ${m[2]}` : ""}`],
@@ -740,6 +779,14 @@
       `Нет сборок ${m[1]} для ${m[2]} — попробуйте другой загрузчик или «Обновить».`],
     [/^No (.+) builds for (.+) — try another loader\.$/, (m) =>
       `Нет сборок ${m[1]} для ${m[2]} — попробуйте другой загрузчик.`],
+    [/^(.+) is unreachable — the build list came from the BMCLAPI mirror\.$/, (m) =>
+      `${m[1]} недоступен — список сборок получен с зеркала BMCLAPI.`],
+    [/^Could not list builds: maven\.neoforged\.net is unreachable; set Settings → Network → Mirror to Auto, or add the host to the bypass in the Bypass tab\.$/, () =>
+      "Не удалось получить список сборок: maven.neoforged.net недоступен. Включите зеркало в «Настройки → Сеть» или добавьте хост в обход на вкладке «Обход»."],
+    [/^Install failed: maven\.neoforged\.net is unreachable; set Settings → Network → Mirror to Auto, or add the host to the bypass in the Bypass tab\.$/, () =>
+      "Ошибка установки: maven.neoforged.net недоступен. Включите зеркало в «Настройки → Сеть» или добавьте хост в обход на вкладке «Обход»."],
+    [/^Could not list builds: The NeoForge build list could not be read: (.*)$/, (m) =>
+      `Не удалось получить список сборок: не удалось прочитать список сборок NeoForge: ${m[1]}`],
     [/^Could not list builds: (.*)$/, (m) =>
       `Не удалось получить список сборок: ${m[1]}`],
     [/^Could not load the Mojang version list: (.*)$/, (m) =>

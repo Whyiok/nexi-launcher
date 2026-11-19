@@ -448,6 +448,8 @@ def download_file(url: str, target: Path, size=None, cancel=None, timeout=180,
                 done = 0
                 last_report = 0.0
                 while True:
+                    if cancel is not None and cancel.is_set():
+                        raise InstallCancelled()
                     chunk = response.read(262144)
                     if not chunk:
                         break

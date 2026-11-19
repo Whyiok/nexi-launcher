@@ -70,7 +70,7 @@ let S = {
   accounts: [], active_account: "", account: "offline", paths: {},
   busy: "", launching: false, launching_slugs: [], game_running: false,
   game_instance: "", running: [], theme: "mint",
-  color_mode: "dark", language: "en",
+  color_mode: "dark", language: "en", version: "",
 };
 let screen = "home";
 let booted = false;
