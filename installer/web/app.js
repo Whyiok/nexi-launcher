@@ -298,7 +298,7 @@
     $("#btn-close").title = t.close_window;
     $("#foot-note").textContent = VIEW === "uninstall"
       ? t.footer_uninstall : t.footer;
-    const version = S.state && S.state.version ? S.state.version : "1.5.0";
+    const version = S.state && S.state.version ? S.state.version : "1.5.1";
     $("#foot-version").textContent = "v" + version;
     paintLang();
   }
