@@ -161,6 +161,12 @@ class BaseApi:
                  self.java_path or "(auto)", self.selected_slug,
                  len(self.instances), len(self._accounts),
                  self._account_label())
+        # Tells the site that the launcher is open, not only that a game runs.
+        self._nexi_presence_stop = threading.Event()
+        self._nexi_presence_thread = threading.Thread(
+            target=self._nexi_presence_heartbeat, name="nexi-presence",
+            daemon=True)
+        self._nexi_presence_thread.start()
 
     def _install_trace(self):
         """Log every bridged call: if the UI hangs, the log shows the culprit."""

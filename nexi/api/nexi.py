@@ -18,6 +18,7 @@ from ..util import open_in_system
 
 NEXI_TIMEOUT = 20
 NEXI_BROWSER_TIMEOUT = 180
+PRESENCE_HEARTBEAT_SECONDS = 60
 
 
 class _NexiLoginServer(http.server.ThreadingHTTPServer):
@@ -499,6 +500,19 @@ class NexiApi:
             return {"ok": False,
                     "error": data.get("error") or "Could not update presence."}
         return {"ok": True, "online": bool(data.get("online"))}
+
+    def _nexi_presence_heartbeat(self):
+        """Keep the "launcher open" status fresh while signed in."""
+        while not self._nexi_presence_stop.is_set():
+            try:
+                account, token, _ = self._nexi_token_account()
+                if account is not None and token:
+                    self._nexi_call(
+                        "/api/nexi/presence", {"launcher": True}, token=token)
+            except Exception:
+                log.debug("Nexi presence heartbeat failed", exc_info=True)
+            if self._nexi_presence_stop.wait(PRESENCE_HEARTBEAT_SECONDS):
+                break
 
     def nexi_send_playtime(self, minutes):
         """Send a chunk of played minutes to the Nexi profile on the site."""
