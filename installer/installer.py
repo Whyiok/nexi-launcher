@@ -40,7 +40,7 @@ import winreg
 from pathlib import Path
 
 APP_NAME = "Nexi Launcher"
-VERSION = "1.5.1"
+VERSION = "1.6.0"
 EXE_NAME = "nexi.exe"
 UNINSTALLER_NAME = "Uninstall.exe"
 UNINSTALL_KEY = (r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
