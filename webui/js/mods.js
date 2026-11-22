@@ -51,6 +51,8 @@ function resetBrowser() {
   // longer owns the busy flag — otherwise its stale response would leave
   // Search and Install disabled forever after a profile/tab switch.
   mods.busy = false;
+  mods.searchActive = false;
+  mods.pendingSearch = null;
   mods.hits = [];
   mods.selected = -1;
   mods.installed = null;
@@ -58,6 +60,7 @@ function resetBrowser() {
   mods.statusSeq += 1;
   mods.statusLoading = false;
   mods.checked.clear();
+  mods.checkedHits.clear();
   mods.offset = 0;
   mods.total = 0;
   mods.loadingMore = false;
@@ -82,6 +85,7 @@ function saveBrowserState() {
     installed: mods.installed,
     searchedKey: mods.searchedKey,
     checked: new Set(mods.checked),
+    checkedHits: new Map(mods.checkedHits),
     offset: mods.offset,
     total: mods.total,
   });
@@ -102,7 +106,12 @@ function restoreBrowserState(saved) {
   mods.installed = saved.installed || null;
   mods.searchedKey = saved.searchedKey || "";
   mods.checked = saved.checked instanceof Set ? saved.checked : new Set();
-  if (mods.kind === "modpack") mods.checked.clear();
+  mods.checkedHits = saved.checkedHits instanceof Map
+    ? saved.checkedHits : new Map();
+  if (mods.kind === "modpack") {
+    mods.checked.clear();
+    mods.checkedHits.clear();
+  }
   mods.offset = Number(saved.offset) || 0;
   mods.total = Number(saved.total) || mods.hits.length;
   mods.query = saved.query || "";
@@ -176,6 +185,7 @@ function setBrowserSource(source) {
   mods.selected = -1;
   mods.installed = null;
   mods.checked.clear();
+  mods.checkedHits.clear();
   mods.offset = 0;
   mods.total = 0;
   mods.loadingMore = false;
@@ -285,25 +295,46 @@ function openBrowser(kind) {
   setScreen("mods");
 }
 
-async function searchMods(more = false) {
-  if (mods.busy) return;
+function runPendingSearch() {
+  const pending = mods.pendingSearch;
+  mods.pendingSearch = null;
+  if (pending) searchMods(false, pending.keepChecked);
+}
+
+async function searchMods(more = false, keepChecked = false) {
   if (!S.instance && mods.kind !== "modpack") return;
   if (more) {
-    if (mods.loadingMore || !mods.hits.length || mods.hits.length >= mods.total) {
+    if (mods.busy || mods.loadingMore || !mods.hits.length
+        || mods.hits.length >= mods.total) {
       return;
     }
   } else {
+    if (mods.busy) {
+      // A search is already running; remember the newest query so text typed
+      // during the request is not lost when its response arrives.
+      if (mods.searchActive || mods.loadingMore) {
+        mods.pendingSearch = { keepChecked };
+      }
+      return;
+    }
     mods.offset = 0;
     mods.total = 0;
     mods.selected = -1;
-    mods.checked.clear();
+    if (!keepChecked) {
+      mods.checked.clear();
+      mods.checkedHits.clear();
+    }
     mods.loadingMore = false;
     mods.query = $("#mods-query").value.trim();
     mods.searchedKey = browserKey();
   }
   const request = more ? mods.searchSeq : ++mods.searchSeq;
-  if (more) mods.loadingMore = true;
-  else mods.busy = true;
+  if (more) {
+    mods.loadingMore = true;
+  } else {
+    mods.busy = true;
+    mods.searchActive = true;
+  }
   screenStatus("mods", more
     ? "Loading more…" : `Searching ${browserSourceLabel()}…`);
   renderHits();
@@ -312,13 +343,18 @@ async function searchMods(more = false) {
                             mods.loader, mods.offset, mods.game,
                             mods.source);
   if (request !== mods.searchSeq) return;
-  if (more) mods.loadingMore = false;
-  else mods.busy = false;
+  if (more) {
+    mods.loadingMore = false;
+  } else {
+    mods.busy = false;
+    mods.searchActive = false;
+  }
   syncMods();
   if (result.error) {
     mods.searchedKey = "";
     screenStatus("mods", result.error, true);
     renderHits();
+    runPendingSearch();
     return;
   }
   const hits = result.hits || [];
@@ -345,6 +381,7 @@ async function searchMods(more = false) {
       + (mods.hits.length < mods.total ? " — scroll for more" : "")
       + (mods.kind === "modpack" ? "" : " · double-click to pick several"));
   }
+  runPendingSearch();
 }
 
 function maybeLoadMore() {
@@ -396,8 +433,13 @@ function renderHits() {
       box.addEventListener("click", (event) => event.stopPropagation());
       box.addEventListener("dblclick", (event) => event.stopPropagation());
       box.addEventListener("change", () => {
-        if (box.checked) mods.checked.add(hit.project_id);
-        else mods.checked.delete(hit.project_id);
+        if (box.checked) {
+          mods.checked.add(hit.project_id);
+          mods.checkedHits.set(hit.project_id, hit);
+        } else {
+          mods.checked.delete(hit.project_id);
+          mods.checkedHits.delete(hit.project_id);
+        }
         syncBatch();
       });
       row.appendChild(box);
@@ -415,8 +457,13 @@ function renderHits() {
     if (batchable) {
       row.addEventListener("dblclick", () => {
         mods.selected = index;
-        if (mods.checked.has(hit.project_id)) mods.checked.delete(hit.project_id);
-        else mods.checked.add(hit.project_id);
+        if (mods.checked.has(hit.project_id)) {
+          mods.checked.delete(hit.project_id);
+          mods.checkedHits.delete(hit.project_id);
+        } else {
+          mods.checked.add(hit.project_id);
+          mods.checkedHits.set(hit.project_id, hit);
+        }
         applyHitSelection();
       });
     }
@@ -540,7 +587,7 @@ async function installMod() {
 async function installSelected() {
   if (mods.busy || !S.instance || mods.kind === "modpack") return;
   if (mods.kind === "mod" && !modsAllowed()) return;
-  const hits = mods.hits.filter((hit) => mods.checked.has(hit.project_id));
+  const hits = Array.from(mods.checkedHits.values());
   if (!hits.length) return;
   mods.busy = true;
   syncMods();
@@ -557,6 +604,7 @@ async function installSelected() {
     if (result.ok) {
       done += 1;
       mods.checked.delete(hit.project_id);
+      mods.checkedHits.delete(hit.project_id);
     } else {
       errors.push(`${hit.title}: ${result.error || result.message || "failed"}`);
     }

@@ -29,6 +29,18 @@ function spawnRipple(event) {
 
 let bound = false;
 
+/* Typing in the mods search box searches shortly after the user stops. */
+let modSearchTimer = 0;
+
+function scheduleModSearch() {
+  clearTimeout(modSearchTimer);
+  modSearchTimer = setTimeout(() => {
+    modSearchTimer = 0;
+    mods.searchedKey = "";
+    searchMods(false, true);
+  }, 400);
+}
+
 function syncWindowMaximized(maximized) {
   const button = $("#btn-win-max");
   if (!button) return;
@@ -151,6 +163,7 @@ function bind() {
     hideProfileTip();
     hideProfileMenu();
   });
+  $("#profile-list").addEventListener("pointerdown", profileDragStart);
   window.addEventListener("resize", () => {
     hideProfileTip();
     hideProfileMenu();
@@ -420,13 +433,18 @@ function bind() {
     if (button) setBrowserKind(button.dataset.kind);
   });
   $("#btn-mod-search").addEventListener("click", () => {
+    clearTimeout(modSearchTimer);
+    modSearchTimer = 0;
     mods.searchedKey = "";
-    searchMods();
+    searchMods(false, true);
   });
+  $("#mods-query").addEventListener("input", scheduleModSearch);
   $("#mods-query").addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
+      clearTimeout(modSearchTimer);
+      modSearchTimer = 0;
       mods.searchedKey = "";
-      searchMods();
+      searchMods(false, true);
     }
   });
   $("#btn-mod-install").addEventListener("click", installMod);

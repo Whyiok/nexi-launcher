@@ -97,7 +97,8 @@ const mods = { hits: [], selected: -1, loader: "any", game: "", kind: "mod",
                source: "modrinth",
                key: "", searchedKey: "", busy: false, installed: null,
                statusSeq: 0, statusLoading: false, profile: "",
-               checked: new Set(), query: "", offset: 0, total: 0,
+               checked: new Set(), checkedHits: new Map(), query: "", offset: 0, total: 0,
+               searchActive: false, pendingSearch: null,
                loadingMore: false, searchSeq: 0 };
 /* Each profile keeps its own mod browser: search text, results and selection. */
 const browserStates = new Map();
