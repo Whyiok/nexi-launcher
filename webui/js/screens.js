@@ -25,6 +25,10 @@ function applyTheme(theme) {
   // colour in every theme.
   const brandIcon = document.querySelector(".brand-icon");
   if (brandIcon) brandIcon.src = THEME_BRAND_ICONS[next] || THEME_BRAND_ICONS.mint;
+  const friendsLogo = document.querySelector("#friends-signin-logo");
+  if (friendsLogo) {
+    friendsLogo.src = THEME_BRAND_ICONS[next] || THEME_BRAND_ICONS.mint;
+  }
   startOrb();
   if (typeof refreshHomePanorama === "function") refreshHomePanorama();
 }

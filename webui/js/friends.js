@@ -192,6 +192,15 @@ function bindFriends() {
   const signIn = $("#btn-friends-signin");
   if (!signIn) return;
   signIn.addEventListener("click", friendsSignIn);
+  signIn.addEventListener("pointermove", (event) => {
+    const rect = signIn.getBoundingClientRect();
+    signIn.style.setProperty("--mx", `${event.clientX - rect.left}px`);
+    signIn.style.setProperty("--my", `${event.clientY - rect.top}px`);
+  });
+  signIn.addEventListener("pointerleave", () => {
+    signIn.style.removeProperty("--mx");
+    signIn.style.removeProperty("--my");
+  });
   $("#btn-friends-signin-cancel").addEventListener(
     "click", friendsCancelSignIn);
   $("#btn-friends-refresh").addEventListener("click", loadFriends);
