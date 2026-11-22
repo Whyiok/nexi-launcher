@@ -498,6 +498,7 @@ function bind() {
 
   bindZapret();
   bindMirror();
+  if (typeof bindCrashScreen === "function") bindCrashScreen();
   bindNetworkSettings();
   if (typeof bindUpdate === "function") bindUpdate();
 

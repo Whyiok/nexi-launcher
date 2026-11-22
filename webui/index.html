@@ -1822,6 +1822,57 @@
   </div>
 </div>
 
+<!-- Full-screen crash card: the backend names a likely cause, suggests the
+     next steps and offers a repair that can be applied in one click. -->
+<div class="crash-screen hidden" id="crash-screen" role="dialog"
+     aria-modal="true" aria-labelledby="crash-title">
+  <div class="crash-card">
+    <div class="crash-head">
+      <span class="eyebrow">GAME CRASHED</span>
+      <button class="btn ghost mirror-close" id="btn-crash-close"
+              type="button" aria-label="Close">
+        <svg class="icon"><use href="#i-x"/></svg>
+      </button>
+    </div>
+    <div class="crash-hero">
+      <span class="crash-badge" aria-hidden="true">
+        <svg class="icon"><use href="#i-alert"/></svg>
+      </span>
+      <div class="crash-hero-text">
+        <h2 class="crash-title" id="crash-title"></h2>
+        <p class="crash-summary" id="crash-summary"></p>
+      </div>
+    </div>
+    <div class="crash-grid">
+      <section class="crash-section" id="crash-why-block">
+        <span class="crash-label">WHY IT HAPPENED</span>
+        <p class="crash-why" id="crash-why"></p>
+      </section>
+      <section class="crash-section" id="crash-steps-block">
+        <span class="crash-label">WHAT TO DO</span>
+        <ol class="crash-steps" id="crash-steps"></ol>
+      </section>
+    </div>
+    <details class="crash-details" id="crash-details">
+      <summary>Technical details</summary>
+      <pre class="crash-log" id="crash-log"></pre>
+      <p class="hint" id="crash-report-path"></p>
+    </details>
+    <p class="crash-status hidden" id="crash-status"></p>
+    <div class="crash-foot">
+      <button class="btn ghost" id="btn-crash-logs" type="button">
+        <svg class="icon"><use href="#i-folder"/></svg>Open logs
+      </button>
+      <div class="crash-actions">
+        <button class="link" id="btn-crash-close-2" type="button">Close</button>
+        <button class="btn primary" id="btn-crash-fix" type="button">
+          Fix automatically
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- First-run setup. Shown once, before the main screen, until the user
      finishes it or skips it (the flag lives in settings.json). -->
 <div class="welcome hidden" id="welcome" role="dialog" aria-modal="true"
@@ -1968,6 +2019,7 @@
 <script src="js/mirror.js"></script>
 <script src="js/update.js"></script>
 <script src="js/skin.js"></script>
+<script src="js/crash.js"></script>
 <script src="js/events.js"></script>
 <script src="js/welcome.js"></script>
 <script src="js/main.js"></script>

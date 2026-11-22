@@ -7,9 +7,10 @@ import threading
 import time
 from pathlib import Path
 
+from ..crash import diagnose_crash
 from ..ely_auth import ensure_authlib_injector
 from ..game_options import write_game_options
-from ..instances import (instance_game_dir, instance_label,
+from ..instances import (instance_game_dir, instance_label, instance_mods_dir,
                          write_instance)
 from ..java_runtime import ensure_java
 from ..logging_setup import log
@@ -165,6 +166,129 @@ class LaunchApi:
             except Exception:
                 pass
 
+    def _instance_for(self, slug):
+        with self._lock:
+            if not slug:
+                return self.active_instance()
+            return next((item for item in self.instances
+                         if item.get("_slug") == slug), None)
+
+    def _explain_crash(self, slug, exit_code, stderr_text=""):
+        """Read the game's log and turn the crash into a readable card."""
+        instance = self._instance_for(str(slug or ""))
+        if instance is None:
+            return {}
+        game_dir = instance_game_dir(instance["_root"])
+        mods_dir = instance_mods_dir(instance["_root"])
+        try:
+            mods_present = any(mods_dir.glob("*.jar"))
+        except OSError:
+            mods_present = False
+        try:
+            ram = int(instance.get("ram") or self.ram)
+        except (TypeError, ValueError):
+            ram = int(self.ram)
+        try:
+            return diagnose_crash(
+                game_dir, exit_code, ram=ram, ram_max=self.RAM_MAX,
+                java_override=bool(self.java_path),
+                mods_present=mods_present,
+                options_present=(game_dir / "options.txt").is_file(),
+                stderr_text=stderr_text)
+        except Exception:
+            log.exception("could not diagnose the crash of %r", slug)
+            return {}
+
+    def crash_fix(self, action, slug=""):
+        """Apply the repair offered by the crash card."""
+        action = str(action or "")
+        slug = str(slug or "")
+        instance = self._instance_for(slug)
+        if instance is None:
+            return {"ok": False, "error": "That profile no longer exists."}
+        slug = str(instance.get("_slug", ""))
+        game_dir = instance_game_dir(instance["_root"])
+        if action == "raise_ram":
+            with self._lock:
+                try:
+                    current = int(instance.get("ram") or self.ram)
+                except (TypeError, ValueError):
+                    current = int(self.ram)
+                target = min(self.RAM_MAX, max(4, current + 2))
+                if target <= current:
+                    return {
+                        "ok": False,
+                        "error": f"Memory is already at the maximum "
+                                 f"({self.RAM_MAX} GB). Close other programs "
+                                 f"or remove heavy mods."}
+                instance["ram"] = target
+                write_instance(instance["_root"], instance)
+                if self.selected_slug == slug:
+                    self.ram = target
+                self._save()
+            self.refresh_instances(select=self.selected_slug)
+            self._event("refresh")
+            return {"ok": True,
+                    "message": f"Memory raised to {target} GB. Start the "
+                               f"game again.",
+                    "state": self.state()}
+        if action == "reset_java":
+            if not self.java_path:
+                return {"ok": False,
+                        "error": "The launcher already picks Java for this "
+                                 "version automatically."}
+            result = self.set_java("")
+            if not result.get("ok"):
+                return result
+            return {"ok": True,
+                    "message": "Custom Java disabled — the launcher will use "
+                               "the runtime this version expects.",
+                    "state": self.state()}
+        if action == "verify_files":
+            if self.selected_slug != slug:
+                self.refresh_instances(select=slug)
+            result = self.verify_files()
+            if result.get("ok"):
+                result["state"] = self.state()
+            return result
+        if action == "disable_mods":
+            mods = instance_mods_dir(instance["_root"])
+            if not mods.is_dir():
+                return {"ok": False,
+                        "error": "This profile has no mods folder."}
+            target = mods.with_name(
+                f"{mods.name}.disabled-{time.strftime('%Y%m%d-%H%M%S')}")
+            try:
+                mods.rename(target)
+            except OSError as exc:
+                return {"ok": False,
+                        "error": f"Could not move the mods folder: {exc}"}
+            log.info("mods disabled for %r: %s", slug, target.name)
+            self._event("refresh")
+            return {"ok": True,
+                    "message": f"Mods moved to {target.name}. Rename that "
+                               f"folder back to '{mods.name}' to enable them "
+                               f"again.",
+                    "state": self.state()}
+        if action == "reset_graphics":
+            options = game_dir / "options.txt"
+            if not options.is_file():
+                return {"ok": False,
+                        "error": "options.txt has already been removed."}
+            backup = options.with_name(
+                f"options.txt.bak-{time.strftime('%Y%m%d-%H%M%S')}")
+            try:
+                options.rename(backup)
+            except OSError as exc:
+                return {"ok": False,
+                        "error": f"Could not reset options.txt: {exc}"}
+            log.info("options.txt reset for %r: %s", slug, backup.name)
+            return {"ok": True,
+                    "message": "Graphics settings were reset. Start the game "
+                               "again.",
+                    "state": self.state()}
+        return {"ok": False, "error": "Unknown crash repair."}
+
     def _watch_game(self, process, slug):
         """Announce the game's exit so the Play button comes back."""
         try:
@@ -185,8 +309,11 @@ class LaunchApi:
             # A non-zero exit that we did not ask for is a crash: keep the
             # status bar quiet and put a notification in the lower-right.
             log.warning("game %r exited with code %s", slug, code)
+            # The game can still be flushing latest.log right after exit.
+            time.sleep(0.3)
+            crash = self._explain_crash(slug, code, self._take_stderr(process))
             self._event("gameproc", running=False, slug=slug, crashed=True,
-                        exit_code=code,
+                        exit_code=code, crash=crash,
                         message=f"Minecraft closed unexpectedly "
                                 f"(exit code {code}). Check the game log.")
         else:
@@ -411,6 +538,24 @@ class LaunchApi:
                     message=message)
         return {"ok": True, "message": message}
 
+    def _remember_stderr(self, process, line):
+        """Keep the JVM's last words: startup errors never reach latest.log."""
+        with self._game_lock:
+            store = getattr(self, "_game_stderr_tail", None)
+            if store is None:
+                store = self._game_stderr_tail = {}
+            lines = store.setdefault(process.pid, [])
+            lines.append(line)
+            if len(lines) > 300:
+                del lines[:len(lines) - 300]
+            if len(store) > 8:
+                store.pop(next(iter(store)))
+
+    def _take_stderr(self, process):
+        with self._game_lock:
+            store = getattr(self, "_game_stderr_tail", None) or {}
+            return "\n".join(store.get(process.pid, []))
+
     def _read_stderr(self, process):
         stream = process.stderr
         if stream is None:
@@ -420,5 +565,6 @@ class LaunchApi:
                 line = raw.decode("utf-8", "replace").rstrip()
                 if line:
                     self._game_line(line)
+                    self._remember_stderr(process, line)
         except (OSError, ValueError):
             pass

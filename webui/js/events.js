@@ -119,8 +119,12 @@ function handleEvent(ev) {
         // The save was written while playing, so the world order changes.
         if (typeof maybeReloadHome === "function") maybeReloadHome();
         if (ev.crashed) {
-          showErrorToast(ev.message || "Minecraft closed unexpectedly.",
-                         "Game crash");
+          if (ev.crash && typeof showCrashScreen === "function") {
+            showCrashScreen(ev);
+          } else {
+            showErrorToast(ev.message || "Minecraft closed unexpectedly.",
+                           "Game crash");
+          }
         }
         if (ev.message) setStatus(ev.message, !!ev.crashed);
       }
