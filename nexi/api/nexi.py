@@ -1,6 +1,8 @@
 """Sign-in with a Nexi site account (Nexi ID) and profile sync."""
 
+import ipaddress
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -12,7 +14,34 @@ from ..net import open_url
 
 NEXI_TIMEOUT = 20
 
+
+# A refused connection usually means Flask is still starting or the debug
+# reloader is restarting. Retrying briefly turns that into a normal response.
+NEXI_RETRY_DELAYS = (0.5, 1.5)
+
+
 MC_TYPES = ("offline", "microsoft", "ely")
+
+
+def _refused(exc) -> bool:
+    reason = getattr(exc, "reason", exc)
+    text = (str(reason) or str(exc)).lower()
+    return ("10061" in text or "connection refused" in text
+            or "actively refused" in text or "отверг" in text)
+
+
+def _unreachable_message(exc) -> str:
+    """Readable text for connection failures instead of a raw urlopen error."""
+    reason = getattr(exc, "reason", exc)
+    text = str(reason) or str(exc)
+    if _refused(exc):
+        return "The Nexi site is not running — start it and try again."
+    low = text.lower()
+    if ("10060" in text or "10051" in text or "timed out" in low
+            or "timeout" in low):
+        return ("The Nexi site did not respond — check its address in "
+                "Settings → Accounts.")
+    return f"Could not reach the Nexi site: {text}"
 
 
 class NexiApi:
@@ -36,22 +65,27 @@ class NexiApi:
             method = "POST" if payload is not None else "GET"
         request_obj = urllib.request.Request(
             base + path, data=body, headers=headers, method=method)
-        try:
-            with open_url(
-                    request_obj, timeout=NEXI_TIMEOUT) as response:
-                raw = response.read().decode("utf-8", "replace")
-        except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", "replace")
+        for attempt in range(len(NEXI_RETRY_DELAYS) + 1):
             try:
-                data = json.loads(raw or "{}")
-            except ValueError:
-                data = {}
-            message = str((data or {}).get("error") or "").strip()
-            if not message:
-                message = f"The Nexi site returned HTTP {exc.code}."
-            return False, {"error": message, "status": exc.code}
-        except (urllib.error.URLError, OSError, TimeoutError) as exc:
-            return False, {"error": f"Could not reach the Nexi site: {exc}"}
+                with open_url(
+                        request_obj, timeout=NEXI_TIMEOUT) as response:
+                    raw = response.read().decode("utf-8", "replace")
+                break
+            except urllib.error.HTTPError as exc:
+                raw = exc.read().decode("utf-8", "replace")
+                try:
+                    data = json.loads(raw or "{}")
+                except ValueError:
+                    data = {}
+                message = str((data or {}).get("error") or "").strip()
+                if not message:
+                    message = f"The Nexi site returned HTTP {exc.code}."
+                return False, {"error": message, "status": exc.code}
+            except (urllib.error.URLError, OSError, TimeoutError) as exc:
+                if attempt < len(NEXI_RETRY_DELAYS) and _refused(exc):
+                    time.sleep(NEXI_RETRY_DELAYS[attempt])
+                    continue
+                return False, {"error": _unreachable_message(exc)}
         try:
             data = json.loads(raw or "{}")
         except ValueError:
@@ -356,6 +390,44 @@ class NexiApi:
         values = urllib.parse.parse_qs(parsed.query or "")
         return str((values.get("token") or [""])[0]).strip()
 
+    @staticmethod
+    def _nexi_link_base_from_uri(uri):
+        """The LAN site address carried by ``nexi://link?base=...``, or ""."""
+        try:
+            parsed = urllib.parse.urlparse(str(uri or "").strip())
+            values = urllib.parse.parse_qs(parsed.query or "")
+            base = str((values.get("base") or [""])[0]).strip().rstrip("/")
+            address = urllib.parse.urlparse(base)
+        except ValueError:
+            return ""
+        if (address.scheme not in ("http", "https") or not address.netloc
+                or address.username or address.password or address.path
+                or address.query or address.fragment):
+            return ""
+        try:
+            host = ipaddress.ip_address(address.hostname or "")
+        except ValueError:
+            return ""
+        if not (host.is_private or host.is_loopback):
+            return ""
+        return base
+
+    def _nexi_adopt_link_base(self, uri):
+        """Use the sender's LAN address when this launcher has no site set."""
+        base = self._nexi_link_base_from_uri(uri)
+        if not base:
+            return
+        current = str(getattr(self, "nexi_base_url", "") or "").strip()
+        if current.startswith(("http://", "https://")):
+            current_host = urllib.parse.urlparse(current).hostname or ""
+            if current_host not in ("127.0.0.1", "localhost", "::1"):
+                return
+        with self._lock:
+            if self.nexi_base_url != base:
+                self.nexi_base_url = base
+                self._save()
+                log.info("Nexi site address taken from the link: %s", base)
+
     def _nexi_link_accounts(self):
         """Only accounts that were actually signed in can be linked."""
         with self._lock:
@@ -368,6 +440,7 @@ class NexiApi:
 
     def nexi_handle_link(self, uri):
         """A ``nexi://link`` URL arrived (startup or a second instance)."""
+        self._nexi_adopt_link_base(uri)
         token = self._nexi_link_token_from_uri(uri)
         if not token:
             log.warning("Nexi link ignored: no token in %r", str(uri)[:120])
