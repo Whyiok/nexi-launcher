@@ -726,6 +726,10 @@
     "Checking this computer…": "Проверяем компьютер…",
     "Could not detect this computer — pick the values manually.": "Не удалось определить параметры компьютера — выберите значения вручную.",
     "Memory size was not detected — choose how much RAM Minecraft should use.": "Объём памяти не определён — выберите, сколько ОЗУ выделить Minecraft.",
+    "FIRST-RUN SETUP": "ПЕРВЫЙ ЗАПУСК",
+    "Run the welcome screen again": "Открыть экран приветствия снова",
+    "Review the language, appearance, network bypass and Minecraft defaults chosen at first launch. Nothing is reset.": "Ещё раз пройдите выбор языка, оформления, обхода блокировок и настроек Minecraft, сделанный при первом запуске. Ничего не сбрасывается.",
+    "Open welcome screen": "Открыть приветствие",
 
     /* Site-initiated Minecraft account link */
     "Link a Minecraft account?": "Привязать аккаунт Minecraft?",

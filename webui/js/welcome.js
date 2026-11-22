@@ -42,6 +42,15 @@ function hideWelcome() {
   if (root) root.classList.add("hidden");
 }
 
+function reopenWelcome() {
+  // Drop cached step data so the setup reads the current saved values again.
+  welcomeSetup = null;
+  welcomeSetupLoading = false;
+  welcomeZapretFound = null;
+  welcomeZapretBusy = false;
+  showWelcome();
+}
+
 /* ---------------------------------------------------------------- steps */
 
 function welcomeNextLabel() {
@@ -350,6 +359,7 @@ function bindWelcome() {
   });
   $("#btn-welcome-back").addEventListener("click", () => welcomeGo(-1));
   $("#btn-welcome-skip").addEventListener("click", () => finishWelcome(true));
+  $("#btn-reopen-welcome").addEventListener("click", reopenWelcome);
 
   $$("#welcome [data-wlang]").forEach((button) => {
     button.addEventListener("click", async () => {
