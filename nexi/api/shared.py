@@ -7,6 +7,8 @@ each player's own profile.
 
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 from ..curseforge import curseforge_versions, resolve_manifest_file
 from ..instances import (
@@ -38,6 +40,97 @@ def shared_fingerprint(definition):
     text = json.dumps(definition or {}, sort_keys=True, ensure_ascii=False,
                       separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _file_sha1(path):
+    digest = hashlib.sha1()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _modrinth_version_for(path):
+    try:
+        version = modrinth_get(f"/version_file/{_file_sha1(path)}",
+                               params={"algorithm": "sha1"}, timeout=25)
+    except Exception:
+        return None
+    return version if isinstance(version, dict) and version.get(
+        "project_id") else None
+
+
+def reconcile_profile_files(root):
+    """Track files that were copied in manually or by a modpack import.
+
+    Shared builds only know about content the launcher installed itself, so
+    anything that came with an imported pack used to travel as nothing. Match
+    those files to Modrinth by SHA-1 and record them like normal installs.
+    """
+    root = Path(root)
+    targets = [("mod", instance_mods_dir(root), (".jar",))]
+    for kind in SHARED_PACK_KINDS:
+        targets.append((kind, instance_pack_dir(root, kind), (".zip", ".jar")))
+
+    jobs = []
+    for kind, folder, suffixes in targets:
+        if not folder.is_dir():
+            continue
+        if kind == "mod":
+            state = read_mods_state(root)
+        else:
+            bucket = read_packs_state(root).get(kind)
+            state = bucket if isinstance(bucket, dict) else {}
+        known = {safe_filename(str(entry.get("filename") or "")).lower()
+                 for entry in state.values() if isinstance(entry, dict)}
+        try:
+            children = list(folder.iterdir())
+        except OSError:
+            continue
+        for path in children:
+            if (path.is_file() and path.suffix.lower() in suffixes
+                    and path.name.lower() not in known):
+                jobs.append((kind, path))
+    if not jobs:
+        return 0
+
+    found = {}
+    with ThreadPoolExecutor(max_workers=min(8, len(jobs))) as pool:
+        futures = {pool.submit(_modrinth_version_for, path): (kind, path)
+                   for kind, path in jobs}
+        for future in as_completed(futures):
+            kind, path = futures[future]
+            try:
+                version = future.result()
+            except Exception:
+                version = None
+            if version is not None:
+                found.setdefault(kind, []).append((path, version))
+
+    added = 0
+    for kind, rows in found.items():
+        if kind == "mod":
+            state = read_mods_state(root)
+            full = None
+        else:
+            full = read_packs_state(root)
+            bucket = full.get(kind)
+            state = bucket if isinstance(bucket, dict) else {}
+            full[kind] = state
+        for path, version in rows:
+            project = str(version.get("project_id") or "")
+            if not project or project in state:
+                continue
+            state[project] = mod_state_entry(
+                version, {"filename": path.name}, project,
+                title=str(version.get("name") or path.name),
+                source="modrinth")
+            added += 1
+        if full is None:
+            write_mods_state(root, state)
+        else:
+            write_packs_state(root, full)
+    return added
 
 
 def _shared_entry(entry):
@@ -72,6 +165,14 @@ class SharedApi:
     def _shared_profile_definition(self, instance):
         """The shareable part of a profile: version, loader and exact files."""
         root = instance["_root"]
+        try:
+            tracked = reconcile_profile_files(root)
+            if tracked:
+                log.info("shared %r: tracked %s file(s) that were not "
+                         "installed through the launcher",
+                         instance.get("_slug"), tracked)
+        except Exception as exc:
+            log.warning("shared: could not match profile files: %s", exc)
         try:
             base = instance_base_version(instance)
         except Exception:
