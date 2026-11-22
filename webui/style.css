@@ -1094,6 +1094,23 @@ body.pet-holding * { cursor: grabbing !important; }
 }
 .profile-card:hover { background: var(--surface-3); border-color: var(--line-strong); }
 .profile-card:active { transform: scale(.97); }
+.profile-card img { -webkit-user-drag: none; }
+.profile-card {
+  cursor: pointer;
+  touch-action: none;
+}
+.profile-card:active { cursor: grabbing; }
+.profile-card.dragging {
+  z-index: 6;
+  cursor: grabbing;
+  border-color: var(--accent);
+  box-shadow: 0 16px 34px -18px rgba(0, 0, 0, .9);
+  opacity: .96;
+  transition: none;
+  will-change: transform;
+}
+body.profile-dragging { cursor: grabbing; }
+body.profile-dragging .profile-card { cursor: grabbing; }
 .profile-card .profile-icon {
   position: absolute;
   inset: 0;

@@ -185,10 +185,36 @@ class ProfilesApi:
         with self._lock:
             previous = self.selected_slug if select is None else select
             self.instances = list_instances()
+            # The rail keeps the drag order from settings; builds that are not
+            # in it yet (created after the last reorder) follow alphabetically.
+            rank = {slug: index for index, slug in enumerate(
+                getattr(self, "instance_order", []))}
+            self.instances.sort(key=lambda item: (
+                rank.get(item["_slug"], len(rank)), item["name"].lower()))
             slugs = {instance["_slug"] for instance in self.instances}
             if previous not in slugs:
                 previous = self.instances[0]["_slug"] if self.instances else ""
             self.selected_slug = previous
+
+    def reorder_instances(self, order):
+        """Save the build order of the left rail (a list of profile slugs)."""
+        if not isinstance(order, list):
+            return {"ok": False, "error": "Invalid build order."}
+        with self._lock:
+            slugs = [instance["_slug"] for instance in self.instances]
+            known = set(slugs)
+            clean = []
+            for slug in order:
+                slug = str(slug or "")
+                if slug in known and slug not in clean:
+                    clean.append(slug)
+            clean += [slug for slug in slugs if slug not in clean]
+            if clean == slugs:
+                return {"ok": True, "state": self.state()}
+            self.instance_order = clean
+            self._save()
+            self.refresh_instances(select=self.selected_slug)
+        return {"ok": True, "state": self.state()}
 
     def select(self, slug):
         with self._lock:

@@ -28,6 +28,9 @@ class BaseApi:
     def __init__(self):
         self.instances = []
         self.selected_slug = str(self._saved("instance", "") or "")
+        order = self._saved("instance_order", [])
+        self.instance_order = ([str(slug) for slug in order if str(slug or "")]
+                               if isinstance(order, list) else [])
         self.player = str(self._saved("player", "Player") or "Player")
         try:
             ram = int(self._saved("ram", 2) or 2)
@@ -487,6 +490,7 @@ class BaseApi:
                 "onboarded": bool(self._onboarded),
                 "java": self.java_path,
                 "instance": self.selected_slug,
+                "instance_order": self.instance_order,
                 "background": self._background,
                 "mirror": self.mirror,
                 "proxy": self.proxy,

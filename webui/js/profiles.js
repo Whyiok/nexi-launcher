@@ -131,6 +131,127 @@ function runProfileMenuAction(action) {
    short by a full re-render. */
 let profilesKey = "";
 
+/* Pointer drag reorders the rail. Writes are saved once the card settles, so
+   the backend receives a single final order instead of every hover slot. */
+const profileDrag = { card: null, startY: 0, grab: 0, shift: 0, active: false,
+                      suppressClick: false };
+
+function profileDragStart(event) {
+  if (event.button !== 0 || S.busy) return;
+  const card = event.target.closest(".profile-card");
+  if (!card || !card.dataset.slug) return;
+  profileDrag.card = card;
+  profileDrag.startY = event.clientY;
+  profileDrag.grab = event.clientY - card.getBoundingClientRect().top;
+  profileDrag.shift = 0;
+  profileDrag.active = false;
+  document.addEventListener("pointermove", profileDragMove);
+  document.addEventListener("pointerup", profileDragEnd);
+  document.addEventListener("pointercancel", profileDragEnd);
+}
+
+function reorderProfileCard(list, card, before) {
+  const tops = new Map();
+  for (const el of list.querySelectorAll(".profile-card")) {
+    tops.set(el, el.getBoundingClientRect().top);
+  }
+  if (before) list.insertBefore(card, before);
+  else list.appendChild(card);
+  for (const [el, top] of tops) {
+    if (el === card) continue;
+    const delta = top - el.getBoundingClientRect().top;
+    if (Math.abs(delta) < 0.5) continue;
+    el.style.transition = "none";
+    el.style.transform = `translateY(${delta}px)`;
+    requestAnimationFrame(() => {
+      el.style.transition = "";
+      el.style.transform = "";
+    });
+  }
+}
+
+function profileDragMove(event) {
+  const card = profileDrag.card;
+  if (!card || !card.isConnected) return;
+  if (!profileDrag.active) {
+    if (Math.abs(event.clientY - profileDrag.startY) < 5) return;
+    profileDrag.active = true;
+    hideProfileTip();
+    hideProfileMenu();
+    card.classList.add("dragging");
+    document.body.classList.add("profile-dragging");
+  }
+  event.preventDefault();
+  const list = $("#profile-list");
+  if (!list) return;
+
+  // Keep the card's visual top under the pointer.
+  const targetTop = event.clientY - profileDrag.grab;
+  let rect = card.getBoundingClientRect();
+  profileDrag.shift += targetTop - rect.top;
+  card.style.transform = `translateY(${profileDrag.shift}px)`;
+
+  const center = targetTop + rect.height / 2;
+  const cards = $$(".profile-card", list).filter((item) => item !== card);
+  const before = cards.find((item) => {
+    const box = item.getBoundingClientRect();
+    return center < box.top + box.height / 2;
+  }) || null;
+  if (before ? card.nextElementSibling !== before : card.nextElementSibling) {
+    reorderProfileCard(list, card, before);
+    // The slot changed — offset the shift so the card does not jump.
+    rect = card.getBoundingClientRect();
+    profileDrag.shift += targetTop - rect.top;
+    card.style.transform = `translateY(${profileDrag.shift}px)`;
+  }
+
+  const box = list.getBoundingClientRect();
+  if (event.clientY < box.top + 28) list.scrollTop -= 12;
+  else if (event.clientY > box.bottom - 28) list.scrollTop += 12;
+}
+
+function profileDragEnd() {
+  document.removeEventListener("pointermove", profileDragMove);
+  document.removeEventListener("pointerup", profileDragEnd);
+  document.removeEventListener("pointercancel", profileDragEnd);
+  const card = profileDrag.card;
+  const active = profileDrag.active;
+  profileDrag.card = null;
+  profileDrag.active = false;
+  profileDrag.shift = 0;
+  document.body.classList.remove("profile-dragging");
+  if (!card) return;
+  card.classList.remove("dragging");
+  if (!active) return;
+  // The pointerup that ends a drag is followed by a click on the card; it must
+  // not also switch the selected build.
+  profileDrag.suppressClick = true;
+  setTimeout(() => { profileDrag.suppressClick = false; }, 0);
+  const order = $$("#profile-list .profile-card")
+    .map((item) => item.dataset.slug).filter(Boolean);
+  card.style.transition = "transform .18s var(--ease)";
+  card.style.transform = "translateY(0)";
+  setTimeout(() => {
+    if (card.isConnected) {
+      card.style.transition = "";
+      card.style.transform = "";
+    }
+    const current = (S.instances || []).map((inst) => inst.slug);
+    if (order.join("|") !== current.join("|")) reorderProfiles(order);
+  }, 180);
+}
+
+async function reorderProfiles(order) {
+  const result = await call("reorder_instances", order);
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not reorder builds.", true);
+    if (result && result.state) applyState(result.state);
+    else await refreshState();
+    return;
+  }
+  if (result.state) applyState(result.state);
+}
+
 function profilesSignature() {
   return S.instances.map((inst) => {
     const icon = inst.icon || "";
@@ -723,7 +844,7 @@ async function clearProfileBanner() {
 }
 
 async function selectInstance(slug) {
-  if (!slug) return;
+  if (!slug || profileDrag.suppressClick) return;
   // On Home a rail click chooses the build the Play button starts, exactly
   // like clicking one of the build rows there; it must not leave Home.
   if (screen === "home") {
