@@ -93,6 +93,30 @@ function handleEvent(ev) {
           "Nexi link");
       }
       break;
+    case "nexi_login":
+      if (ev.status === "waiting") {
+        friendsState.waiting = true;
+        friendsStatus("Waiting for you to sign in in the browser…");
+        renderFriendsGate();
+      } else if (ev.status === "ok") {
+        friendsState.waiting = false;
+        friendsStatus("");
+        if (ev.state) applyState(ev.state);
+        else refreshState();
+        if (screen === "home") loadFriends();
+        setStatus(`Signed in to Nexi as ${ev.name || "your account"}.`);
+      } else if (ev.status === "error") {
+        friendsState.waiting = false;
+        renderFriendsGate();
+        friendsStatus(ev.message || "Browser sign-in failed.", true);
+        setStatus(ev.message || "Browser sign-in failed.", true);
+      } else if (ev.status === "cancelled") {
+        friendsState.waiting = false;
+        renderFriendsGate();
+        friendsStatus("");
+        setStatus("Nexi sign-in cancelled.");
+      }
+      break;
     case "play": {
       const slug = ev.slug || (S.instance ? S.instance.slug : "");
       clearStarting(slug);

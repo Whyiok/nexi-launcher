@@ -61,6 +61,8 @@ class BaseApi:
         self.nexi_base_url = str(nexi.get("base_url")
                                  or NEXI_BASE_URL_DEFAULT).strip().rstrip("/")
         self._nexi_pending = None
+        self._nexi_login_thread = None
+        self._nexi_login_stop = threading.Event()
         # Companion shown in the top bar; purely cosmetic.
         pet = str(self._saved("pet", "axi") or "axi").strip().lower()
         self.pet = pet if pet in self.PETS else "axi"

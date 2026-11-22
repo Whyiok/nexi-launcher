@@ -1,7 +1,10 @@
 """Sign-in with a Nexi site account (Nexi ID) and profile sync."""
 
+import http.server
 import ipaddress
 import json
+import secrets
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -10,9 +13,51 @@ import urllib.request
 from ..config import USER_AGENT
 from ..logging_setup import log
 from ..net import open_url
+from ..util import open_in_system
 
 
 NEXI_TIMEOUT = 20
+NEXI_BROWSER_TIMEOUT = 180
+
+
+class _NexiLoginServer(http.server.ThreadingHTTPServer):
+    allow_reuse_address = True
+
+    def __init__(self, address, callback_path):
+        super().__init__(address, _NexiLoginHandler)
+        self.callback_path = callback_path.rstrip("/") or "/"
+        self.result = None
+        self.event = threading.Event()
+
+
+class _NexiLoginHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+        if path != self.server.callback_path:
+            self._reply(404, "<!doctype html><meta charset='utf-8'>"
+                             "<h1>Not found</h1>")
+            return
+        self.server.result = urllib.parse.parse_qs(parsed.query)
+        self.server.event.set()
+        self._reply(200, "<!doctype html><meta charset='utf-8'>"
+                         "<title>Nexi</title>"
+                         "<body style='font:16px Segoe UI,sans-serif;"
+                         "background:#0a0a0a;color:#f4f4f4;display:grid;"
+                         "place-items:center;height:100vh;margin:0'>"
+                         "<p>Nexi sign-in complete — you can close this "
+                         "tab and return to the launcher.</p>")
+
+    def _reply(self, status, html):
+        body = html.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, fmt, *args):
+        log.debug("Nexi browser sign-in callback: " + fmt, *args)
 
 
 # A refused connection usually means Flask is still starting or the debug
@@ -253,6 +298,159 @@ class NexiApi:
         self._nexi_apply_user(account, user)
         log.info("Nexi profile refreshed: %s", account.get("name"))
         return {"ok": True, "state": self.state()}
+
+    def nexi_browser_login(self):
+        """Sign in on the Nexi site in the browser and return here."""
+        thread = getattr(self, "_nexi_login_thread", None)
+        if thread is not None and thread.is_alive():
+            return {"ok": False,
+                    "error": "Browser sign-in is already waiting."}
+        base = str(getattr(self, "nexi_base_url", "") or "").strip().rstrip("/")
+        if not base:
+            return {"ok": False, "error": "Set the Nexi site address first."}
+        try:
+            server = _NexiLoginServer(("127.0.0.1", 0), "/nexi-login")
+        except OSError as exc:
+            log.warning("Nexi browser sign-in listener failed: %s", exc)
+            return {"ok": False,
+                    "error": f"Could not listen for the browser redirect: "
+                             f"{exc}"}
+        state = secrets.token_urlsafe(24)
+        stop = threading.Event()
+        self._nexi_login_stop = stop
+        self._nexi_login_thread = threading.Thread(
+            target=self._nexi_browser_login_worker,
+            args=(server, base, state, stop),
+            name="nexi-browser-login", daemon=True)
+        self._nexi_login_thread.start()
+        return {"ok": True}
+
+    def nexi_browser_login_cancel(self):
+        stop = getattr(self, "_nexi_login_stop", None)
+        if stop is not None:
+            stop.set()
+        return {"ok": True}
+
+    def _nexi_browser_login_worker(self, server, base, state, stop):
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            port = server.server_address[1]
+            callback = f"http://127.0.0.1:{port}/nexi-login"
+            query = urllib.parse.urlencode(
+                {"state": state, "redirect": callback})
+            self._event("nexi_login", status="waiting")
+            open_in_system(f"{base}/launcher/login?{query}")
+            deadline = time.monotonic() + NEXI_BROWSER_TIMEOUT
+            while time.monotonic() < deadline:
+                if stop.is_set():
+                    self._event("nexi_login", status="cancelled")
+                    return
+                if server.event.wait(0.5):
+                    break
+            else:
+                self._event("nexi_login", status="error",
+                            message="Browser sign-in timed out. Try again.")
+                return
+
+            params = server.result or {}
+            returned = str((params.get("state") or [""])[0])
+            token = str((params.get("token") or [""])[0])
+            if returned != state:
+                self._event("nexi_login", status="error",
+                            message="Sign-in state mismatch. Try again.")
+                return
+            if not token:
+                self._event("nexi_login", status="error",
+                            message="The Nexi site returned no sign-in token.")
+                return
+
+            ok, data = self._nexi_call(
+                "/api/nexi/launcher-login/"
+                + urllib.parse.quote(token, safe=""),
+                {"state": state})
+            if not ok:
+                self._event("nexi_login", status="error",
+                            message=data.get("error")
+                            or "Browser sign-in failed.")
+                return
+            api_token = str(data.get("token") or "")
+            user = data.get("user") if isinstance(data.get("user"), dict) else {}
+            if not api_token:
+                self._event("nexi_login", status="error",
+                            message="The Nexi site returned no account token.")
+                return
+            account = self._nexi_account(user, api_token)
+            with self._lock:
+                stored = self._upsert_account(account)
+                self._save()
+            log.info("Nexi browser sign-in complete: %s (ID %s)",
+                     stored["name"], stored.get("nexi_id") or "?")
+            self._event("nexi_login", status="ok", name=stored["name"],
+                        state=self.state())
+        finally:
+            try:
+                server.shutdown()
+            except Exception:
+                log.exception("Nexi browser sign-in listener shutdown failed")
+            server.server_close()
+
+    def nexi_friends(self):
+        """Friends and pending requests from the Nexi site."""
+        account, token, error = self._nexi_token_account()
+        if account is None:
+            return {"ok": True, "signed_in": False}
+        if not token:
+            return {"ok": False, "signed_in": True, "error": error}
+        ok, data = self._nexi_call("/api/nexi/friends", token=token)
+        if not ok:
+            return {"ok": False, "signed_in": True,
+                    "error": data.get("error") or "Could not load friends."}
+        return self._nexi_friends_result(data)
+
+    def nexi_friend_accept(self, friend_id=""):
+        return self._nexi_friend_action("accept", friend_id)
+
+    def nexi_friend_decline(self, friend_id=""):
+        return self._nexi_friend_action("decline", friend_id)
+
+    def _nexi_friend_action(self, action, friend_id):
+        try:
+            friend_id = int(str(friend_id).strip())
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "That friend request is invalid."}
+        account, token, error = self._nexi_token_account()
+        if account is None or not token:
+            return {"ok": False, "signed_in": account is not None,
+                    "error": error}
+        ok, data = self._nexi_call(
+            f"/api/nexi/friends/{action}", {"id": friend_id}, token=token)
+        if not ok:
+            return {"ok": False, "signed_in": True,
+                    "error": data.get("error")
+                    or "Could not update the friend request."}
+        log.info("Nexi friend request %s: %s", action, friend_id)
+        return self._nexi_friends_result(data)
+
+    @staticmethod
+    def _nexi_friends_result(data):
+        data = data if isinstance(data, dict) else {}
+        counts = data.get("counts") if isinstance(data.get("counts"), dict) else {}
+        result = {
+            "ok": True,
+            "signed_in": True,
+            "friends": data.get("friends")
+            if isinstance(data.get("friends"), list) else [],
+            "incoming": data.get("incoming")
+            if isinstance(data.get("incoming"), list) else [],
+            "outgoing": data.get("outgoing")
+            if isinstance(data.get("outgoing"), list) else [],
+            "counts": {
+                "friends": int(counts.get("friends") or 0),
+                "online": int(counts.get("online") or 0),
+                "incoming": int(counts.get("incoming") or 0),
+            },
+        }
+        return result
 
     def site_profile_url(self):
         """The player's profile page on the Nexi site, for the in-app view."""

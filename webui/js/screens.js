@@ -143,6 +143,8 @@ function setScreen(name) {
     renderHome();
     loadHome();
     startHomePanorama();
+    renderFriendsGate();
+    loadFriends();
   } else if (name === "profiles") {
     renderProfiles();
   } else if (name === "create") {

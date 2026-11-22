@@ -433,6 +433,7 @@ function fillAccount() {
       + "paste its Client Secret too. Enter them here once; everyone using "
       + "this copy of the launcher can then sign in with the button above.";
   renderSiteButton();
+  if (typeof renderFriendsGate === "function") renderFriendsGate();
   updateSegFill($("#account-methods"));
 }
 

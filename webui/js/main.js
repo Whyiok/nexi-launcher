@@ -348,6 +348,7 @@ function bind() {
   $("#nexi-base-url").addEventListener("keydown", (event) => {
     if (event.key === "Enter") saveNexiBaseUrl();
   });
+  bindFriends();
   $("#btn-ely-login").addEventListener("click", elyLogin);
   $("#btn-ely-browser").addEventListener("click", elyBrowserLogin);
   $("#btn-ely-cancel").addEventListener("click", elyCancel);

@@ -12,6 +12,11 @@
   <symbol id="i-profile" viewBox="0 0 24 24">
     <circle cx="12" cy="8" r="3.4"/><path d="M5.2 19.4c.6-3.3 3.5-5.2 6.8-5.2s6.2 1.9 6.8 5.2"/>
   </symbol>
+  <symbol id="i-users" viewBox="0 0 24 24">
+    <circle cx="9" cy="8.2" r="2.9"/>
+    <path d="M3.4 18.8c.5-2.8 2.9-4.4 5.6-4.4s5.1 1.6 5.6 4.4"/>
+    <path d="M15.6 5.7a2.9 2.9 0 0 1 0 5.3M17.4 14.6c1.9.5 3.2 2 3.6 4.2"/>
+  </symbol>
   <symbol id="i-builds" viewBox="0 0 24 24">
     <path d="M12 3.4 20 8v8l-8 4.6L4 16V8l8-4.6Z"/>
     <path d="m4 8 8 4.6L20 8M12 12.6v8"/>
@@ -261,6 +266,60 @@
           </section>
         </div>
       </div>
+
+      <aside class="home-friends" aria-label="Friends">
+        <div class="home-friends-head">
+          <div class="home-friends-title">
+            <span class="eyebrow">FRIENDS</span>
+            <span class="count" id="friends-status">not signed in</span>
+          </div>
+          <div class="home-friends-tools">
+            <button class="friends-icon-btn hidden" id="btn-friends-profile"
+                    type="button" title="My profile" aria-label="My profile">
+              <svg class="icon"><use href="#i-profile"/></svg>
+            </button>
+            <button class="friends-icon-btn hidden" id="btn-friends-refresh"
+                    type="button" title="Refresh" aria-label="Refresh">
+              <svg class="icon"><use href="#i-refresh"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="friends-gate" id="friends-gate">
+          <div class="friends-gate-icon"><svg><use href="#i-users"/></svg></div>
+          <p class="hint">Sign in with your browser to see friends, requests
+             and who is online.</p>
+          <button class="btn primary" id="btn-friends-signin" type="button">
+            Sign in to Nexi
+          </button>
+          <button class="btn ghost hidden" id="btn-friends-signin-cancel"
+                  type="button">
+            Cancel
+          </button>
+          <p class="hint friends-signin-status hidden"
+             id="friends-signin-status"></p>
+        </div>
+
+        <div class="friends-body hidden" id="friends-body">
+          <section class="hidden" id="friends-requests-card">
+            <div class="friends-section-head">
+              <span class="eyebrow">FRIEND REQUESTS</span>
+              <span class="count" id="friends-requests-count">0</span>
+            </div>
+            <div class="friends-list" id="friends-requests"></div>
+          </section>
+          <section>
+            <div class="friends-section-head">
+              <span class="eyebrow">FRIENDS</span>
+              <span class="count" id="friends-count">0</span>
+            </div>
+            <div class="friends-list" id="friends-list"></div>
+            <p class="hint hidden" id="friends-empty">No friends yet. Add
+               people on the Nexi site and they will appear here.</p>
+          </section>
+          <p class="hint hidden" id="friends-error"></p>
+        </div>
+      </aside>
     </section>
 
     <!-- Profiles ------------------------------------------------------- -->
@@ -2120,6 +2179,7 @@
 <script src="js/profiles.js"></script>
 <script src="js/home.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/friends.js"></script>
 <script src="js/create.js"></script>
 <script src="js/mods.js"></script>
 <script src="js/loaders.js"></script>
