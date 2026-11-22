@@ -259,10 +259,28 @@ async function sharedSyncNow() {
     if (result && (result.message || result.error)) {
       setStatus(result.message || result.error, false);
     }
+    if (result && result.ok) sharedRefreshProfile();
     await loadSharedCard();
     loadSharedAvailable();
   } finally {
     if (button) button.disabled = false;
+  }
+}
+
+/* Sync writes files straight into the profile folder, so the cached
+   contents pane and the mods browser have to re-read them at once. */
+function sharedRefreshProfile() {
+  if (typeof detail !== "undefined" && detail.contents
+      && typeof loadProfileContents === "function") {
+    loadProfileContents(true);
+  }
+  if (typeof instanceKey !== "function") return;
+  const profile = instanceKey();
+  if (typeof browserStates !== "undefined") browserStates.delete(profile);
+  if (typeof mods !== "undefined" && mods.profile === profile) {
+    mods.installed = null;
+    if (mods.selected >= 0) refreshModStatus();
+    else syncMods();
   }
 }
 
@@ -320,6 +338,7 @@ async function sharedJoin(button) {
     const result = await call("shared_join", id);
     if (result && result.state) applyState(result.state);
     if (result && result.message) setStatus(result.message);
+    if (result && result.ok) sharedRefreshProfile();
     loadSharedAvailable();
     if (result && result.ok) setScreen("profiles");
     else button.disabled = false;
@@ -354,6 +373,7 @@ async function sharedAutoTick() {
   try {
     const result = await call("shared_auto_sync");
     if (result && result.changed) {
+      sharedRefreshProfile();
       if (screen === "home") loadSharedAvailable();
       if (sharedCardVisible()) loadSharedCard();
     }

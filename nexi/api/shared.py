@@ -7,9 +7,14 @@ each player's own profile.
 
 import hashlib
 import json
+import shutil
+import urllib.error
+import urllib.parse
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from ..config import USER_AGENT
 from ..curseforge import curseforge_versions, resolve_manifest_file
 from ..instances import (
     create_instance, instance_base_version, instance_mods_dir,
@@ -21,7 +26,7 @@ from ..java_runtime import ensure_java
 from ..loaders import console_java_for, find_loader_profile, install_loader
 from ..logging_setup import log
 from ..modrinth import mod_versions, modrinth_get, primary_file
-from ..net import download_file
+from ..net import download_file, open_url
 from ..util import safe_filename
 from ..vanilla import (
     fetch_version_manifest, install_vanilla, manifest_entry, version_installed,
@@ -66,6 +71,8 @@ def reconcile_profile_files(root):
     Shared builds only know about content the launcher installed itself, so
     anything that came with an imported pack used to travel as nothing. Match
     those files to Modrinth by SHA-1 and record them like normal installs.
+    Files no catalog knows are recorded as direct uploads, so they can be
+    sent to friends as they are.
     """
     root = Path(root)
     targets = [("mod", instance_mods_dir(root), (".jar",))]
@@ -107,8 +114,22 @@ def reconcile_profile_files(root):
             if version is not None:
                 found.setdefault(kind, []).append((path, version))
 
+    rows = {}
+    for kind, items in found.items():
+        rows.setdefault(kind, []).extend(items)
+    matched = {path for items in rows.values() for path, _ in items}
+    for kind, path in jobs:
+        if path in matched:
+            continue
+        try:
+            size = path.stat().st_size
+            sha1 = _file_sha1(path)
+        except OSError:
+            continue
+        rows.setdefault(kind, []).append((path, None, sha1, size))
+
     added = 0
-    for kind, rows in found.items():
+    for kind, items in rows.items():
         if kind == "mod":
             state = read_mods_state(root)
             full = None
@@ -117,14 +138,33 @@ def reconcile_profile_files(root):
             bucket = full.get(kind)
             state = bucket if isinstance(bucket, dict) else {}
             full[kind] = state
-        for path, version in rows:
-            project = str(version.get("project_id") or "")
-            if not project or project in state:
-                continue
-            state[project] = mod_state_entry(
-                version, {"filename": path.name}, project,
-                title=str(version.get("name") or path.name),
-                source="modrinth")
+        for row in items:
+            path = row[0]
+            if len(row) == 2:
+                version = row[1]
+                project = str(version.get("project_id") or "")
+                if not project or project in state:
+                    continue
+                state[project] = mod_state_entry(
+                    version, {"filename": path.name}, project,
+                    title=str(version.get("name") or path.name),
+                    source="modrinth")
+            else:
+                sha1, size = row[2], row[3]
+                project = "file:" + sha1
+                if project in state:
+                    continue
+                state[project] = {
+                    "filename": path.name,
+                    "version_id": sha1,
+                    "version_number": "",
+                    "project_id": project,
+                    "slug": "",
+                    "title": path.stem,
+                    "source": "file",
+                    "sha1": sha1,
+                    "size": size,
+                }
             added += 1
         if full is None:
             write_mods_state(root, state)
@@ -144,6 +184,8 @@ def _shared_entry(entry):
         "slug": str(entry.get("slug") or ""),
         "title": str(entry.get("title") or ""),
         "icon_url": str(entry.get("icon_url") or ""),
+        "sha1": str(entry.get("sha1") or ""),
+        "size": int(entry.get("size") or 0),
     }
 
 
@@ -284,7 +326,126 @@ class SharedApi:
         version = versions[0] if versions else None
         return (primary_file(version) if version else None, version)
 
-    def _shared_apply_items(self, root, items, kind, game, loader):
+    # --------------------------------------------------------- direct files
+
+    def _shared_url(self, path):
+        base = str(getattr(self, "nexi_base_url", "") or "").strip().rstrip("/")
+        return base + path if base else ""
+
+    def _shared_upload_file(self, build_id, sha1, path, filename, token):
+        """Send one file the catalogs do not have straight to the site."""
+        url = self._shared_url(
+            f"/api/nexi/builds/{int(build_id)}/files/{sha1}"
+            f"?filename={urllib.parse.quote(filename)}")
+        if not url:
+            return False, {"error": "Set the Nexi site address first."}
+        try:
+            size = path.stat().st_size
+            with path.open("rb") as handle:
+                request = urllib.request.Request(
+                    url, data=handle, method="POST",
+                    headers={"Content-Type": "application/octet-stream",
+                             "Content-Length": str(size),
+                             "User-Agent": USER_AGENT,
+                             "Authorization": "Bearer " + token})
+                with open_url(request, timeout=600) as response:
+                    raw = response.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode("utf-8", "replace")
+            try:
+                data = json.loads(raw or "{}")
+            except ValueError:
+                data = {}
+            return False, {"error": str(data.get("error")
+                                       or f"HTTP {exc.code}")}
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            reason = getattr(exc, "reason", exc)
+            return False, {"error": str(reason)}
+        try:
+            data = json.loads(raw or "{}")
+        except ValueError:
+            return False, {"error": "The site returned an unexpected answer."}
+        if not isinstance(data, dict) or data.get("ok") is False:
+            return False, {"error": str((data or {}).get("error")
+                                       or "Upload failed.")}
+        return True, data
+
+    def _shared_upload_missing(self, instance, definition, build, token):
+        """Upload direct files the site does not have yet."""
+        if not token:
+            return []
+        build = build if isinstance(build, dict) else {}
+        try:
+            build_id = int(build.get("id") or 0)
+        except (TypeError, ValueError):
+            build_id = 0
+        if not build_id:
+            return []
+        stored = {str(item) for item in build.get("files") or []}
+        root = instance["_root"]
+        buckets = [("mod", instance_mods_dir(root), definition.get("mods"))]
+        packs = definition.get("packs")
+        packs = packs if isinstance(packs, dict) else {}
+        for kind in SHARED_PACK_KINDS:
+            buckets.append((kind, instance_pack_dir(root, kind),
+                            packs.get(kind)))
+        failed = []
+        announced = False
+        try:
+            for kind, folder, items in buckets:
+                for item in items or []:
+                    if (not isinstance(item, dict)
+                            or item.get("source") != "file"):
+                        continue
+                    sha1 = str(item.get("sha1") or "").lower()
+                    name = safe_filename(str(item.get("filename") or ""))
+                    if not sha1 or not name or sha1 in stored:
+                        continue
+                    path = folder / name
+                    if not path.is_file():
+                        continue
+                    title = str(item.get("title") or name)
+                    self._status("profiles", f"Uploading {name}…")
+                    if not announced:
+                        announced = True
+                        self._event("busy", task="shared", on=True,
+                                    label=f"Uploading {name}")
+                    ok, data = self._shared_upload_file(
+                        build_id, sha1, path, name, token)
+                    if not ok:
+                        failed.append(f"{title}: {data.get('error')}")
+                    else:
+                        stored.add(sha1)
+        finally:
+            if announced:
+                self._event("busy", task="shared", on=False)
+        build["files"] = sorted(stored)
+        return failed
+
+    def _shared_download_file(self, build_id, sha1, target, token, size=0):
+        url = self._shared_url(
+            f"/api/nexi/builds/{int(build_id)}/files/{sha1}")
+        if not url:
+            raise RuntimeError("the Nexi site address is not set")
+        request = urllib.request.Request(url, headers={
+            "User-Agent": USER_AGENT, "Authorization": "Bearer " + token})
+        target = Path(target)
+        part = target.with_name(target.name + ".part")
+        try:
+            with open_url(request, timeout=600) as response, \
+                    part.open("wb") as handle:
+                shutil.copyfileobj(response, handle)
+            if _file_sha1(part) != sha1:
+                raise RuntimeError("the downloaded file was corrupted")
+            if size and part.stat().st_size != int(size):
+                raise RuntimeError("the downloaded file has the wrong size")
+            part.replace(target)
+        except BaseException:
+            part.unlink(missing_ok=True)
+            raise
+
+    def _shared_apply_items(self, root, items, kind, game, loader,
+                            build_id=0, token=""):
         """Install exact versions and drop tracked files no longer listed."""
         if kind == "mod":
             folder = instance_mods_dir(root)
@@ -321,6 +482,50 @@ class SharedApi:
             entry = state.get(project)
             entry = entry if isinstance(entry, dict) else {}
             current = safe_filename(str(entry.get("filename") or ""))
+            if source == "file":
+                sha1 = str(item.get("sha1") or "").lower()
+                name = safe_filename(str(item.get("filename") or ""))
+                target = folder / name if name else None
+                size = int(item.get("size") or 0)
+                ready = (entry and name and current == name
+                         and target.is_file()
+                         and str(entry.get("sha1") or "") == sha1
+                         and (not size or target.stat().st_size == size))
+                if ready:
+                    continue
+                if not sha1 or not name:
+                    failed.append(f"{title}: invalid direct file")
+                    continue
+                if not build_id or not token:
+                    failed.append(f"{title}: sign in to Nexi to receive it")
+                    continue
+                self._status("profiles", f"Downloading {name}…")
+                self._event("busy", task="shared", on=True,
+                            label=f"Downloading {name}")
+                try:
+                    self._shared_download_file(build_id, sha1, target, token,
+                                               size)
+                except Exception as exc:
+                    failed.append(f"{title}: {exc}")
+                    continue
+                state[project] = {
+                    "filename": name,
+                    "version_id": sha1,
+                    "version_number": str(item.get("version_number") or ""),
+                    "project_id": project,
+                    "slug": str(item.get("slug") or ""),
+                    "title": str(item.get("title") or ""),
+                    "source": "file",
+                    "sha1": sha1,
+                    "size": size,
+                }
+                if current and current != name:
+                    try:
+                        (folder / current).unlink()
+                    except OSError:
+                        pass
+                changed += 1
+                continue
             if entry and (folder / current).is_file() and (
                     not version_id
                     or str(entry.get("version_id") or "") == version_id):
@@ -431,13 +636,20 @@ class SharedApi:
             version = profile
         instance["version"] = version
 
+        try:
+            build_id = int(build.get("id") or 0)
+        except (TypeError, ValueError):
+            build_id = 0
+        _, token, _ = self._nexi_token_account()
         changed, removed, failed = self._shared_apply_items(
-            root, definition.get("mods") or [], "mod", base, loader)
+            root, definition.get("mods") or [], "mod", base, loader,
+            build_id=build_id, token=token)
         packs = definition.get("packs")
         packs = packs if isinstance(packs, dict) else {}
         for kind in SHARED_PACK_KINDS:
             c, r, f = self._shared_apply_items(
-                root, packs.get(kind) or [], kind, base, loader)
+                root, packs.get(kind) or [], kind, base, loader,
+                build_id=build_id, token=token)
             changed += c
             removed += r
             failed += f
@@ -461,30 +673,42 @@ class SharedApi:
         if definition is None:
             definition = self._shared_profile_definition(instance)
         fingerprint = shared_fingerprint(definition)
-        if fingerprint == str(link.get("fingerprint") or ""):
-            return False
-        payload = {
-            "definition": definition,
-            "name": str(link.get("name") or instance.get("name") or ""),
-            "description": str(link.get("description") or ""),
-        }
-        ok, data = self._nexi_call(
-            f"/api/nexi/builds/{int(link['build_id'])}", payload, token=token)
-        if not ok:
-            if data.get("status") == 404:
-                raise SharedBuildMissing(
-                    "The owner deleted this shared build.")
-            raise RuntimeError(data.get("error")
-                               or "Could not update the shared build.")
-        build = data.get("build") or {}
-        link["revision"] = int(build.get("revision")
-                               or link.get("revision") or 1)
-        link["fingerprint"] = fingerprint
-        link["name"] = str(build.get("name") or link.get("name") or "")
-        link["updated"] = str(build.get("updated") or "")
+        build = {"id": int(link.get("build_id") or 0),
+                 "files": list(link.get("files") or [])}
+        changed = False
+        if fingerprint != str(link.get("fingerprint") or ""):
+            payload = {
+                "definition": definition,
+                "name": str(link.get("name") or instance.get("name") or ""),
+                "description": str(link.get("description") or ""),
+            }
+            ok, data = self._nexi_call(
+                f"/api/nexi/builds/{int(link['build_id'])}", payload,
+                token=token)
+            if not ok:
+                if data.get("status") == 404:
+                    raise SharedBuildMissing(
+                        "The owner deleted this shared build.")
+                raise RuntimeError(data.get("error")
+                                   or "Could not update the shared build.")
+            build = data.get("build") or {}
+            link["revision"] = int(build.get("revision")
+                                   or link.get("revision") or 1)
+            link["fingerprint"] = fingerprint
+            link["name"] = str(build.get("name") or link.get("name") or "")
+            link["updated"] = str(build.get("updated") or "")
+            link["files"] = list(build.get("files") or [])
+            instance["shared"] = link
+            write_instance(instance["_root"], instance)
+            changed = True
+        # Direct files are sent even when the definition itself is unchanged,
+        # because an earlier upload may have failed.
+        upload_failed = self._shared_upload_missing(
+            instance, definition, build, token)
+        link["files"] = list(build.get("files") or [])
         instance["shared"] = link
         write_instance(instance["_root"], instance)
-        return True
+        return changed, upload_failed
 
     def _shared_pull(self, instance, link, token, build=None):
         if build is None:
@@ -659,11 +883,24 @@ class SharedApi:
             "name": str(build.get("name") or build_name),
             "owner_name": str(account.get("name") or ""),
             "description": desc,
+            "files": list(build.get("files") or []),
         })
+        upload_failed = self._shared_upload_missing(
+            instance, definition, build, token)
+        link = self._shared_link(instance)
+        link["files"] = list(build.get("files") or [])
+        instance["shared"] = link
+        write_instance(instance["_root"], instance)
         log.info("Shared build %s saved for %r (revision %s)",
                  build.get("id"), instance.get("_slug"),
                  build.get("revision"))
         self._event("refresh", select=instance.get("_slug"))
+        if upload_failed:
+            message = (f"Shared build saved, but {len(upload_failed)} direct "
+                       "file(s) could not be uploaded: "
+                       + "; ".join(upload_failed[:3]))
+            return {"ok": True, "warning": True, "message": message,
+                    "state": self.state()}
         message = (f"Shared build updated (revision {build.get('revision')})."
                    if old else
                    f'Published "{build_name}" to your friends.')
@@ -851,7 +1088,15 @@ class SharedApi:
         self._event("busy", task="shared", on=True)
         try:
             if link.get("owner"):
-                changed = self._shared_push(instance, link, token)
+                changed, upload_failed = self._shared_push(instance, link,
+                                                           token)
+                if upload_failed:
+                    message = (f"{len(upload_failed)} direct file(s) could "
+                               "not be uploaded and will retry: "
+                               + "; ".join(upload_failed[:3]))
+                    self._status("profiles", message, error=True)
+                    return {"ok": True, "warning": True, "changed": changed,
+                            "message": message, "state": self.state()}
                 message = ("Shared build updated — friends get the new "
                            "revision on their next check." if changed else
                            "The shared build is already up to date.")
@@ -936,9 +1181,16 @@ class SharedApi:
             for action, instance, link, payload in pending:
                 try:
                     if action == "push":
-                        if self._shared_push(instance, link, token,
-                                             definition=payload):
+                        pushed, upload_failed = self._shared_push(
+                            instance, link, token, definition=payload)
+                        if pushed:
                             changed += 1
+                        if upload_failed:
+                            log.warning("shared auto sync: %d direct file(s) "
+                                        "failed to upload for %r: %s",
+                                        len(upload_failed),
+                                        instance.get("_slug"),
+                                        "; ".join(upload_failed[:3]))
                     else:
                         got, removed, failed, _build = self._shared_pull(
                             instance, link, token, build=payload)
