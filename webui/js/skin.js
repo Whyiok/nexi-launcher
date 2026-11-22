@@ -263,8 +263,15 @@ function skinLoop() {
   }
 }
 
+/* The skin editor lives inside the Accounts settings tab now, so it is
+   visible (and animates) only while that pane is on screen. */
+function skinVisible() {
+  return screen === "settings"
+    && typeof settingsTab !== "undefined" && settingsTab === "account";
+}
+
 function kickSkinView() {
-  if (!skinView.ready || screen !== "skin") return;
+  if (!skinView.ready || !skinVisible()) return;
   if (!skinView.raf) skinView.raf = requestAnimationFrame(skinLoop);
 }
 
@@ -319,7 +326,7 @@ function skinHeadAnchor(rect) {
 
 /* The head follows the cursor anywhere in the window. */
 function trackSkinPointer(event) {
-  if (screen !== "skin") return;
+  if (!skinVisible()) return;
   const canvas = $("#skin-canvas");
   if (!canvas || !skinView.ready) return;
   const rect = canvas.getBoundingClientRect();
@@ -407,19 +414,22 @@ function drawSkinPreview(dataUrl, variant) {
    accounts stay in the list but are greyed out and cannot be chosen. */
 function skinAccountLabel(account) {
   return account.type === "microsoft" ? "Microsoft"
-    : account.type === "ely" ? "Ely.by" : "Offline";
+    : account.type === "ely" ? "Ely.by"
+      : account.type === "nexi" ? "Nexi" : "Offline";
 }
 
 function fillSkinAccounts() {
   const select = $("#skin-account-select");
   if (!select) return;
   const accounts = S.accounts || [];
-  const online = accounts.filter((account) => account.type !== "offline");
+  // Only accounts with their own skin service can change a skin here. A Nexi
+  // account points at a Minecraft identity but is managed on the Nexi site.
+  const online = accounts.filter(
+    (account) => account.type === "microsoft" || account.type === "ely");
   const current = accounts.find((account) => account.id === skin.account);
-  if (!current || current.type === "offline") {
+  if (!current || !online.includes(current)) {
     const active = online.find((account) => account.id === S.active_account);
-    const fallback = active || online[0]
-      || accounts.find((account) => account.active) || accounts[0];
+    const fallback = active || online[0] || accounts[0];
     skin.account = fallback ? fallback.id : "";
   }
   select.replaceChildren();
@@ -435,7 +445,7 @@ function fillSkinAccounts() {
     const option = document.createElement("option");
     option.value = account.id;
     option.textContent = `${account.name} · ${skinAccountLabel(account)}`;
-    if (account.type === "offline") {
+    if (!online.includes(account)) {
       option.disabled = true;
       option.textContent += " — unavailable";
     }

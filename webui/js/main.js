@@ -43,6 +43,21 @@ async function toggleWindowMaximize() {
   if (result && result.ok) syncWindowMaximized(!!result.maximized);
 }
 
+async function openSiteProfile() {
+  const result = await call("site_profile_url");
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not open the site profile.", true);
+    return;
+  }
+  const frame = $("#site-frame");
+  if (frame.dataset.url !== result.url) {
+    frame.src = result.url;
+    frame.dataset.url = result.url;
+  }
+  if (editSlug) resetCreateMode();
+  setScreen("site");
+}
+
 /* Maximizing through Win+Up or by dragging to the top of the screen never
    goes through our button, so the glyph is refreshed from the real window
    state whenever the window changes size. */
@@ -59,6 +74,7 @@ function queueMaximizedSync() {
 function bind() {
   if (bound) return;
   bound = true;
+  upgradeSelects();
   // The selected build is only highlighted while the launcher window is the
   // one in front; alt-tabbing away drops the highlight.
   const setWindowActive = (active) => {
@@ -74,6 +90,7 @@ function bind() {
   $("#btn-win-min").addEventListener("click", () => call("window_minimize"));
   $("#btn-win-max").addEventListener("click", toggleWindowMaximize);
   $("#btn-win-close").addEventListener("click", () => call("window_close"));
+  $("#btn-site-profile").addEventListener("click", openSiteProfile);
   const dragRegion = $(".titlebar-drag");
   if (dragRegion) dragRegion.addEventListener("dblclick", toggleWindowMaximize);
   $$("[data-window-resize]").forEach((node) => {
@@ -158,8 +175,6 @@ function bind() {
   });
   $("#account-list").addEventListener("pointerdown", accountDragStart);
 
-  $("#ram-down").addEventListener("click", () => changeRam(-1));
-  $("#ram-up").addEventListener("click", () => changeRam(1));
   $("#theme-grid").addEventListener("click", (event) => {
     const option = event.target.closest("[data-theme-option]");
     if (option) changeTheme(option.dataset.themeOption);
@@ -172,8 +187,14 @@ function bind() {
     const option = event.target.closest("[data-lang-option]");
     if (option) changeLanguage(option.dataset.langOption);
   });
+  $("#pet-seg").addEventListener("click", (event) => {
+    const option = event.target.closest("[data-pet-option]");
+    if (option) changePet(option.dataset.petOption);
+  });
   $("#btn-pick-background").addEventListener("click", pickBackground);
   $("#btn-clear-background").addEventListener("click", clearBackground);
+  $("#btn-pane-banner").addEventListener("click", setProfileBanner);
+  $("#btn-pane-clear-banner").addEventListener("click", clearProfileBanner);
   $("#btn-play").addEventListener("click", play);
   $("#btn-stop").addEventListener("click", stopGame);
   $("#btn-restart").addEventListener("click", restartGame);
@@ -265,14 +286,22 @@ function bind() {
     changePaneAccount(event.target.value || "");
   });
 
-  $("#default-ram-down").addEventListener("click", () => changeDefaultRam(-1));
-  $("#default-ram-up").addEventListener("click", () => changeDefaultRam(1));
   $("#btn-pick-java").addEventListener("click", pickJava);
   $("#btn-auto-java").addEventListener("click", useAutoJava);
   $("#java-path").addEventListener("keydown", (event) => {
     if (event.key === "Enter") applyJavaPath();
   });
   $("#java-path").addEventListener("change", applyJavaPath);
+  for (const id of ["default-gui-scale", "default-particles", "default-fps"]) {
+    $("#" + id).addEventListener("change", queueGameDefaultsSave);
+  }
+  for (const id of ["default-fov", "default-distance",
+                    "default-brightness"]) {
+    const input = $("#" + id);
+    input.addEventListener("input", renderDefaultsValues);
+    input.addEventListener("change", queueGameDefaultsSave);
+  }
+  $("#btn-apply-defaults").addEventListener("click", applyGameDefaults);
   $("#btn-open-shared").addEventListener("click", () => call("open_shared"));
 
   $("#btn-ms-login").addEventListener("click", msLogin);
@@ -280,6 +309,31 @@ function bind() {
   $("#account-methods").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-method]");
     if (button) setAccountMethod(button.dataset.method);
+  });
+  $("#btn-nexi-login").addEventListener("click", nexiLogin);
+  $("#btn-nexi-verify").addEventListener("click", nexiVerify);
+  $("#btn-nexi-cancel").addEventListener("click", nexiCancel);
+  $("#btn-nexi-logout").addEventListener("click", nexiLogout);
+  $("#btn-nexi-refresh").addEventListener("click", nexiRefresh);
+  $("#btn-nexi-link-mc").addEventListener("click", nexiLinkMc);
+  $("#btn-nexi-unlink-mc").addEventListener("click", nexiUnlinkMc);
+  $("#btn-save-nexi-url").addEventListener("click", saveNexiBaseUrl);
+  $("#btn-nexi-link-close").addEventListener("click", closeNexiLinkPrompt);
+  $("#btn-nexi-link-cancel").addEventListener("click", closeNexiLinkPrompt);
+  $("#btn-nexi-link-confirm").addEventListener("click", nexiLinkConfirm);
+  $$("[data-nexi-link-close]").forEach((node) => {
+    node.addEventListener("click", closeNexiLinkPrompt);
+  });
+  for (const id of ["nexi-login", "nexi-password"]) {
+    $("#" + id).addEventListener("keydown", (event) => {
+      if (event.key === "Enter") nexiLogin();
+    });
+  }
+  $("#nexi-code").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") nexiVerify();
+  });
+  $("#nexi-base-url").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") saveNexiBaseUrl();
   });
   $("#btn-ely-login").addEventListener("click", elyLogin);
   $("#btn-ely-browser").addEventListener("click", elyBrowserLogin);
@@ -332,6 +386,10 @@ function bind() {
   });
   $("#btn-clear-create-log").addEventListener("click", clearCreateLog);
 
+  $("#source-seg").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-source]");
+    if (button) setBrowserSource(button.dataset.source);
+  });
   $("#mods-seg").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-loader]");
     if (!button || mods.busy) return;
@@ -347,6 +405,15 @@ function bind() {
     updateScreenHeads();
     mods.searchedKey = "";
     searchMods();
+  });
+  document.addEventListener("mousedown", (event) => {
+    const open = $(".vsel.open");
+    if (!open || event.target.closest(".vsel")) return;
+    closeVsel(open);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    closeVsel($(".vsel.open"));
   });
   $("#kind-seg").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-kind]");
@@ -413,6 +480,7 @@ function bind() {
 
   bindZapret();
   bindMirror();
+  bindNetworkSettings();
   if (typeof bindUpdate === "function") bindUpdate();
 
   $("#btn-open-game-log-folder").addEventListener("click", () =>
@@ -579,12 +647,17 @@ async function boot() {
   if (!api()) return;
   booted = true;
   bind();
+  bindSettingsTabs();
+  setSettingsTab(settingsTab, true);
+  bindLogsTabs();
+  setLogsTab(logsTab, true);
   initSegHover();
   await refreshState();
   queueMaximizedSync();
   setScreen("home");
   if (typeof maybeShowWelcome === "function") maybeShowWelcome();
   setInterval(pollOnce, 160);
+  if (typeof autoNetworkCheck === "function") autoNetworkCheck();
   if (!S.instances.length) {
     setStatus("Create a profile to get started.");
   } else {

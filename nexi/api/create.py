@@ -19,8 +19,8 @@ from ..loaders import (
     vanilla_versions,
 )
 from ..modpacks import (
-    _curseforge_loader, _download_modpack_files, _extract_zip,
-    _modpack_loader,
+    _curseforge_loader, _download_curseforge_manifest,
+    _download_modpack_files, _extract_zip, _modpack_loader,
 )
 from ..util import InstallCancelled, _version_key
 from ..vanilla import (
@@ -553,6 +553,11 @@ class CreateApi:
                     self._status("import", "Downloading modpack files…")
                     downloaded = _download_modpack_files(
                         index.get("files"), game_dir, log, self._progress,
+                        cancel)
+                elif manifest is not None and manifest.get("files"):
+                    self._status("import", "Downloading CurseForge files…")
+                    downloaded = _download_curseforge_manifest(
+                        manifest.get("files"), game_dir, log, self._progress,
                         cancel)
 
                 extracted = 0

@@ -85,6 +85,14 @@ function handleEvent(ev) {
         setStatus("Ely.by browser sign-in cancelled.");
       }
       break;
+    case "nexi_link":
+      if (ev.ok) {
+        if (typeof showNexiLinkPrompt === "function") showNexiLinkPrompt(ev);
+      } else {
+        showErrorToast(ev.error || "The link from the site has expired.",
+          "Nexi link");
+      }
+      break;
     case "play": {
       const slug = ev.slug || (S.instance ? S.instance.slug : "");
       clearStarting(slug);
@@ -151,8 +159,8 @@ function syncBusy() {
   $("#btn-install-loader").disabled = busy || lb.loading || lb.selected < 0;
   for (const id of ["btn-new-profile", "btn-empty-create",
                     "btn-import-modpack", "btn-pane-update-all",
-                    "btn-pane-backup", "btn-pane-icon", "btn-pane-edit",
-                    "btn-pick-background"]) {
+                    "btn-pane-backup", "btn-pane-icon", "btn-pane-banner",
+                    "btn-pane-edit", "btn-pick-background"]) {
     const node = $("#" + id);
     if (node) node.disabled = busy;
   }
@@ -165,6 +173,10 @@ function syncBusy() {
   });
   const clearIcon = $("#btn-pane-clear-icon");
   if (clearIcon) clearIcon.disabled = busy || !S.instance || !S.instance.icon;
+  const clearBanner = $("#btn-pane-clear-banner");
+  if (clearBanner) {
+    clearBanner.disabled = busy || !S.instance || !S.instance.banner;
+  }
   syncVersionEditor();
   syncPlay();
   syncZapret();

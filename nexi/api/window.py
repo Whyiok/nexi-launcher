@@ -56,6 +56,32 @@ class WindowApi:
             window.maximize()
         return {"ok": True, "maximized": not maximized}
 
+    def window_activate(self):
+        """Bring the window to the front (a second launch or a nexi:// link)."""
+        window = self._app_window()
+        if window is None:
+            return {"ok": False}
+        try:
+            window.restore()
+        except Exception:
+            pass
+        try:
+            window.show()
+        except Exception:
+            pass
+        if os.name == "nt":
+            native = getattr(window, "native", None)
+            handle = (getattr(native, "Handle", None)
+                      if native is not None else None)
+            if handle is not None:
+                try:
+                    user32 = ctypes.windll.user32
+                    user32.ShowWindow(ctypes.c_void_p(int(handle)), 9)
+                    user32.SetForegroundWindow(ctypes.c_void_p(int(handle)))
+                except Exception:
+                    pass
+        return {"ok": True}
+
     def window_close(self):
         window = self._app_window()
         if window is None:

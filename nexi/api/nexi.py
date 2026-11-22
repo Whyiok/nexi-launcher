@@ -1,0 +1,478 @@
+"""Sign-in with a Nexi site account (Nexi ID) and profile sync."""
+
+import json
+import urllib.error
+import urllib.parse
+import urllib.request
+
+from ..config import USER_AGENT
+from ..logging_setup import log
+from ..net import open_url
+
+
+NEXI_TIMEOUT = 20
+
+MC_TYPES = ("offline", "microsoft", "ely")
+
+
+class NexiApi:
+    """The site account is only used to sign in and to know the linked
+    Minecraft identity; game credentials still come from the normal account
+    list."""
+
+    def _nexi_call(self, path, payload=None, token="", method=""):
+        """Call the Nexi site; returns ``(ok, data)`` with parsed JSON."""
+        base = str(getattr(self, "nexi_base_url", "") or "").strip().rstrip("/")
+        if not base:
+            return False, {"error": "Set the Nexi site address first."}
+        headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
+        body = None
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        if token:
+            headers["Authorization"] = "Bearer " + token
+        if not method:
+            method = "POST" if payload is not None else "GET"
+        request_obj = urllib.request.Request(
+            base + path, data=body, headers=headers, method=method)
+        try:
+            with open_url(
+                    request_obj, timeout=NEXI_TIMEOUT) as response:
+                raw = response.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode("utf-8", "replace")
+            try:
+                data = json.loads(raw or "{}")
+            except ValueError:
+                data = {}
+            message = str((data or {}).get("error") or "").strip()
+            if not message:
+                message = f"The Nexi site returned HTTP {exc.code}."
+            return False, {"error": message, "status": exc.code}
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            return False, {"error": f"Could not reach the Nexi site: {exc}"}
+        try:
+            data = json.loads(raw or "{}")
+        except ValueError:
+            return False, {
+                "error": "The Nexi site returned an unexpected response."}
+        if not isinstance(data, dict):
+            return False, {
+                "error": "The Nexi site returned an unexpected response."}
+        if data.get("ok") is False:
+            return False, {
+                "error": str(data.get("error") or "Nexi sign-in failed.")}
+        return True, data
+
+    @staticmethod
+    def _nexi_mc(mc):
+        mc = mc if isinstance(mc, dict) else {}
+        return {
+            "type": str(mc.get("type") or "offline").strip().lower(),
+            "label": str(mc.get("label") or ""),
+            "name": str(mc.get("name") or "")[:16],
+            "uuid": str(mc.get("uuid") or "").lower(),
+            "custom": bool(mc.get("custom")),
+            "head": str(mc.get("head") or ""),
+            "linked_at": mc.get("linked_at") or None,
+        }
+
+    def _nexi_account(self, user, token):
+        """Turn the site's public user JSON into a stored account entry."""
+        user = user if isinstance(user, dict) else {}
+        mc = self._nexi_mc(user.get("mc"))
+        nick = (user.get("account_name") or user.get("nick")
+                or user.get("username") or user.get("nexi_id") or "Player")
+        return {
+            "type": "nexi",
+            "name": str(nick).strip()[:16] or "Player",
+            "uuid": mc.get("uuid", ""),
+            "token": str(token or ""),
+            "site_id": str(user.get("id") or ""),
+            "nexi_id": str(user.get("nexi_id") or ""),
+            "account_name": str(user.get("account_name") or ""),
+            "username": str(user.get("username") or ""),
+            "email": str(user.get("email") or ""),
+            "mc": mc,
+        }
+
+    def _nexi_token_account(self):
+        """The Nexi account to talk to: active one, else the first one."""
+        with self._lock:
+            account = self._active_account()
+            if account is None or account.get("type") != "nexi":
+                account = next((item for item in self._accounts
+                                if item.get("type") == "nexi"), None)
+            token = str((account or {}).get("token") or "")
+        if account is None:
+            return None, "", "Sign in with your Nexi account first."
+        if not token:
+            return account, "", ("This Nexi account has no saved token — "
+                                 "sign in again.")
+        return account, token, ""
+
+    def _nexi_apply_user(self, account, user):
+        """Merge a fresh site profile into the stored account."""
+        with self._lock:
+            target = self._account_by_id(account.get("id"))
+            if target is None:
+                return None
+            fresh = self._nexi_account(user, account.get("token", ""))
+            target.update(fresh)
+            self._save()
+            return target
+
+    def nexi_login(self, login, password):
+        """Send the e-mail code for a Nexi ID, e-mail or @username."""
+        login = str(login or "").strip()
+        password = str(password or "")
+        if not login or not password:
+            return {"ok": False,
+                    "error": "Enter your Nexi ID and password."}
+        ok, data = self._nexi_call(
+            "/api/nexi/login", {"login": login, "password": password})
+        if not ok:
+            return {"ok": False, "error": data.get("error")
+                    or "Nexi sign-in failed."}
+        email = str(data.get("email") or "")
+        with self._lock:
+            self._nexi_pending = {"login": login, "email": email}
+        log.info("Nexi sign-in code requested for %s", email or "(no e-mail)")
+        return {"ok": True, "email": email,
+                "expires_in": data.get("expires_in") or 900}
+
+    def nexi_verify(self, code, login=""):
+        """Confirm the e-mail code and keep the returned account token."""
+        code = str(code or "").strip()
+        if not code:
+            return {"ok": False,
+                    "error": "Enter the 6-digit code from the e-mail."}
+        with self._lock:
+            pending = dict(self._nexi_pending or {})
+        login = str(login or pending.get("login") or "").strip()
+        if not login:
+            return {"ok": False,
+                    "error": "Request a new code first."}
+        ok, data = self._nexi_call(
+            "/api/nexi/verify", {"login": login, "code": code})
+        if not ok:
+            return {"ok": False, "error": data.get("error")
+                    or "Could not confirm the code."}
+        token = str(data.get("token") or "")
+        user = data.get("user") if isinstance(data.get("user"), dict) else {}
+        if not token:
+            return {"ok": False,
+                    "error": "The Nexi site returned no account token."}
+        account = self._nexi_account(user, token)
+        with self._lock:
+            stored = self._upsert_account(account)
+            self._nexi_pending = None
+            self._save()
+        log.info("Nexi sign-in complete: %s (ID %s)", stored["name"],
+                 stored.get("nexi_id") or "?")
+        self._event("refresh")
+        return {"ok": True, "name": stored["name"], "state": self.state()}
+
+    def nexi_cancel_login(self):
+        with self._lock:
+            self._nexi_pending = None
+        return {"ok": True}
+
+    def nexi_logout(self):
+        with self._lock:
+            self._nexi_pending = None
+            account = self._active_account()
+            if account is None or account.get("type") != "nexi":
+                account = next((item for item in self._accounts
+                                if item.get("type") == "nexi"), None)
+        if account is not None:
+            self.account_remove(account["id"])
+        log.info("Nexi account signed out")
+        return {"ok": True, "state": self.state()}
+
+    def nexi_profile(self, account_id=""):
+        """Refresh the profile and the linked Minecraft identity from the site."""
+        account_id = str(account_id or "")
+        if account_id:
+            with self._lock:
+                account = self._account_by_id(account_id)
+            if account is None or account.get("type") != "nexi":
+                return {"ok": False, "error": "That Nexi account is gone.",
+                        "state": self.state()}
+            token = str(account.get("token") or "")
+            if not token:
+                return {"ok": False,
+                        "error": "Sign in to Nexi again.",
+                        "state": self.state()}
+        else:
+            account, token, error = self._nexi_token_account()
+            if account is None:
+                return {"ok": False, "error": error, "state": self.state()}
+        ok, data = self._nexi_call("/api/nexi/me", token=token)
+        if not ok:
+            return {"ok": False,
+                    "error": data.get("error") or "Could not refresh the "
+                                                  "Nexi profile.",
+                    "state": self.state()}
+        user = data.get("user") if isinstance(data.get("user"), dict) else {}
+        self._nexi_apply_user(account, user)
+        log.info("Nexi profile refreshed: %s", account.get("name"))
+        return {"ok": True, "state": self.state()}
+
+    def site_profile_url(self):
+        """The player's profile page on the Nexi site, for the in-app view."""
+        account, token, error = self._nexi_token_account()
+        if account is None or not token:
+            return {"ok": False,
+                    "error": error or "Sign in with your Nexi account first."}
+        site_id = str(account.get("site_id") or "").strip()
+        if not site_id:
+            ok, data = self._nexi_call("/api/nexi/me", token=token)
+            if not ok:
+                return {"ok": False,
+                        "error": data.get("error") or "Could not read the "
+                                                      "Nexi profile."}
+            user = data.get("user") if isinstance(data.get("user"), dict) else {}
+            site_id = str(user.get("id") or "").strip()
+            self._nexi_apply_user(account, user)
+        base = str(getattr(self, "nexi_base_url", "") or "").strip().rstrip("/")
+        if not site_id or not base:
+            return {"ok": False,
+                    "error": "Could not find this profile on the Nexi site."}
+        ok, data = self._nexi_call("/api/nexi/embed-token", payload={},
+                                   token=token)
+        embed = str(data.get("token") or "") if ok else ""
+        url = (f"{base}/user/{urllib.parse.quote(site_id, safe='')}"
+               f"?embed=1")
+        if embed:
+            url += "&nexi_embed=" + urllib.parse.quote(embed, safe="")
+        try:
+            request_obj = urllib.request.Request(
+                url, headers={"User-Agent": USER_AGENT})
+            with open_url(request_obj, timeout=4) as response:
+                response.read(1)
+        except Exception:
+            return {"ok": False, "error": "The Nexi site is not running."}
+        return {"ok": True, "url": url}
+
+    def nexi_send_presence(self, online=True):
+        """Tell the site whether the player is currently in the game."""
+        account, token, error = self._nexi_token_account()
+        if account is None or not token:
+            return {"ok": False, "error": error}
+        ok, data = self._nexi_call(
+            "/api/nexi/presence", {"online": bool(online)}, token=token)
+        if not ok:
+            return {"ok": False,
+                    "error": data.get("error") or "Could not update presence."}
+        return {"ok": True, "online": bool(data.get("online"))}
+
+    def nexi_send_playtime(self, minutes):
+        """Send a chunk of played minutes to the Nexi profile on the site."""
+        try:
+            minutes = int(minutes)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "Invalid play time."}
+        if minutes <= 0:
+            return {"ok": True, "skipped": True}
+        account, token, error = self._nexi_token_account()
+        if account is None or not token:
+            return {"ok": False, "error": error}
+        ok, data = self._nexi_call(
+            "/api/nexi/activity", {"minutes": minutes}, token=token)
+        if not ok:
+            return {"ok": False,
+                    "error": data.get("error") or "Could not sync play time."}
+        log.info("Play time synced: +%d min (total %s min)",
+                 minutes, data.get("minutes"))
+        return {"ok": True, "minutes": data.get("minutes"),
+                "hours": data.get("hours")}
+
+    def nexi_link_minecraft(self, mc_type="offline", name=""):
+        """Link a Minecraft nickname to the Nexi profile on the site."""
+        mc_type = str(mc_type or "offline").strip().lower()
+        name = str(name or "").strip()
+        if mc_type not in MC_TYPES:
+            return {"ok": False, "error": "Unknown Minecraft account type."}
+        if not name:
+            return {"ok": False, "error": "Type the Minecraft nickname."}
+        account, token, error = self._nexi_token_account()
+        if account is None or not token:
+            return {"ok": False, "error": error, "state": self.state()}
+        ok, data = self._nexi_call(
+            "/api/nexi/minecraft", {"type": mc_type, "name": name},
+            token=token)
+        if not ok:
+            return {"ok": False,
+                    "error": data.get("error") or "Could not link the "
+                                                  "Minecraft account.",
+                    "state": self.state()}
+        user = data.get("user") if isinstance(data.get("user"), dict) else {}
+        stored = self._nexi_apply_user(account, user)
+        mc = (stored or {}).get("mc") or {}
+        log.info("Nexi Minecraft linked: %s (%s)", mc.get("name"),
+                 mc.get("type"))
+        self._event("refresh")
+        return {"ok": True, "message": f"Linked {mc.get('name') or name}.",
+                "state": self.state()}
+
+    def nexi_unlink_minecraft(self):
+        """Restore the default offline nickname on the Nexi profile."""
+        account, token, error = self._nexi_token_account()
+        if account is None or not token:
+            return {"ok": False, "error": error, "state": self.state()}
+        ok, data = self._nexi_call(
+            "/api/nexi/minecraft", token=token, method="DELETE")
+        if not ok:
+            return {"ok": False,
+                    "error": data.get("error") or "Could not unlink the "
+                                                  "Minecraft account.",
+                    "state": self.state()}
+        user = data.get("user") if isinstance(data.get("user"), dict) else {}
+        self._nexi_apply_user(account, user)
+        log.info("Nexi Minecraft unlinked")
+        self._event("refresh")
+        return {"ok": True,
+                "message": "Minecraft link reset to the offline nickname.",
+                "state": self.state()}
+
+    # ---------------------------------------------------- linking via the site
+    # The site creates a one-time link token and opens nexi://link?token=...
+    # in the browser. The launcher shows a dialog with the accounts that are
+    # signed in here, and sends the chosen one back to the site.
+
+    @staticmethod
+    def _nexi_link_token_from_uri(uri):
+        """Pull the token out of a ``nexi://link?token=...`` URL."""
+        try:
+            parsed = urllib.parse.urlparse(str(uri or "").strip())
+        except ValueError:
+            return ""
+        if parsed.scheme.lower() not in ("nexi", "nexilauncher"):
+            return ""
+        if (parsed.netloc or "").strip().lower() != "link":
+            return ""
+        values = urllib.parse.parse_qs(parsed.query or "")
+        return str((values.get("token") or [""])[0]).strip()
+
+    def _nexi_link_accounts(self):
+        """Only accounts that were actually signed in can be linked."""
+        with self._lock:
+            return [self._account_public(account)
+                    for account in self._accounts
+                    if account.get("type") in ("microsoft", "ely")
+                    and account.get("uuid")
+                    and (account.get("refresh_token")
+                         or account.get("access_token"))]
+
+    def nexi_handle_link(self, uri):
+        """A ``nexi://link`` URL arrived (startup or a second instance)."""
+        token = self._nexi_link_token_from_uri(uri)
+        if not token:
+            log.warning("Nexi link ignored: no token in %r", str(uri)[:120])
+            return {"ok": False, "error": "The link from the site is broken."}
+        ok, data = self._nexi_call(
+            "/api/nexi/link/" + urllib.parse.quote(token, safe=""))
+        if not ok:
+            message = data.get("error") or ("The link has expired — start "
+                                            "again on the site.")
+            self._event("nexi_link", ok=False, error=message)
+            return {"ok": False, "error": message}
+        user = data.get("user") if isinstance(data.get("user"), dict) else {}
+        display = str(user.get("display_name") or user.get("account_name")
+                      or user.get("nexi_id") or "Nexi ID")
+        accounts = self._nexi_link_accounts()
+        log.info("Nexi link request for %s (%d signed-in account(s))",
+                 display, len(accounts))
+        self._event("nexi_link", ok=True, token=token, display_name=display,
+                    nexi_id=str(user.get("nexi_id") or ""),
+                    handle=str(user.get("handle") or ""), accounts=accounts)
+        return {"ok": True}
+
+    def nexi_link_start(self):
+        """Start the same link flow from the launcher's own Nexi account."""
+        account, token, error = self._nexi_token_account()
+        if account is None or not token:
+            return {"ok": False, "error": error, "state": self.state()}
+        ok, data = self._nexi_call("/api/nexi/link/start", {}, token=token)
+        if not ok:
+            return {"ok": False,
+                    "error": data.get("error") or "Could not start linking.",
+                    "state": self.state()}
+        link_token = str(data.get("token") or "")
+        if not link_token:
+            return {"ok": False,
+                    "error": "The Nexi site did not return a link.",
+                    "state": self.state()}
+        handle_name = (account.get("username") or account.get("nexi_id") or "")
+        self._event(
+            "nexi_link", ok=True, token=link_token,
+            display_name=str(account.get("name") or "Nexi ID"),
+            nexi_id=str(account.get("nexi_id") or ""),
+            handle=f"@{handle_name}" if handle_name else "",
+            accounts=self._nexi_link_accounts())
+        return {"ok": True, "state": self.state()}
+
+    def nexi_link_account(self, token, account_id=""):
+        """Send the chosen signed-in account to the site and consume the link."""
+        token = str(token or "").strip()
+        if not token:
+            return {"ok": False, "error": "The link has expired — start again "
+                                          "on the site."}
+        with self._lock:
+            account = self._account_by_id(account_id)
+            chosen = None
+            if (account is not None
+                    and account.get("type") in ("microsoft", "ely")
+                    and account.get("uuid")
+                    and (account.get("refresh_token")
+                         or account.get("access_token"))):
+                chosen = {
+                    "type": account["type"],
+                    "name": str(account.get("name") or "").strip()[:16],
+                    "uuid": str(account.get("uuid") or "").lower(),
+                }
+        if chosen is None:
+            return {"ok": False, "error": "Choose a Microsoft or Ely.by "
+                                          "account that is signed in."}
+        ok, data = self._nexi_call(
+            "/api/nexi/link/" + urllib.parse.quote(token, safe=""),
+            {"type": chosen["type"], "name": chosen["name"],
+             "uuid": chosen["uuid"]})
+        if not ok:
+            return {"ok": False,
+                    "error": data.get("error") or "Could not link the "
+                                                  "Minecraft account.",
+                    "state": self.state()}
+        user = data.get("user") if isinstance(data.get("user"), dict) else {}
+        nexi_id = str(user.get("nexi_id") or "")
+        # Refresh the launcher's own Nexi account when it is the same user.
+        with self._lock:
+            local = next((item for item in self._accounts
+                          if item.get("type") == "nexi"
+                          and item.get("nexi_id") == nexi_id), None)
+        if local is not None:
+            self._nexi_apply_user(local, user)
+        mc = self._nexi_mc(user.get("mc"))
+        log.info("Nexi Minecraft linked via the site: %s (%s)",
+                 mc.get("name"), mc.get("type"))
+        self._event("refresh")
+        return {"ok": True,
+                "message": f"Linked {mc.get('name') or chosen['name']}.",
+                "state": self.state()}
+
+    def set_nexi_base_url(self, value):
+        """Save the site address used for Nexi sign-in."""
+        value = str(value or "").strip().rstrip("/")
+        parsed = urllib.parse.urlparse(value)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return {"ok": False,
+                    "error": "Enter a full http(s) address, for example "
+                             "http://127.0.0.1:5000.",
+                    "state": self.state()}
+        with self._lock:
+            self.nexi_base_url = value
+            self._save()
+        log.info("Nexi site address: %s", value)
+        return {"ok": True, "state": self.state()}

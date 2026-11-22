@@ -1,14 +1,18 @@
 """Log and network panels."""
 
+import urllib.parse
 from pathlib import Path
 
+from .. import curseforge
 from ..config import LOG_FILE, MAX_LOG_BACKLOG
 from ..instances import instance_log_file
 from ..logging_setup import log
 from ..net import (
     MIRROR_MODES, NETWORK_LOG, _network_log_lock, mirror_mode, network_check,
-    set_mirror_mode,
+    normalize_proxy, parse_dns_servers, reset_host_state,
+    set_dns as apply_dns, set_mirror_mode, set_proxy as apply_proxy,
 )
+from ..util import open_in_system
 
 
 class DiagnosticsApi:
@@ -133,3 +137,72 @@ class DiagnosticsApi:
         set_mirror_mode(mode)
         log.info("Mirror mode: %s", mode)
         return {"ok": True, "mode": mode, "state": self.state()}
+
+    def set_proxy(self, value):
+        """Route the launcher's connections through an HTTP/HTTPS proxy."""
+        text = str(value or "").strip()
+        if text.lower() in ("none", "off", "direct", "system"):
+            text = ""
+        try:
+            proxy_url = normalize_proxy(text)
+        except ValueError:
+            return {"ok": False,
+                    "error": "Enter a proxy as host:port or "
+                             "http://host:port. Proxies that need a "
+                             "password are not supported.",
+                    "state": self.state()}
+        with self._lock:
+            self.proxy = proxy_url
+            self._save()
+        apply_proxy(proxy_url)
+        reset_host_state()
+        if proxy_url:
+            parts = urllib.parse.urlsplit(proxy_url)
+            log.info("Proxy: %s://%s:%s", parts.scheme,
+                     parts.hostname or "", parts.port)
+        else:
+            log.info("Proxy: direct connection")
+        return {"ok": True, "proxy": proxy_url, "state": self.state()}
+
+    def set_dns(self, value):
+        """Use custom DNS servers for the launcher's own name lookups."""
+        text = str(value or "").strip()
+        if text.lower() in ("auto", "system", "off", "none"):
+            text = ""
+        try:
+            servers = parse_dns_servers(text)
+        except ValueError:
+            return {"ok": False,
+                    "error": "DNS servers must be IP addresses, for "
+                             "example 1.1.1.1, 8.8.8.8.",
+                    "state": self.state()}
+        if len(servers) > 3:
+            return {"ok": False, "error": "Use up to three DNS servers.",
+                    "state": self.state()}
+        value = ", ".join(servers)
+        with self._lock:
+            self.dns = value
+            self._save()
+        apply_dns(value)
+        reset_host_state()
+        log.info("DNS servers: %s", value or "system")
+        return {"ok": True, "dns": value, "state": self.state()}
+
+    def set_curseforge_key(self, value):
+        """Store a personal CurseForge API key in accounts.json."""
+        text = str(value or "").strip()
+        if len(text) > 200 or any(char.isspace() for char in text):
+            return {"ok": False,
+                    "error": "That does not look like a CurseForge API key.",
+                    "state": self.state()}
+        with self._lock:
+            self._curseforge_key = text
+            self._save_accounts()
+        curseforge.set_api_key(text)
+        log.info("CurseForge API key: %s", "saved" if text else "cleared")
+        return {"ok": True, "set": bool(text), "state": self.state()}
+
+    def curseforge_key_page(self):
+        """Open the CurseForge console where personal API keys are created."""
+        open_in_system(curseforge.CF_KEY_PAGE)
+        return {"ok": True}

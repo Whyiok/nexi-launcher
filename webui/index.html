@@ -56,6 +56,9 @@
   <symbol id="i-play" viewBox="0 0 24 24">
     <path d="M8 5.4v13.2L19 12 8 5.4Z"/>
   </symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="7.8"/><path d="M12 7.6V12l3 1.9"/>
+  </symbol>
   <symbol id="i-trash" viewBox="0 0 24 24">
     <path d="M5 7h14M10 7V5.2h4V7M7 7l.9 12.1c0 .5.4.9.9.9h6.4c.5 0 .9-.4.9-.9L17 7"/>
   </symbol>
@@ -88,6 +91,9 @@
   <symbol id="i-check" viewBox="0 0 24 24">
     <path d="m5 12.6 4.4 4.4L19 6.8"/>
   </symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24">
+    <path d="m6.5 9.5 5.5 5.5 5.5-5.5"/>
+  </symbol>
   <symbol id="i-import" viewBox="0 0 24 24">
     <path d="M12 4v10.4M7.6 10.4 12 14.8l4.4-4.4"/>
     <path d="M5 16.6v1.8c0 1 .8 1.8 1.8 1.8h10.4c1 0 1.8-.8 1.8-1.8v-1.8"/>
@@ -96,6 +102,15 @@
     <rect x="3.6" y="4.8" width="16.8" height="14.4" rx="2.6"/>
     <circle cx="9" cy="9.6" r="1.5"/>
     <path d="m5.4 16.6 4.4-4 3.1 2.7 2.3-2.1 3.4 3.4"/>
+  </symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24">
+    <path d="M12 3.6a8.4 8.4 0 1 0 0 16.8c.94 0 1.7-.76 1.7-1.7 0-.43-.16-.82-.43-1.12-.28-.3-.43-.68-.43-1.13 0-.94.76-1.7 1.7-1.7h1.67a3.98 3.98 0 0 0 3.98-3.98c0-3.62-3.68-7.17-8.19-7.17Z"/>
+    <circle cx="7.6" cy="12.2" r="1.1"/><circle cx="9.8" cy="8.2" r="1.1"/>
+    <circle cx="14.2" cy="8" r="1.1"/>
+  </symbol>
+  <symbol id="i-network" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.2"/>
+    <path d="M3.8 12h16.4M12 3.8c2.2 2.3 3.4 5.1 3.4 8.2s-1.2 5.9-3.4 8.2c-2.2-2.3-3.4-5.1-3.4-8.2S9.8 6.1 12 3.8Z"/>
   </symbol>
   <symbol id="i-alert" viewBox="0 0 24 24">
     <path d="M12 3.8 21 20H3L12 3.8Z"/>
@@ -132,6 +147,13 @@
   </header>
   <header class="topbar">
     <div class="topbar-left">
+      <span class="pet-slot" id="pet-slot">
+        <button class="pet" id="pet" type="button" title="Axi"
+                aria-label="Axi">
+          <img class="pet-img" id="pet-img" src="axi.png" alt=""
+               draggable="false">
+        </button>
+      </span>
       <nav class="tabs bypass-tabs" id="bypass-tabs" aria-label="Bypass">
         <button class="tab" data-screen="bypass" type="button">
           <svg class="icon"><use href="#i-world"/></svg><span>Bypass</span>
@@ -155,11 +177,13 @@
       <button class="tab" data-screen="modpacks" type="button">
         <svg class="icon"><use href="#i-layers"/></svg><span>Modpacks</span>
       </button>
-      <button class="tab" data-screen="skin" type="button">
-        <svg class="icon"><use href="#i-skin"/></svg><span>Skins</span>
-      </button>
       <button class="tab" data-screen="settings" type="button">
         <svg class="icon"><use href="#i-gear"/></svg><span>Settings</span>
+      </button>
+      <button class="tab site-profile" id="btn-site-profile" type="button"
+              title="Open your profile on the Nexi site"
+              aria-label="Open your profile on the Nexi site">
+        <span class="site-skin">?</span>
       </button>
     </nav>
   </header>
@@ -202,6 +226,12 @@
           <span class="eyebrow">MAIN MENU</span>
           <h1 class="home-title" id="home-title">Nexi</h1>
           <p class="home-meta" id="home-meta"></p>
+          <div class="home-badges" id="home-badges">
+            <span class="playtime-badge hidden" id="home-playtime">
+              <svg class="icon"><use href="#i-clock"/></svg>
+              <span id="home-playtime-text"></span>
+            </span>
+          </div>
         </div>
         <button class="home-play" id="home-play" type="button">
           <span class="home-play-glyph">
@@ -243,7 +273,11 @@
         </section>
 
         <section class="card detail hidden" id="profile-detail">
-          <div class="detail-head">
+          <div class="detail-head" id="detail-head">
+            <img class="detail-banner hidden" id="detail-banner" alt="">
+            <video class="detail-banner hidden" id="detail-banner-video"
+                   autoplay muted loop playsinline aria-hidden="true"></video>
+            <div class="detail-banner-shade" aria-hidden="true"></div>
             <div class="detail-title">
               <h1 id="detail-name">Profile</h1>
               <div class="meta" id="detail-meta"></div>
@@ -251,6 +285,10 @@
             </div>
             <div class="detail-side">
               <span class="badge" id="detail-badge">vanilla</span>
+              <span class="playtime-badge" id="detail-playtime">
+                <svg class="icon"><use href="#i-clock"/></svg>
+                <span id="detail-playtime-text"></span>
+              </span>
               <button class="btn primary play" id="btn-play" type="button">
                 <svg class="icon"><use href="#i-play"/></svg>
                 <span id="play-label">Play</span>
@@ -495,6 +533,20 @@
                     </div>
                     <div class="setting-row">
                       <div class="setting-text">
+                        <span class="setting-name">Banner</span>
+                        <span class="hint">PNG, JPG, WEBP, GIF, MP4 or WebM shown at the top of this build</span>
+                      </div>
+                      <div class="pane-actions">
+                        <button class="btn ghost" id="btn-pane-banner" type="button">
+                          <svg class="icon"><use href="#i-image"/></svg>Set banner
+                        </button>
+                        <button class="btn ghost" id="btn-pane-clear-banner" type="button">
+                          <svg class="icon"><use href="#i-x"/></svg>Remove
+                        </button>
+                      </div>
+                    </div>
+                    <div class="setting-row">
+                      <div class="setting-text">
                         <span class="setting-name">Game folder</span>
                         <span class="hint" id="pane-path">—</span>
                       </div>
@@ -601,6 +653,10 @@
       </div>
 
       <div class="toolbar">
+        <div class="seg" id="source-seg">
+          <button data-source="modrinth" class="on" type="button">Modrinth</button>
+          <button data-source="curseforge" type="button">CurseForge</button>
+        </div>
         <div class="seg" id="kind-seg">
           <button data-kind="mod" class="on" type="button">Mods</button>
           <button data-kind="resourcepack" type="button">Resource packs</button>
@@ -613,7 +669,6 @@
           <button data-loader="neoforge" type="button">NeoForge</button>
         </div>
         <select class="input" id="mods-version" aria-label="Minecraft version">
-          <option value="">Any version</option>
         </select>
         <input class="input grow" id="mods-query" placeholder="Search by name"
                spellcheck="false" autocomplete="off">
@@ -719,7 +774,38 @@
         </button>
       </div>
 
-      <div class="settings-grid">
+      <div class="settings-layout">
+      <div class="seg settings-tabs" id="settings-tabs" role="tablist"
+           aria-label="Settings sections">
+        <button class="on" type="button" role="tab" aria-selected="true"
+                data-settings-tab="account">
+          <svg class="icon"><use href="#i-profile"/></svg><span>Accounts</span>
+        </button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1"
+                data-settings-tab="game">
+          <svg class="icon"><use href="#i-play"/></svg><span>Game</span>
+        </button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1"
+                data-settings-tab="appearance">
+          <svg class="icon"><use href="#i-palette"/></svg><span>Appearance</span>
+        </button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1"
+                data-settings-tab="network">
+          <svg class="icon"><use href="#i-network"/></svg><span>Network</span>
+        </button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1"
+                data-settings-tab="launcher">
+          <svg class="icon"><use href="#i-gear"/></svg><span>Launcher</span>
+        </button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1"
+                data-settings-tab="logs">
+          <svg class="icon"><use href="#i-logs"/></svg><span>Logs</span>
+        </button>
+      </div>
+
+      <div class="settings-content">
+      <div class="settings-pane active" data-settings-pane="account"
+           role="tabpanel">
         <section class="card settings-card">
           <div class="card-head">
             <span class="eyebrow">ACCOUNT</span>
@@ -740,7 +826,7 @@
                     data-method="offline" type="button">Offline</button>
           </div>
 
-          <div class="account-panel" id="panel-microsoft">
+          <div class="account-panel hidden" id="panel-microsoft">
             <div class="account-row" id="account-signed-out">
               <span class="account-avatar">
                 <svg class="icon"><use href="#i-profile"/></svg>
@@ -920,39 +1006,195 @@
           </div>
         </section>
 
+        <section class="card settings-card" id="nexi-card">
+          <div class="card-head">
+            <span class="eyebrow">NEXI SITE</span>
+            <span class="count" id="nexi-status">not signed in</span>
+          </div>
+          <div class="account-panel" id="panel-nexi">
+            <div class="account-row" id="nexi-signed-out">
+              <span class="account-avatar">
+                <svg class="icon"><use href="#i-profile"/></svg>
+              </span>
+              <div class="setting-text">
+                <span class="account-name">Sign in with your Nexi account</span>
+                <span class="hint">Use the Nexi ID, e-mail or @username of your
+                   account on the Nexi site.</span>
+              </div>
+            </div>
+
+            <div class="ely-form" id="nexi-signin">
+              <label class="field">
+                <span class="field-label">NEXI ID, E-MAIL OR @USERNAME</span>
+                <input class="input" id="nexi-login" spellcheck="false"
+                       autocomplete="username">
+              </label>
+              <label class="field">
+                <span class="field-label">PASSWORD</span>
+                <input class="input" id="nexi-password" type="password"
+                       autocomplete="current-password">
+              </label>
+              <button class="btn primary" id="btn-nexi-login" type="button">
+                Sign in
+              </button>
+              <p class="hint">A 6-digit code arrives by e-mail and confirms the
+                 sign-in. The password goes only to the Nexi site and is never
+                 stored.</p>
+            </div>
+
+            <div class="ely-form hidden" id="nexi-code-box">
+              <p class="hint" id="nexi-code-hint">We sent a code to your
+                 e-mail.</p>
+              <label class="field">
+                <span class="field-label">CODE FROM THE E-MAIL</span>
+                <input class="input" id="nexi-code" inputmode="numeric"
+                       maxlength="6" autocomplete="one-time-code"
+                       placeholder="000000">
+              </label>
+              <div class="input-row">
+                <button class="btn primary" id="btn-nexi-verify"
+                        type="button">
+                  Confirm
+                </button>
+                <button class="btn ghost" id="btn-nexi-cancel" type="button">
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+            <div class="account-panel hidden" id="nexi-profile">
+              <div class="account-row">
+                <span class="account-avatar" id="nexi-avatar">?</span>
+                <div class="setting-text">
+                  <span class="account-name" id="nexi-name">Nexi account</span>
+                  <span class="hint" id="nexi-handle">—</span>
+                </div>
+              </div>
+
+              <div class="account-row">
+                <span class="account-avatar">
+                  <svg class="icon"><use href="#i-play"/></svg>
+                </span>
+                <div class="setting-text">
+                  <span class="account-name" id="nexi-mc-name">—</span>
+                  <span class="hint" id="nexi-mc-hint">Minecraft account</span>
+                </div>
+              </div>
+
+              <div class="input-row">
+                <button class="btn ghost" id="btn-nexi-link-mc" type="button">
+                  Link account
+                </button>
+                <button class="btn ghost" id="btn-nexi-unlink-mc"
+                        type="button">
+                  Unlink
+                </button>
+              </div>
+              <p class="hint">Links your Minecraft account through the Nexi
+                 site. The site opens the launcher and asks which Microsoft or
+                 Ely.by account you are signed in with.</p>
+
+              <div class="input-row">
+                <button class="btn ghost" id="btn-nexi-refresh" type="button">
+                  Refresh profile
+                </button>
+                <button class="btn ghost" id="btn-nexi-logout" type="button">
+                  Sign out
+                </button>
+              </div>
+
+              <details class="ms-help">
+                <summary>Advanced: Nexi site address</summary>
+                <label class="field">
+                  <span class="field-label">SITE ADDRESS</span>
+                  <div class="input-row">
+                    <input class="input" id="nexi-base-url" spellcheck="false"
+                           autocomplete="off"
+                           placeholder="http://127.0.0.1:5000">
+                    <button class="btn ghost" id="btn-save-nexi-url"
+                            type="button">
+                      Save
+                    </button>
+                  </div>
+                </label>
+                <p class="hint">Used for Nexi sign-in and profile sync. Change it
+                   if the site runs on another address or domain.</p>
+              </details>
+            </div>
+          </div>
+        </section>
+
+        <section class="card settings-card wide" id="skin-card">
+          <div class="card-head">
+            <span class="eyebrow">SKIN</span>
+            <div class="pane-actions">
+              <span class="count" id="skin-sub">Sign in to manage your
+                 skin.</span>
+              <button class="btn ghost" id="btn-skin-choose" type="button">
+                Choose PNG…
+              </button>
+              <button class="btn primary" id="btn-skin-apply" type="button">
+                Apply to account
+              </button>
+            </div>
+          </div>
+
+          <div class="skin-screen">
+            <div class="skin-preview">
+              <canvas id="skin-canvas" width="260" height="340"
+                      aria-label="3D skin preview"></canvas>
+              <p class="hint skin-hint">The head follows the cursor; drag the
+                model sideways to spin it.</p>
+            </div>
+            <div class="skin-side">
+              <div>
+                <span class="field-label">ACCOUNT</span>
+                <select class="input" id="skin-account-select"
+                        aria-label="Account whose skin is shown"></select>
+              </div>
+              <div>
+                <span class="field-label">MODEL</span>
+                <div class="seg" id="skin-seg">
+                  <button type="button" data-skin-variant="classic">Classic</button>
+                  <button type="button" data-skin-variant="slim">Slim</button>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <span class="setting-name" id="skin-account-name">—</span>
+                  <span class="hint" id="skin-account-hint">—</span>
+                </div>
+              </div>
+              <p class="hint" id="skin-note">A skin is a 64×64 or 64×32 PNG. The
+                 file is stored by the launcher and never sent anywhere except the
+                 account you apply it to.</p>
+              <div class="path" id="skin-path" title=""></div>
+              <a class="skin-ely-link hidden" id="skin-ely-link"
+                 href="https://ely.by/skins" target="_blank" rel="noreferrer">
+                Change skin on ely.by →
+              </a>
+              <div class="skin-history hidden" id="skin-history">
+                <div class="skin-history-head">
+                  <span class="field-label">SKIN HISTORY</span>
+                  <button class="link skin-history-clear"
+                          id="btn-skin-history-clear" type="button">
+                    Clear
+                  </button>
+                </div>
+                <div class="skin-history-grid" id="skin-history-grid"></div>
+                <p class="hint skin-history-empty hidden" id="skin-history-empty">
+                  Skins you pick are kept here so you can switch back.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="settings-pane" data-settings-pane="game" role="tabpanel">
         <section class="card settings-card">
           <div class="card-head">
             <span class="eyebrow">MINECRAFT</span>
-          </div>
-
-          <div class="setting-row">
-            <div class="setting-text">
-              <span class="setting-name">Memory for new profiles</span>
-              <span class="hint">Every new profile starts with this much
-                 RAM.</span>
-            </div>
-            <div class="stepper">
-              <button class="step" id="default-ram-down" type="button"
-                      aria-label="Less default memory">−</button>
-              <span class="step-value" id="default-ram-value">2 GB</span>
-              <button class="step" id="default-ram-up" type="button"
-                      aria-label="More default memory">+</button>
-            </div>
-          </div>
-
-          <div class="setting-row">
-            <div class="setting-text">
-              <span class="setting-name" id="ram-profile-name">Memory for this profile</span>
-              <span class="hint" id="ram-profile-hint">Select a profile to
-                 change its memory.</span>
-            </div>
-            <div class="stepper">
-              <button class="step" id="ram-down" type="button"
-                      aria-label="Less memory">−</button>
-              <span class="step-value" id="ram-value">—</span>
-              <button class="step" id="ram-up" type="button"
-                      aria-label="More memory">+</button>
-            </div>
           </div>
 
           <div class="field">
@@ -975,6 +1217,77 @@
           </div>
         </section>
 
+        <section class="card settings-card wide" id="defaults-card">
+          <div class="card-head">
+            <span class="eyebrow">GAME DEFAULTS</span>
+            <span class="count" id="defaults-profile">No profile selected</span>
+          </div>
+          <p class="hint">Written to the selected profile's options.txt every
+             time it starts. Pick a profile in the rail on the left.</p>
+
+          <div class="defaults-grid">
+            <label class="mini-field">
+              <span class="field-label">GUI SCALE</span>
+              <select class="input" id="default-gui-scale">
+                <option value="0">Auto</option>
+                <option value="1">1×</option>
+                <option value="2">2×</option>
+                <option value="3">3×</option>
+                <option value="4">4×</option>
+              </select>
+            </label>
+            <label class="mini-field">
+              <span class="field-label">PARTICLES</span>
+              <select class="input" id="default-particles">
+                <option value="0">All</option>
+                <option value="1">Decreased</option>
+                <option value="2">Minimal</option>
+              </select>
+            </label>
+            <label class="mini-field">
+              <span class="field-label">FPS LIMIT</span>
+              <select class="input" id="default-fps">
+                <option value="260">Unlimited</option>
+                <option value="60">60</option>
+                <option value="120">120</option>
+                <option value="144">144</option>
+                <option value="240">240</option>
+              </select>
+            </label>
+            <div class="mini-field range-field">
+              <span class="field-label">FOV
+                <span class="range-value" id="default-fov-value">70°</span></span>
+              <input type="range" id="default-fov" min="30" max="110" step="5"
+                     aria-label="Field of view">
+            </div>
+            <div class="mini-field range-field">
+              <span class="field-label">RENDER DISTANCE
+                <span class="range-value" id="default-distance-value">12</span></span>
+              <input type="range" id="default-distance" min="2" max="32"
+                     step="1" aria-label="Render distance">
+            </div>
+            <div class="mini-field range-field">
+              <span class="field-label">BRIGHTNESS
+                <span class="range-value" id="default-brightness-value">50%</span></span>
+              <input type="range" id="default-brightness" min="0" max="100"
+                     step="1" aria-label="Brightness">
+            </div>
+          </div>
+
+          <div class="row-head tight">
+            <p class="hint">Values changed inside the game are replaced by
+               these on the next launch.</p>
+            <div class="pane-actions">
+              <button class="btn ghost" id="btn-apply-defaults" type="button">
+                <svg class="icon"><use href="#i-check"/></svg>Apply now
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="settings-pane" data-settings-pane="appearance"
+           role="tabpanel">
         <section class="card settings-card wide">
           <div class="card-head">
             <span class="eyebrow">APPEARANCE</span>
@@ -1059,64 +1372,28 @@
                 </div>
               </div>
             </div>
-          </div>
-        </section>
 
-        <section class="card settings-card wide">
-          <div class="card-head">
-            <span class="eyebrow">LAUNCHER LOG</span>
-            <span class="count path" id="logs-sub">logs\launcher.log</span>
-          </div>
-          <div class="log console settings-log" id="log-console"></div>
-          <div class="row-head tight">
-            <p class="hint">Diagnostic log of the launcher itself. It rotates
-               automatically and never contains passwords or account tokens.</p>
-            <div class="pane-actions">
-              <button class="btn ghost" id="btn-open-logs-folder"
-                      type="button"><svg class="icon"><use href="#i-folder"/></svg>Folder</button>
-              <button class="btn ghost" id="btn-open-log-file"
-                      type="button"><svg class="icon"><use href="#i-logs"/></svg>File</button>
-              <button class="btn ghost" id="btn-clear-logs"
-                      type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear view</button>
+            <div class="setting-row">
+              <div class="setting-text">
+                <span class="setting-name">Top bar companion</span>
+                <p class="hint">Who keeps you company in the corner of the top
+                   bar. Pick one up to drag it around.</p>
+              </div>
+              <div class="seg" id="pet-seg" role="radiogroup"
+                   aria-label="Top bar companion">
+                <button type="button" data-pet-option="axi">
+                  <img class="seg-thumb" src="axi.png" alt="">Axi
+                </button>
+                <button type="button" data-pet-option="clawd">
+                  <img class="seg-thumb" src="clawd.png" alt="">Clawd
+                </button>
+              </div>
             </div>
           </div>
         </section>
+      </div>
 
-        <section class="card settings-card wide">
-          <div class="card-head">
-            <span class="eyebrow">NETWORK</span>
-            <span class="count" id="net-sub">Not checked yet</span>
-          </div>
-          <div class="net-targets" id="net-targets">
-            <p class="hint net-empty" id="net-empty">Run the check to see which
-               game hosts this network can reach.</p>
-          </div>
-          <label class="field">
-            <span class="field-label">MIRROR / BYPASS</span>
-            <select class="input" id="mirror-mode">
-              <option value="auto">Automatic — use the mirror only when a host
-                is blocked</option>
-              <option value="always">Always use the BMCLAPI mirror</option>
-              <option value="never">Never use the mirror — rely on the
-                bypass</option>
-            </select>
-          </label>
-          <div class="log console settings-log" id="net-console"></div>
-          <div class="row-head tight">
-            <p class="hint">Every host the launcher tried to download from and
-               what came back. When something fails, copy this report — it shows
-               exactly which host is blocked on this network.</p>
-            <div class="pane-actions">
-              <button class="btn ghost" id="btn-net-check"
-                      type="button"><svg class="icon"><use href="#i-refresh"/></svg>Run check</button>
-              <button class="btn ghost" id="btn-net-copy"
-                      type="button"><svg class="icon"><use href="#i-copy"/></svg>Copy report</button>
-              <button class="btn ghost" id="btn-net-clear"
-                      type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear log</button>
-            </div>
-          </div>
-        </section>
-
+      <div class="settings-pane" data-settings-pane="launcher" role="tabpanel">
         <section class="card settings-card wide">
           <div class="card-head">
             <span class="eyebrow">FOLDERS</span>
@@ -1161,6 +1438,145 @@
           </div>
           <p class="hint update-status" id="update-status"></p>
         </section>
+      </div>
+
+      <div class="settings-pane" data-settings-pane="network" role="tabpanel">
+        <section class="card settings-card wide">
+          <div class="card-head">
+            <span class="eyebrow">NETWORK</span>
+            <span class="count" id="net-sub">Not checked yet</span>
+          </div>
+          <div class="net-targets" id="net-targets">
+            <p class="hint net-empty" id="net-empty">Run the check to see which
+               game hosts this network can reach.</p>
+          </div>
+          <label class="field">
+            <span class="field-label">MIRROR / BYPASS</span>
+            <select class="input" id="mirror-mode">
+              <option value="auto">Automatic — use the mirror only when a host
+                is blocked</option>
+              <option value="always">Always use the BMCLAPI mirror</option>
+              <option value="never">Never use the mirror — rely on the
+                bypass</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">PROXY</span>
+            <div class="input-row">
+              <input class="input" id="proxy-url" spellcheck="false"
+                     autocomplete="off" placeholder="http://127.0.0.1:8080">
+              <button class="btn ghost" id="btn-save-proxy"
+                      type="button">Save</button>
+            </div>
+          </label>
+          <p class="hint">Used for downloads, sign-in and updates. Leave empty
+             to use the system connection; localhost and LAN addresses always
+             connect directly. Format: host:port or http://host:port.</p>
+          <label class="field">
+            <span class="field-label">DNS SERVERS</span>
+            <div class="input-row">
+              <input class="input" id="dns-servers" spellcheck="false"
+                     autocomplete="off" placeholder="1.1.1.1, 8.8.8.8">
+              <button class="btn ghost" id="btn-save-dns"
+                      type="button">Save</button>
+            </div>
+          </label>
+          <div class="dns-presets" id="dns-presets">
+            <button class="btn ghost dns-preset" type="button"
+                    data-dns-preset="9.9.9.9, 149.112.112.112"
+                    title="Quad9 — 9.9.9.9, 149.112.112.112">Quad9<small>9.9.9.9</small></button>
+            <button class="btn ghost dns-preset" type="button"
+                    data-dns-preset="8.8.8.8, 8.8.4.4"
+                    title="Google — 8.8.8.8, 8.8.4.4">Google<small>8.8.8.8</small></button>
+            <button class="btn ghost dns-preset" type="button"
+                    data-dns-preset="1.1.1.1, 1.0.0.1"
+                    title="Cloudflare — 1.1.1.1, 1.0.0.1">Cloudflare<small>1.1.1.1</small></button>
+            <button class="btn ghost dns-preset" type="button"
+                    data-dns-preset="" title="Use the system DNS">System DNS</button>
+          </div>
+          <p class="hint">Comma-separated IP addresses. Leave empty for the
+             system DNS. Applies to the launcher only, not the game.</p>
+          <label class="field">
+            <span class="field-label">CURSEFORGE API KEY</span>
+            <div class="input-row">
+              <input class="input" id="curseforge-key" type="password"
+                     spellcheck="false" autocomplete="off"
+                     placeholder="Paste a personal API key">
+              <button class="btn ghost" id="btn-save-curseforge-key"
+                      type="button">Save</button>
+            </div>
+          </label>
+          <p class="hint" id="curseforge-key-hint">Get a personal key at
+             console.curseforge.com. It is stored locally in accounts.json
+             and only sent to api.curseforge.com. Without a key, search by
+             pasting a CurseForge project link, numeric ID or exact slug.</p>
+          <button class="link" id="btn-curseforge-key-page"
+                  type="button">Open the CurseForge console →</button>
+          <div class="row-head tight">
+            <p class="hint">Probe every game host once and see which ones this
+               network can reach. The full event history lives in the Logs
+               section.</p>
+            <div class="pane-actions">
+              <button class="btn ghost" id="btn-net-check"
+                      type="button"><svg class="icon"><use href="#i-refresh"/></svg>Run check</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="settings-pane" data-settings-pane="logs" role="tabpanel">
+        <section class="card settings-card wide">
+          <div class="card-head">
+            <span class="eyebrow">LOGS</span>
+            <div class="seg" id="logs-tabs" role="tablist"
+                 aria-label="Log source">
+              <button class="on" type="button" role="tab"
+                      aria-selected="true" data-logs-tab="launcher">
+                <svg class="icon"><use href="#i-logs"/></svg><span>Launcher</span>
+              </button>
+              <button type="button" role="tab" aria-selected="false"
+                      tabindex="-1" data-logs-tab="network">
+                <svg class="icon"><use href="#i-network"/></svg><span>Network</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="logs-pane active" data-logs-pane="launcher"
+               role="tabpanel">
+            <div class="logs-row">
+              <span class="count path" id="logs-sub">logs\launcher.log</span>
+              <div class="pane-actions">
+                <button class="btn ghost" id="btn-open-logs-folder"
+                        type="button"><svg class="icon"><use href="#i-folder"/></svg>Folder</button>
+                <button class="btn ghost" id="btn-open-log-file"
+                        type="button"><svg class="icon"><use href="#i-logs"/></svg>File</button>
+                <button class="btn ghost" id="btn-clear-logs"
+                        type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear view</button>
+              </div>
+            </div>
+            <div class="log console settings-log" id="log-console"></div>
+            <p class="hint">Diagnostic log of the launcher itself. It rotates
+               automatically and never contains passwords or account tokens.</p>
+          </div>
+
+          <div class="logs-pane" data-logs-pane="network" role="tabpanel">
+            <div class="logs-row">
+              <span class="count">Every host the launcher tried to reach</span>
+              <div class="pane-actions">
+                <button class="btn ghost" id="btn-net-copy"
+                        type="button"><svg class="icon"><use href="#i-copy"/></svg>Copy report</button>
+                <button class="btn ghost" id="btn-net-clear"
+                        type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear log</button>
+              </div>
+            </div>
+            <div class="log console settings-log" id="net-console"></div>
+            <p class="hint">Downloads and what came back. When something fails,
+               copy this report — it shows exactly which host is blocked on this
+               network.</p>
+          </div>
+        </section>
+      </div>
+      </div>
       </div>
     </section>
 
@@ -1253,72 +1669,10 @@
       </div>
     </section>
 
-    <!-- Skins ----------------------------------------------------------- -->
-    <section class="screen" id="screen-skin">
-      <div class="screen-head">
-        <div>
-          <h1 class="screen-title">Skin</h1>
-          <p class="screen-sub" id="skin-sub">Sign in to manage your skin.</p>
-        </div>
-        <div class="pane-actions">
-          <button class="btn ghost" id="btn-skin-choose" type="button">
-            Choose PNG…
-          </button>
-          <button class="btn primary" id="btn-skin-apply" type="button">
-            Apply to account
-          </button>
-        </div>
-      </div>
-
-      <div class="skin-screen">
-        <div class="skin-preview">
-          <canvas id="skin-canvas" width="260" height="340"
-                  aria-label="3D skin preview"></canvas>
-          <p class="hint skin-hint">The head follows the cursor; drag the model
-            sideways to spin it.</p>
-        </div>
-        <div class="card settings-card skin-side">
-          <div>
-            <span class="field-label">ACCOUNT</span>
-            <select class="input" id="skin-account-select"
-                    aria-label="Account whose skin is shown"></select>
-          </div>
-          <div>
-            <span class="field-label">MODEL</span>
-            <div class="seg" id="skin-seg">
-              <button type="button" data-skin-variant="classic">Classic</button>
-              <button type="button" data-skin-variant="slim">Slim</button>
-            </div>
-          </div>
-          <div class="setting-row">
-            <div class="setting-text">
-              <span class="setting-name" id="skin-account-name">—</span>
-              <span class="hint" id="skin-account-hint">—</span>
-            </div>
-          </div>
-          <p class="hint" id="skin-note">A skin is a 64×64 or 64×32 PNG. The
-             file is stored by the launcher and never sent anywhere except the
-             account you apply it to.</p>
-          <div class="path" id="skin-path" title=""></div>
-          <a class="skin-ely-link hidden" id="skin-ely-link"
-             href="https://ely.by/skins" target="_blank" rel="noreferrer">
-            Change skin on ely.by →
-          </a>
-          <div class="skin-history hidden" id="skin-history">
-            <div class="skin-history-head">
-              <span class="field-label">SKIN HISTORY</span>
-              <button class="link skin-history-clear"
-                      id="btn-skin-history-clear" type="button">
-                Clear
-              </button>
-            </div>
-            <div class="skin-history-grid" id="skin-history-grid"></div>
-            <p class="hint skin-history-empty hidden" id="skin-history-empty">
-              Skins you pick are kept here so you can switch back.
-            </p>
-          </div>
-        </div>
-      </div>
+    <!-- Nexi site profile ----------------------------------------------- -->
+    <section class="screen site-screen" id="screen-site">
+      <iframe class="site-frame" id="site-frame"
+              title="Profile on the Nexi site"></iframe>
     </section>
 
     </div>
@@ -1438,6 +1792,32 @@
       <button class="link" id="btn-mirror-auto" type="button">Decide
         automatically every time</button>
       <button class="link" id="btn-mirror-later" type="button">Not now</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shown when the site asks to link a Minecraft account (the browser opens
+     nexi://link?token=...). Only accounts signed in here are offered. -->
+<div class="mirror-modal hidden" id="nexi-link-modal" role="dialog"
+     aria-modal="true" aria-labelledby="nexi-link-title">
+  <div class="mirror-backdrop" data-nexi-link-close></div>
+  <div class="mirror-card nexi-link-card">
+    <div class="mirror-head">
+      <span class="eyebrow">NEXI ID</span>
+      <button class="btn ghost mirror-close" id="btn-nexi-link-close"
+              type="button" aria-label="Close">
+        <svg class="icon"><use href="#i-x"/></svg>
+      </button>
+    </div>
+    <h2 class="mirror-title" id="nexi-link-title">Link a Minecraft account?</h2>
+    <p class="mirror-text" id="nexi-link-text"></p>
+    <div class="nexi-link-accounts" id="nexi-link-accounts"></div>
+    <p class="hint nexi-link-status hidden" id="nexi-link-status"></p>
+    <div class="mirror-foot">
+      <button class="link" id="btn-nexi-link-cancel" type="button">Cancel</button>
+      <button class="btn primary" id="btn-nexi-link-confirm" type="button">
+        Link account
+      </button>
     </div>
   </div>
 </div>
@@ -1584,6 +1964,7 @@
 <script src="js/logs.js"></script>
 <script src="js/network.js"></script>
 <script src="js/zapret.js"></script>
+<script src="js/pet.js"></script>
 <script src="js/mirror.js"></script>
 <script src="js/update.js"></script>
 <script src="js/skin.js"></script>

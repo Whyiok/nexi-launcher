@@ -20,6 +20,7 @@ import urllib.request
 from pathlib import Path
 
 from .logging_setup import log
+from .net import open_url
 from .util import InstallCancelled
 from .version import VERSION
 
@@ -62,7 +63,7 @@ def _request_json(url: str, timeout: float = 25) -> dict:
         "User-Agent": USER_AGENT,
     })
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with open_url(request, timeout=timeout) as response:
             body = response.read(4 * 1024 * 1024)
     except urllib.error.HTTPError as exc:
         if exc.code == 404:

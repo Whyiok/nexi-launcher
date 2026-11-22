@@ -3,8 +3,10 @@
 import re
 import shutil
 import stat
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from . import curseforge
 from .config import LOADER_LABELS
 from .java_runtime import java_executable
 from .net import _download_many
@@ -124,6 +126,59 @@ def _download_modpack_files(files, game_dir: Path, log, progress,
             log(f"SKIP unsafe modpack path: {item.get('path')}")
             continue
         jobs.append((urls[0], target, item.get("fileSize")))
+    _download_many(jobs, log, progress, cancel)
+    return len(jobs)
+
+
+def _download_curseforge_manifest(files, game_dir: Path, log, progress,
+                                  cancel) -> int:
+    """Resolve manifest projectID/fileID pairs and download the files."""
+    entries = []
+    seen = set()
+    for item in files or []:
+        if not isinstance(item, dict) or item.get("required") is False:
+            continue
+        project = str(item.get("projectID") or "").strip()
+        file_id = str(item.get("fileID") or "").strip()
+        if not project or not file_id or (project, file_id) in seen:
+            continue
+        seen.add((project, file_id))
+        entries.append((project, file_id))
+    if not entries:
+        return 0
+    log(f"Resolving {len(entries)} CurseForge files…")
+    mods_dir = Path(game_dir) / "mods"
+    workers = 8 if curseforge.has_api_key() else 3
+    jobs = []
+    with ThreadPoolExecutor(
+            max_workers=min(workers, len(entries))) as pool:
+        futures = {
+            pool.submit(curseforge.resolve_manifest_file, project, file_id):
+            (project, file_id)
+            for project, file_id in entries
+        }
+        for done, future in enumerate(as_completed(futures), 1):
+            if cancel is not None and cancel.is_set():
+                raise InstallCancelled()
+            project, file_id = futures[future]
+            try:
+                info = future.result()
+            except Exception as exc:
+                info = None
+                log(f"SKIP CurseForge file {project}/{file_id}: {exc}")
+            if not info:
+                log(f"WARNING: CurseForge file {project}/{file_id} "
+                    "could not be resolved.")
+            else:
+                target = _zip_member_target(
+                    mods_dir, str(info.get("filename") or ""))
+                if target is None:
+                    log(f"SKIP unsafe CurseForge file name: "
+                        f"{info.get('filename')}")
+                else:
+                    jobs.append((info["url"], target, info.get("filesize")))
+            if progress and (done == len(entries) or done % 10 == 0):
+                progress(done, len(entries))
     _download_many(jobs, log, progress, cancel)
     return len(jobs)
 

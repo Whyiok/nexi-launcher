@@ -4,6 +4,9 @@ import logging
 import tempfile
 from pathlib import Path
 
+from ..curseforge import (
+    CurseForgeError, curseforge_icon, curseforge_versions, search_curseforge,
+)
 from ..instances import (
     PACK_DIRS, PACK_LABELS, installed_mod_entry, installed_pack_entry,
     instance_pack_dir, mod_state_entry, read_packs_state, write_packs_state,
@@ -22,9 +25,22 @@ class ContentApi:
         return kind if kind in ("mod", "resourcepack", "shader",
                                 "modpack") else "mod"
 
+    @staticmethod
+    def _content_source(source):
+        return ("curseforge"
+                if str(source or "").strip().lower() == "curseforge"
+                else "modrinth")
+
+    @staticmethod
+    def _versions(source, project, game, loader, kind):
+        if source == "curseforge":
+            return curseforge_versions(project, game, loader, kind)
+        return mod_versions(project, game, loader, kind)
+
     def content_search(self, kind, query="", loader="any", offset=0,
-                       game_version=None):
+                       game_version=None, source="modrinth"):
         kind = self._content_kind(kind)
+        source = self._content_source(source)
         try:
             offset = max(0, int(offset or 0))
         except (TypeError, ValueError):
@@ -53,12 +69,20 @@ class ContentApi:
                         "error": "No profile selected."}
         loader = str(loader or "any")
         try:
-            hits, total = search_modrinth(str(query or ""), game, loader, kind,
-                                          offset=offset)
+            if source == "curseforge":
+                hits, total = search_curseforge(
+                    str(query or ""), game, loader, kind, offset=offset)
+            else:
+                hits, total = search_modrinth(
+                    str(query or ""), game, loader, kind, offset=offset)
+        except CurseForgeError as exc:
+            return {"hits": [], "game": game, "loader": loader, "kind": kind,
+                    "source": source, "total": 0, "offset": offset,
+                    "error": str(exc)}
         except Exception as exc:
             return {"hits": [], "game": game, "loader": loader,
-                    "total": 0, "offset": offset,
-                    "error": f"Search failed: {exc}"}
+                    "kind": kind, "source": source, "total": 0,
+                    "offset": offset, "error": f"Search failed: {exc}"}
         return {
             "hits": [{
                 "project_id": hit.get("project_id", ""),
@@ -68,9 +92,10 @@ class ContentApi:
                 "author": hit.get("author") or "",
                 "description": hit.get("description", ""),
                 "icon_url": hit.get("icon_url") or "",
+                "source": hit.get("source") or source,
             } for hit in hits],
-            "game": game, "loader": loader, "kind": kind, "total": total,
-            "offset": offset, "error": "",
+            "game": game, "loader": loader, "kind": kind, "source": source,
+            "total": total, "offset": offset, "error": "",
         }
 
     def content_status(self, kind, project_id, loader="any", slug=None):
@@ -94,13 +119,16 @@ class ContentApi:
         }
 
     def content_install(self, kind, project_id, loader="any", slug=None,
-                        game_version=None):
+                        game_version=None, source="modrinth"):
         kind = self._content_kind(kind)
+        source = self._content_source(source)
         if kind == "mod":
-            return self.mods_install(project_id, loader, slug, game_version)
+            return self.mods_install(project_id, loader, slug, game_version,
+                                     source)
         if kind == "modpack":
-            return self.modpack_install(project_id, slug)
-        return self.pack_install(kind, project_id, loader, slug, game_version)
+            return self.modpack_install(project_id, slug, source)
+        return self.pack_install(kind, project_id, loader, slug, game_version,
+                                 source)
 
     def content_uninstall(self, kind, project_id, filename=None):
         kind = self._content_kind(kind)
@@ -112,17 +140,20 @@ class ContentApi:
                 "error": "Modpacks are profiles — remove the profile instead."}
 
     def content_update(self, kind, project_id, loader="any", slug=None,
-                       game_version=None):
+                       game_version=None, source="modrinth"):
         kind = self._content_kind(kind)
+        source = self._content_source(source)
         if kind == "mod":
-            return self.mods_update(project_id, loader, slug, game_version)
+            return self.mods_update(project_id, loader, slug, game_version,
+                                    source)
         if kind in PACK_DIRS:
             return self.pack_update(kind, project_id, loader, slug,
-                                    game_version)
+                                    game_version, source)
         return {"ok": False, "error": "Modpacks are installed as profiles."}
 
     def pack_install(self, kind, project_id, loader="any", slug=None,
-                     game_version=None):
+                     game_version=None, source="modrinth"):
+        source = self._content_source(source)
         instance, profile_game, _detected = self._instance_game()
         if instance is None:
             return {"ok": False, "error": "No profile selected."}
@@ -140,7 +171,7 @@ class ContentApi:
         label = PACK_LABELS.get(kind, "pack")
         where = f"Minecraft {game}" if game else "this version"
         try:
-            versions = mod_versions(project, game, loader, kind)
+            versions = self._versions(source, project, game, loader, kind)
             if not versions:
                 return {"ok": False,
                         "error": f"No {label} files for {where}."}
@@ -165,7 +196,8 @@ class ContentApi:
             if not isinstance(bucket, dict):
                 bucket = {}
             bucket[project] = mod_state_entry(
-                version, file, project, slug=str(slug or ""))
+                version, file, project, slug=str(slug or ""),
+                source=source)
             state[kind] = bucket
             write_packs_state(root, state)
             self._status("mods", message)
@@ -217,7 +249,8 @@ class ContentApi:
         return {"ok": True, "message": message}
 
     def pack_update(self, kind, project_id, loader="any", slug=None,
-                    game_version=None):
+                    game_version=None, source="modrinth"):
+        source = self._content_source(source)
         instance, profile_game, _detected = self._instance_game()
         if instance is None:
             return {"ok": False, "error": "No profile selected."}
@@ -239,7 +272,8 @@ class ContentApi:
             if not entry:
                 return {"ok": False,
                         "error": f"This {label} is not installed in this profile."}
-            versions = mod_versions(project, game, loader, kind)
+            source = self._content_source(entry.get("source") or source)
+            versions = self._versions(source, project, game, loader, kind)
             if not versions:
                 return {"ok": False,
                         "error": f"No {label} files for {where}."}
@@ -274,7 +308,7 @@ class ContentApi:
             bucket[project] = mod_state_entry(
                 latest, file, project,
                 slug=str(slug or entry.get("slug") or ""),
-                title=str(entry.get("title") or ""))
+                title=str(entry.get("title") or ""), source=source)
             state[kind] = bucket
             write_packs_state(root, state)
             version = (latest.get("version_number")
@@ -290,14 +324,15 @@ class ContentApi:
             self.busy = ""
             self._event("busy", task="packs", on=False)
 
-    def modpack_install(self, project_id, slug=None):
+    def modpack_install(self, project_id, slug=None, source="modrinth"):
+        source = self._content_source(source)
         if self.busy:
             return {"ok": False, "error": "Another task is already running."}
         self.busy = "modpack"
         self._event("busy", task="modpack", on=True)
         project = str(project_id or "")
         try:
-            versions = mod_versions(project, "", "", "modpack")
+            versions = self._versions(source, project, "", "", "modpack")
             if not versions:
                 return {"ok": False,
                         "error": "No downloadable modpack versions found."}
@@ -306,21 +341,29 @@ class ContentApi:
             if file is None:
                 return {"ok": False,
                         "error": "This modpack has no downloadable file."}
-            if not str(file.get("filename", "")).lower().endswith(".mrpack"):
+            if (source != "curseforge"
+                    and not str(file.get("filename", "")).lower()
+                    .endswith(".mrpack")):
                 candidates = [item for item in version.get("files") or []
                               if str(item.get("filename", "")).lower()
                               .endswith(".mrpack")]
                 if candidates:
                     file = candidates[0]
-            name = safe_filename(file.get("filename") or "modpack.mrpack")
-            # The .mrpack has no artwork; the project page has the icon.
+            name = safe_filename(file.get("filename") or (
+                "modpack.zip" if source == "curseforge"
+                else "modpack.mrpack"))
             icon_url = ""
-            try:
-                project_info = modrinth_get(f"/project/{project}", timeout=30)
-                if isinstance(project_info, dict):
-                    icon_url = str(project_info.get("icon_url") or "")
-            except Exception as exc:
-                logging.debug("Modpack icon lookup failed: %s", exc)
+            if source == "curseforge":
+                icon_url = curseforge_icon(project)
+            else:
+                # The .mrpack has no artwork; Modrinth serves the icon.
+                try:
+                    project_info = modrinth_get(f"/project/{project}",
+                                                timeout=30)
+                    if isinstance(project_info, dict):
+                        icon_url = str(project_info.get("icon_url") or "")
+                except Exception as exc:
+                    logging.debug("Modpack icon lookup failed: %s", exc)
             self._status("mods", f"Downloading {name}…")
             self._event("busy", task="modpack", on=True,
                         label=f"Downloading {name}")

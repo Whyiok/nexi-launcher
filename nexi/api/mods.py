@@ -1,5 +1,8 @@
 """Modrinth mod install / update / uninstall actions."""
 
+from ..curseforge import (
+    curseforge_versions, resolve_curseforge_dependency,
+)
 from ..instances import (
     installed_mod_entry, instance_base_version, instance_mods_dir,
     mod_state_entry, read_mods_state, write_mods_state,
@@ -52,7 +55,21 @@ class ModsApi:
             "game": game, "loader": loader, "total": total, "error": "",
         }
 
-    def mods_install(self, project_id, loader, slug=None, game_version=None):
+    @staticmethod
+    def _mod_source(source):
+        return ("curseforge"
+                if str(source or "").strip().lower() == "curseforge"
+                else "modrinth")
+
+    @classmethod
+    def _mod_versions(cls, source, project, game, loader):
+        if source == "curseforge":
+            return curseforge_versions(project, game, loader, "mod")
+        return mod_versions(project, game, loader)
+
+    def mods_install(self, project_id, loader, slug=None, game_version=None,
+                     source="modrinth"):
+        source = self._mod_source(source)
         instance, profile_game, detected = self._instance_game()
         if instance is None:
             return {"ok": False, "error": "No profile selected."}
@@ -70,7 +87,8 @@ class ModsApi:
         mods_dir = instance_mods_dir(root)
         where = f"Minecraft {game}" if game else "this version"
         try:
-            versions = mod_versions(str(project_id), game, loader)
+            versions = self._mod_versions(source, str(project_id), game,
+                                          loader)
             if not versions:
                 suffix = "" if loader == "any" else f" ({loader})"
                 return {"ok": False, "error": f"No files for {where}{suffix}."}
@@ -100,9 +118,13 @@ class ModsApi:
                     installed.append(target.name)
                 state[str(project)] = mod_state_entry(
                     version, file, project,
-                    slug=slug if str(project) == str(project_id) else "")
+                    slug=slug if str(project) == str(project_id) else "",
+                    source=source)
                 for dep in required_dependencies(version):
-                    dep_version = resolve_dependency(dep, game, loader)
+                    dep_version = (
+                        resolve_curseforge_dependency(dep, game, loader)
+                        if source == "curseforge"
+                        else resolve_dependency(dep, game, loader))
                     if dep_version is not None:
                         pending.append(dep_version)
             if state:
@@ -167,7 +189,9 @@ class ModsApi:
         self._status("mods", message)
         return {"ok": True, "message": message}
 
-    def mods_update(self, project_id, loader, slug=None, game_version=None):
+    def mods_update(self, project_id, loader, slug=None, game_version=None,
+                    source="modrinth"):
+        source = self._mod_source(source)
         instance, profile_game, detected = self._instance_game()
         if instance is None:
             return {"ok": False, "error": "No profile selected."}
@@ -190,7 +214,8 @@ class ModsApi:
             if not entry:
                 return {"ok": False,
                         "error": "This mod is not installed in this profile."}
-            versions = mod_versions(project, game, loader)
+            source = self._mod_source(entry.get("source") or source)
+            versions = self._mod_versions(source, project, game, loader)
             if not versions:
                 suffix = "" if loader == "any" else f" ({loader})"
                 return {"ok": False, "error": f"No files for {where}{suffix}."}
@@ -222,7 +247,7 @@ class ModsApi:
             state[project] = mod_state_entry(
                 latest, file, project,
                 slug=str(slug or entry.get("slug") or ""),
-                title=str(entry.get("title") or ""))
+                title=str(entry.get("title") or ""), source=source)
             write_mods_state(root, state)
             version = (latest.get("version_number")
                        or latest.get("name") or target.name)
@@ -256,7 +281,7 @@ class ModsApi:
         if not tracked:
             return {"ok": False,
                     "error": "No tracked mods in this profile yet — install "
-                             "a mod from Modrinth first."}
+                             "a mod first."}
         self.busy = "mods"
         self._event("busy", task="mods", on=True)
         updated, skipped, failed = [], [], []
@@ -266,7 +291,9 @@ class ModsApi:
                 self._status(
                     "mods", f"Checking {name} ({position}/{len(tracked)})…")
                 try:
-                    versions = mod_versions(project, game, loader)
+                    source = self._mod_source(entry.get("source"))
+                    versions = self._mod_versions(source, project, game,
+                                                  loader)
                     if not versions:
                         failed.append(f"{name}: no files for this version")
                         continue
@@ -296,7 +323,7 @@ class ModsApi:
                     state[project] = mod_state_entry(
                         latest, file, project,
                         slug=str(entry.get("slug") or ""),
-                        title=str(entry.get("title") or ""))
+                        title=str(entry.get("title") or ""), source=source)
                     updated.append(name)
                 except Exception as exc:
                     failed.append(f"{name}: {exc}")

@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import INSTANCES_DIR, USER_AGENT
+from .net import open_url
 from .util import safe_filename
 from .versions import game_version_of, version_meta
 
@@ -197,6 +198,23 @@ ICON_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 ICON_MAX_BYTES = 4 * 1024 * 1024
 
 
+BANNER_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm"}
+
+
+BANNER_VIDEO_SUFFIXES = {".mp4", ".webm"}
+
+
+def profile_banner_path(root, name):
+    """The profile's banner file, or None when the record is stale."""
+    filename = safe_filename(str(name or ""))
+    if not filename:
+        return None
+    path = Path(root) / filename
+    if path.suffix.lower() not in BANNER_SUFFIXES or not path.is_file():
+        return None
+    return path
+
+
 IMAGE_SUFFIXES = ICON_SUFFIXES | {".tga"}
 
 
@@ -235,7 +253,7 @@ def download_profile_icon(root, url: str) -> str:
     part = target.with_name(target.name + ".part")
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with urllib.request.urlopen(request, timeout=60) as response, \
+        with open_url(request, timeout=60) as response, \
                 part.open("wb") as handle:
             shutil.copyfileobj(response, handle)
         if part.stat().st_size > ICON_MAX_BYTES:
@@ -437,7 +455,7 @@ def installed_mod_entry(root: Path, project_id: str, slug: str = "") -> dict:
 
 
 def mod_state_entry(version: dict, file: dict, project: str, slug="",
-                    title="") -> dict:
+                    title="", source="modrinth") -> dict:
     return {
         "filename": safe_filename(file.get("filename", "mod.jar")),
         "version_id": str(version.get("id") or ""),
@@ -446,6 +464,7 @@ def mod_state_entry(version: dict, file: dict, project: str, slug="",
         "project_id": str(project),
         "slug": str(slug or ""),
         "title": str(title or version.get("name") or ""),
+        "source": str(source or "modrinth"),
     }
 
 

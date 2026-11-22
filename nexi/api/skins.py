@@ -67,7 +67,10 @@ class SkinsApi:
             "name": account["name"],
             "type": account["type"],
             "uuid": account.get("uuid", ""),
-            "online": account["type"] != "offline"
+            # Nexi accounts only point at a Minecraft identity on the site;
+            # their skins are managed through the linked Microsoft/Ely.by
+            # account, not here.
+            "online": account["type"] in ("microsoft", "ely")
                       and bool(account.get("uuid", "")),
             "variant": variant,
             "skin": skin,

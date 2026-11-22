@@ -198,6 +198,37 @@ function renderProfiles() {
   if (has) fillDetail(S.instance);
 }
 
+function fillDetailBanner(inst) {
+  const banner = $("#detail-banner");
+  const video = $("#detail-banner-video");
+  const head = $("#detail-head");
+  const showVideo = !!inst.banner && inst.banner_kind === "video";
+  const showImage = !!inst.banner && !showVideo;
+  if (banner) {
+    if (showImage) {
+      if (banner.getAttribute("src") !== inst.banner) banner.src = inst.banner;
+      banner.classList.remove("hidden");
+    } else {
+      banner.classList.add("hidden");
+      banner.removeAttribute("src");
+    }
+  }
+  if (video) {
+    if (showVideo) {
+      if (video.getAttribute("src") !== inst.banner) video.src = inst.banner;
+      video.classList.remove("hidden");
+      if (video.paused) video.play().catch(() => {});
+    } else {
+      video.classList.add("hidden");
+      video.pause();
+      video.removeAttribute("src");
+    }
+  }
+  if (head) head.classList.toggle("has-banner", !!inst.banner);
+  const clear = $("#btn-pane-clear-banner");
+  if (clear) clear.disabled = !!S.busy || !inst.banner;
+}
+
 function fillDetail(inst, options = {}) {
   $("#detail-name").textContent = inst.name;
   const loader = inst.loader === "any"
@@ -208,6 +239,8 @@ function fillDetail(inst, options = {}) {
   $("#detail-path").textContent = inst.path;
   $("#detail-path").title = inst.path;
   $("#detail-badge").textContent = loader;
+  fillDetailBanner(inst);
+  $("#detail-playtime-text").textContent = formatPlaytime(inst.playtime);
 
   renderPaneAccount(inst);
   $("#pane-ram-value").textContent = `${S.ram} GB`;
@@ -239,7 +272,7 @@ function fillDetail(inst, options = {}) {
 }
 
 const ACCOUNT_KINDS = {
-  microsoft: "Microsoft", ely: "Ely.by", offline: "Offline",
+  microsoft: "Microsoft", ely: "Ely.by", offline: "Offline", nexi: "Nexi",
 };
 
 /* The account select in Profile settings: one entry per account plus the
@@ -664,6 +697,31 @@ async function clearProfileIcon() {
   else await refreshState();
 }
 
+async function setProfileBanner() {
+  if (!S.instance || S.busy) return;
+  const result = await call("set_profile_banner");
+  if (result.cancelled) return;
+  if (result.error) {
+    setStatus(result.error, true);
+    return;
+  }
+  setStatus("Build banner updated.");
+  if (result.state) applyState(result.state);
+  else await refreshState();
+}
+
+async function clearProfileBanner() {
+  if (!S.instance || !S.instance.banner) return;
+  const result = await call("clear_profile_banner");
+  if (result.error) {
+    setStatus(result.error, true);
+    return;
+  }
+  setStatus("Build banner removed.");
+  if (result.state) applyState(result.state);
+  else await refreshState();
+}
+
 async function selectInstance(slug) {
   if (!slug) return;
   // On Home a rail click chooses the build the Play button starts, exactly
@@ -678,12 +736,4 @@ async function selectInstance(slug) {
   if (slug === S.selected) return;
   resetDeleteConfirm();
   await commitProfileSelection(slug);
-}
-
-async function changeRam(delta) {
-  if (!S.instance) return;
-  const value = Math.max(1, Math.min(16, Number(S.ram) + delta));
-  if (value === S.ram) return;
-  const result = await call("set_ram", value);
-  if (result.state) applyState(result.state);
 }

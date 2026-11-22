@@ -75,9 +75,19 @@ function renderHome() {
       ? `Minecraft ${last.base} · ${homeLoaderLabel(last)}`
       : "Create a profile to get started.";
   }
+  renderHomeBadges(last);
   renderHomePlay();
   renderHomeBuilds();
   renderHomeWorlds();
+}
+
+function renderHomeBadges(inst) {
+  const time = $("#home-playtime");
+  if (time) {
+    time.classList.toggle("hidden", !inst);
+    const text = $("#home-playtime-text");
+    if (text && inst) text.textContent = formatPlaytime(inst.playtime);
+  }
 }
 
 function renderHomePlay() {

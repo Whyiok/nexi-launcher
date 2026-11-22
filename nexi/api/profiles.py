@@ -11,13 +11,15 @@ from pathlib import Path
 from ..config import ELY_SKIN_SITE, INSTANCES_DIR, LOG_DIR, LOG_FILE, MC
 from ..ely_auth import ELY_OAUTH_CLIENT_ID_DEFAULT
 from .. import media
+from ..game_options import normalize_defaults, write_game_options
 from ..logging_setup import log
 from ..instances import (
-    ICON_MAX_BYTES, ICON_SUFFIXES, IMAGE_SUFFIXES, _file_sha1, delete_instance,
-    instance_contents, instance_game_dir, instance_log_file,
-    instance_mods_dir, list_instances, profile_icon_data_url,
-    profile_loader_version, read_instance, read_modrinth_cache,
-    screenshot_entries, write_instance, write_modrinth_cache,
+    BANNER_SUFFIXES, BANNER_VIDEO_SUFFIXES, ICON_MAX_BYTES, ICON_SUFFIXES,
+    IMAGE_SUFFIXES, _file_sha1, delete_instance, instance_contents,
+    instance_game_dir, instance_log_file, instance_mods_dir, list_instances,
+    profile_banner_path, profile_icon_data_url, profile_loader_version,
+    read_instance, read_modrinth_cache, screenshot_entries, write_instance,
+    write_modrinth_cache,
 )
 from ..modpacks import _zip_member_target
 from ..modrinth import modrinth_get
@@ -27,6 +29,10 @@ from ..version import VERSION
 from ..versions import (
     detect_loader, game_version_of, load_version, version_meta,
 )
+
+
+BANNER_MAX_BYTES = 20 * 1024 * 1024
+BANNER_VIDEO_MAX_BYTES = 50 * 1024 * 1024
 
 
 def _attach_shot_urls(entries):
@@ -61,6 +67,12 @@ class ProfilesApi:
         except (TypeError, ValueError):
             ram = int(self.ram)
         ram = max(self.RAM_MIN, min(self.RAM_MAX, ram))
+        try:
+            playtime = max(0, int(instance.get("playtime") or 0))
+        except (TypeError, ValueError):
+            playtime = 0
+        banner = profile_banner_path(
+            instance["_root"], instance.get("banner"))
         account = self._account_by_id(instance.get("account", ""))
         return {
             "slug": instance.get("_slug", ""),
@@ -76,9 +88,21 @@ class ProfilesApi:
                              "neoforge": "NeoForge", "quilt": "Quilt"}
             .get(loader, "Fabric"),
             "ram": ram,
+            # Game options written into options.txt before each launch.
+            "defaults": normalize_defaults(instance.get("game_defaults")),
+            "defaults_set": isinstance(instance.get("game_defaults"), dict),
             # Epoch seconds of the last launch (0 when never started), so the
             # Home screen can show the most recent build first.
             "last_played": float(instance.get("last_played") or 0),
+            # Seconds played in this profile, counted while the game runs.
+            "playtime": playtime,
+            # The banner is served by the loopback media server: a URL is
+            # enough, unlike the small inline profile icon.
+            "banner": media.url_for(banner) if banner is not None else "",
+            "banner_kind": (
+                "video" if banner is not None
+                and banner.suffix.lower() in BANNER_VIDEO_SUFFIXES
+                else "image" if banner is not None else ""),
             "path": str(instance_game_dir(instance["_root"])),
             "icon": profile_icon_data_url(
                 instance["_root"], instance.get("icon")),
@@ -110,9 +134,13 @@ class ProfilesApi:
                 "theme": self.theme,
                 "color_mode": self.color_mode,
                 "language": self.language,
+                "pet": self.pet,
                 "onboarded": bool(getattr(self, "_onboarded", False)),
                 "java": self.java_path,
                 "mirror": self.mirror,
+                "proxy": self.proxy,
+                "dns": self.dns,
+                "curseforge_key_set": bool(self._curseforge_key),
                 "accounts": [self._account_public(account)
                              for account in self._accounts],
                 "active_account": self._active_account_id,
@@ -134,6 +162,10 @@ class ProfilesApi:
                             "configured": bool(
                                 self._ely_oauth_client_id
                                 or ELY_OAUTH_CLIENT_ID_DEFAULT)}},
+                "nexi": {
+                    "base_url": str(getattr(self, "nexi_base_url", "") or ""),
+                    "signed_in": any(account["type"] == "nexi"
+                                     for account in self._accounts)},
                 "account": (active_account["type"]
                             if active_account is not None else "offline"),
                 "paths": {"shared": str(MC),
@@ -191,6 +223,44 @@ class ProfilesApi:
                 write_instance(instance["_root"], instance)
             self._save()
         return {"state": self.state()}
+
+    def set_game_defaults(self, values):
+        """Remember the per-profile game options applied on every launch."""
+        with self._lock:
+            instance = self.active_instance()
+            if instance is None:
+                return {"ok": False, "error": "Select a profile first.",
+                        "state": self.state()}
+            data = normalize_defaults(values)
+            instance["game_defaults"] = data
+            write_instance(instance["_root"], instance)
+            self.refresh_instances(select=self.selected_slug)
+        return {"ok": True, "state": self.state()}
+
+    def apply_game_defaults(self, values=None):
+        """Write the defaults into the profile's options.txt right away."""
+        with self._lock:
+            instance = self.active_instance()
+            if instance is None:
+                return {"ok": False, "error": "Select a profile first."}
+            data = normalize_defaults(
+                values if isinstance(values, dict)
+                else instance.get("game_defaults"))
+            instance["game_defaults"] = data
+            write_instance(instance["_root"], instance)
+            root = instance["_root"]
+            slug = instance.get("_slug", "")
+        try:
+            updates = write_game_options(instance_game_dir(root), data)
+        except OSError as exc:
+            return {"ok": False,
+                    "error": f"Could not write options.txt: {exc}",
+                    "state": self.state()}
+        log.info("Game defaults written: slug=%r keys=%s",
+                 slug, ",".join(sorted(updates)))
+        return {"ok": True,
+                "message": "Game defaults written to options.txt.",
+                "state": self.state()}
 
     def instance_set_account(self, account_id):
         """Pick the account this profile launches with ("" = the active one)."""
@@ -493,6 +563,89 @@ class ProfilesApi:
         data = read_instance(root)
         if data is not None:
             data.pop("icon", None)
+            write_instance(root, data)
+        self.refresh_instances(select=self.selected_slug)
+        return {"ok": True, "state": self.state()}
+
+    def _apply_profile_banner(self, root, source: Path):
+        suffix = source.suffix.lower()
+        if suffix not in BANNER_SUFFIXES:
+            return {"ok": False,
+                    "error": "Choose a PNG, JPG, WEBP, GIF, MP4 or WebM file."}
+        video = suffix in BANNER_VIDEO_SUFFIXES
+        try:
+            if not source.is_file():
+                return {"ok": False, "error": "That file no longer exists."}
+            if source.stat().st_size > (BANNER_VIDEO_MAX_BYTES if video
+                                        else BANNER_MAX_BYTES):
+                return {"ok": False,
+                        "error": ("That video is larger than 50 MB." if video
+                                  else "That image is larger than 20 MB.")}
+            target = Path(root) / f"banner{suffix}"
+            source_path = source.resolve()
+            for old in Path(root).glob("banner.*"):
+                if not old.is_file() or old.suffix.lower() not in BANNER_SUFFIXES:
+                    continue
+                if old.resolve() == source_path:
+                    continue
+                old.unlink(missing_ok=True)
+            if source_path != target.resolve():
+                shutil.copyfile(source, target)
+        except OSError as exc:
+            return {"ok": False, "error": f"Could not set the banner: {exc}"}
+        data = read_instance(root)
+        if data is None:
+            return {"ok": False, "error": "The profile could not be read."}
+        data["banner"] = target.name
+        write_instance(root, data)
+        self.refresh_instances(select=self.selected_slug)
+        return {"ok": True, "state": self.state()}
+
+    def set_profile_banner(self):
+        """Pick an image file and use it behind this profile's header."""
+        instance = self.active_instance()
+        if instance is None:
+            return {"ok": False, "error": "Select a profile first."}
+        if os.name != "nt":
+            return {"ok": False, "error": "The image picker needs Windows."}
+        script = (
+            "Add-Type -AssemblyName System.Windows.Forms | Out-Null; "
+            "$d = New-Object System.Windows.Forms.OpenFileDialog; "
+            "$d.Title = 'Select a build banner'; "
+            "$d.Filter = 'Images and videos (*.png;*.jpg;*.jpeg;*.webp;*.gif;"
+            "*.mp4;*.webm)|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.mp4;*.webm|"
+            "Images (*.png;*.jpg;*.jpeg;*.webp;*.gif)|"
+            "*.png;*.jpg;*.jpeg;*.webp;*.gif|"
+            "Video (*.mp4;*.webm)|*.mp4;*.webm|All files (*.*)|*.*'; "
+            "if ($d.ShowDialog() -eq 'OK') { [Console]::Out.Write($d.FileName) }"
+        )
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-STA", "-Command", script],
+                capture_output=True, text=True, timeout=600,
+                creationflags=subprocess.CREATE_NO_WINDOW)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return {"ok": False,
+                    "error": f"Could not open the file picker: {exc}"}
+        picked = (result.stdout or "").strip()
+        if not picked:
+            return {"ok": False, "cancelled": True}
+        return self._apply_profile_banner(instance["_root"], Path(picked))
+
+    def clear_profile_banner(self):
+        instance = self.active_instance()
+        if instance is None:
+            return {"ok": False, "error": "Select a profile first."}
+        root = instance["_root"]
+        try:
+            for old in Path(root).glob("banner.*"):
+                if old.is_file() and old.suffix.lower() in BANNER_SUFFIXES:
+                    old.unlink(missing_ok=True)
+        except OSError as exc:
+            return {"ok": False, "error": f"Could not remove the banner: {exc}"}
+        data = read_instance(root)
+        if data is not None:
+            data.pop("banner", None)
             write_instance(root, data)
         self.refresh_instances(select=self.selected_slug)
         return {"ok": True, "state": self.state()}

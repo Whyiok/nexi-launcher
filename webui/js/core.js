@@ -37,46 +37,46 @@ const LOADER_KEYS = { Fabric: "fabric", Forge: "forge", NeoForge: "neoforge" };
 const LOADER_LABELS = { fabric: "Fabric", forge: "Forge", neoforge: "NeoForge" };
 const MOD_LOADERS = ["any", "fabric", "forge", "neoforge"];
 
+const SOURCE_LABELS = { modrinth: "Modrinth", curseforge: "CurseForge" };
+
 const CONTENT_KINDS = {
   mod: {
     title: "Mods", plural: "mods", unit: "mod",
     placeholder: "Search mods by name",
-    empty: "Search Modrinth to find mods for this profile.",
     install: "Install", select: "Select a mod",
   },
   resourcepack: {
     title: "Resource packs", plural: "resource packs", unit: "resource pack",
     placeholder: "Search resource packs by name",
-    empty: "Search Modrinth to find resource packs for this profile.",
     install: "Install", select: "Select a resource pack",
   },
   shader: {
     title: "Shaders", plural: "shaders", unit: "shader pack",
     placeholder: "Search shaders by name",
-    empty: "Search Modrinth to find shaders for this profile.",
     install: "Install", select: "Select a shader pack",
   },
   modpack: {
     title: "Modpacks", plural: "modpacks", unit: "modpack",
     placeholder: "Search modpacks by name",
-    empty: "Search Modrinth to find a modpack — it installs as a new profile.",
     install: "Add profile", select: "Select a modpack",
   },
 };
 
 let S = {
   instances: [], selected: "", instance: null,
-  player: "", ram: 2, default_ram: 2, java: "", ms: {}, ely: {},
+  player: "", ram: 2, default_ram: 2, java: "", ms: {}, ely: {}, nexi: {},
   accounts: [], active_account: "", account: "offline", paths: {},
   busy: "", launching: false, launching_slugs: [], game_running: false,
   game_instance: "", running: [], theme: "mint",
-  color_mode: "dark", language: "en", version: "",
+  color_mode: "dark", language: "en", pet: "axi", version: "",
+  curseforge_key_set: false,
 };
 let screen = "home";
 let booted = false;
 
 const msFlow = { active: false };
 const elyFlow = { active: false };
+const nexiFlow = { active: false, login: "", email: "" };
 let accountMethod = "microsoft";
 
 const versions = {
@@ -94,6 +94,7 @@ const vedit = { key: "", mc: "", loader: "any", build: "", origMc: "",
                 req: 0, busy: false, optionsFor: "" };
 
 const mods = { hits: [], selected: -1, loader: "any", game: "", kind: "mod",
+               source: "modrinth",
                key: "", searchedKey: "", busy: false, installed: null,
                statusSeq: 0, statusLoading: false, profile: "",
                checked: new Set(), query: "", offset: 0, total: 0,
@@ -108,7 +109,8 @@ const lb = { label: "Fabric", builds: [], selected: -1, key: "", loading: false,
 const logs = {
   pending: "", buffer: [], timer: null, stick: true,
   el: "#log-console",
-  visible: () => screen === "settings",
+  visible: () => screen === "settings" && settingsTab === "logs"
+    && logsTab === "launcher",
 };
 const gameLogs = {
   pending: "", buffer: [], timer: null, stick: true,
@@ -152,6 +154,17 @@ function elem(tag, cls, text) {
   if (cls) node.className = cls;
   if (text !== undefined && text !== null) node.textContent = text;
   return node;
+}
+
+/* Played seconds, rendered like "12 h 34 min"; the i18n layer translates it. */
+function formatPlaytime(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours && minutes) return `${hours} h ${minutes} min`;
+  if (hours) return `${hours} h`;
+  if (minutes) return `${minutes} min`;
+  return total > 0 ? "< 1 min" : "0 min";
 }
 
 /* Icon sprite node for markup created at runtime. */
@@ -265,7 +278,7 @@ function modsAllowed() {
 }
 
 function browserKey() {
-  return `${mods.kind}|${instanceKey()}`;
+  return `${mods.kind}|${mods.source}|${instanceKey()}`;
 }
 
 function stateInstanceKey(state) {
@@ -346,7 +359,8 @@ function makeRow({ title, side, selected, cls, icon, onClick }) {
 
 function setSeg(selector, value) {
   $$(`${selector} button`).forEach((button) => {
-    const key = button.dataset.loader ?? button.dataset.kind;
+    const key = button.dataset.loader ?? button.dataset.kind
+      ?? button.dataset.source;
     button.classList.toggle("on", key === value);
   });
   updateSegFill($(selector));
@@ -356,8 +370,8 @@ function setSeg(selector, value) {
 
 const FILL_CONTAINERS = [
   "#tabs", "#bypass-tabs", "#detail-tabs", "#account-methods", "#skin-seg",
-  "#kind-seg", "#loader-seg", "#mods-seg", "#loaders-seg",
-  "#mode-seg", "#lang-seg",
+  "#kind-seg", "#source-seg", "#loader-seg", "#mods-seg", "#loaders-seg",
+  "#mode-seg", "#lang-seg", "#pet-seg", "#settings-tabs", "#logs-tabs",
 ];
 
 const hoverButtons = new WeakMap();
@@ -476,4 +490,143 @@ function initSegHover() {
       updateSegHover(container);
     });
   }
+}
+
+/* ----------------------------------------- custom dropdowns for <select> */
+
+/* Every native select stays in the DOM (hidden) so all existing code that
+   sets .value/.disabled, rebuilds options or listens for change keeps
+   working untouched; the custom button and menu mirror it. */
+function syncVsel(select) {
+  const wrap = select.parentElement;
+  if (!wrap || !wrap.classList.contains("vsel")) return;
+  const option = select.options[select.selectedIndex];
+  const label = wrap.querySelector(".vsel-label");
+  if (label) label.textContent = option ? option.text : "";
+  const btn = wrap.querySelector(".vsel-btn");
+  if (btn) btn.disabled = select.disabled;
+  for (const item of wrap.querySelectorAll(".vsel-option")) {
+    item.classList.toggle("selected", item.dataset.value === select.value);
+  }
+}
+
+function renderVselMenu(select) {
+  const wrap = select.parentElement;
+  if (!wrap || !wrap.classList.contains("vsel")) return;
+  const menu = wrap.querySelector(".vsel-menu");
+  menu.replaceChildren();
+  for (const option of select.options) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "vsel-option";
+    item.setAttribute("role", "option");
+    item.dataset.value = option.value;
+    item.appendChild(elem("span", "", option.text));
+    item.appendChild(iconNode("i-check"));
+    menu.appendChild(item);
+  }
+  syncVsel(select);
+}
+
+function closeVsel(wrap) {
+  if (!wrap || !wrap.classList.contains("open")) return;
+  wrap.classList.remove("open");
+  const btn = wrap.querySelector(".vsel-btn");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function upgradeSelect(select) {
+  if (select.dataset.vsel) return;
+  select.dataset.vsel = "1";
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "vsel-btn";
+  btn.setAttribute("aria-haspopup", "listbox");
+  btn.setAttribute("aria-expanded", "false");
+  const ariaLabel = select.getAttribute("aria-label");
+  if (ariaLabel) btn.setAttribute("aria-label", ariaLabel);
+  btn.appendChild(elem("span", "vsel-label"));
+  btn.appendChild(iconNode("i-chev"));
+
+  const menu = document.createElement("div");
+  menu.className = "vsel-menu";
+  menu.setAttribute("role", "listbox");
+  menu.setAttribute("data-i18n-skip", "");
+
+  const wrap = document.createElement("div");
+  wrap.className = "vsel";
+  wrap.appendChild(btn);
+  wrap.appendChild(menu);
+  // The button must precede the hidden select inside the wrapper so a
+  // wrapping <label> forwards its click to the button, not to the invisible
+  // native control.
+  select.parentNode.insertBefore(wrap, select);
+  wrap.appendChild(select);
+  select.classList.add("vsel-native");
+
+  /* Mirror value/disabled writes so existing code keeps working while the
+     custom UI stays in sync. */
+  const proto = HTMLSelectElement.prototype;
+  const nativeValue = Object.getOwnPropertyDescriptor(proto, "value");
+  const nativeDisabled = Object.getOwnPropertyDescriptor(proto, "disabled");
+  Object.defineProperty(select, "value", {
+    configurable: true,
+    get: () => nativeValue.get.call(select),
+    set: (value) => {
+      nativeValue.set.call(select, value);
+      syncVsel(select);
+    },
+  });
+  Object.defineProperty(select, "disabled", {
+    configurable: true,
+    get: () => nativeDisabled.get.call(select),
+    set: (value) => {
+      nativeDisabled.set.call(select, value);
+      syncVsel(select);
+    },
+  });
+
+  btn.addEventListener("click", () => {
+    if (select.disabled) return;
+    const open = wrap.classList.toggle("open");
+    btn.setAttribute("aria-expanded", String(open));
+    if (!open) return;
+    const selected = menu.querySelector(".vsel-option.selected");
+    if (selected) {
+      menu.scrollTop = Math.max(0,
+        selected.offsetTop - menu.clientHeight / 2);
+    }
+  });
+  menu.addEventListener("click", (event) => {
+    const item = event.target.closest(".vsel-option");
+    closeVsel(wrap);
+    if (!item || select.disabled) return;
+    if (item.dataset.value !== select.value) {
+      select.value = item.dataset.value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+  wrap.addEventListener("keydown", (event) => {
+    if (!wrap.classList.contains("open")) return;
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    const items = [...menu.querySelectorAll(".vsel-option")];
+    if (!items.length) return;
+    event.preventDefault();
+    const index = items.indexOf(document.activeElement);
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    const next = index < 0
+      ? items[0]
+      : items[(index + step + items.length) % items.length];
+    next.focus();
+  });
+
+  new MutationObserver(() => renderVselMenu(select)).observe(select, {
+    childList: true, subtree: true, characterData: true,
+  });
+  renderVselMenu(select);
+}
+
+function upgradeSelects() {
+  $$("select").forEach(upgradeSelect);
 }

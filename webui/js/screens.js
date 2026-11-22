@@ -11,6 +11,7 @@ const THEME_BRAND_ICONS = {
 };
 const MODES = ["dark", "light"];
 const LANGUAGES = ["en", "ru"];
+const PET_OPTIONS = ["axi", "clawd"];
 let activeTheme = "";
 let activeMode = "";
 let activeLanguage = "";
@@ -53,6 +54,7 @@ function applyState(next) {
   applyTheme(S.theme);
   applyMode(S.color_mode);
   applyLanguage(S.language);
+  if (typeof applyPet === "function") applyPet(S.pet);
   if (editSlug && (!S.instance || S.instance.slug !== editSlug)) {
     resetCreateMode();
   }
@@ -60,7 +62,7 @@ function applyState(next) {
   renderTabs();
   updateScreenHeads();
   fillSettings();
-  if (screen === "skin") loadSkin();
+  if (screen === "settings" && settingsTab === "account") loadSkin();
   if (screen === "home") {
     renderHome();
     maybeReloadHome();
@@ -134,7 +136,7 @@ function setScreen(name) {
   if (name !== "settings") stopLogsTimer();
   if (name !== "profiles") stopGameLogsTimer();
   if (name !== "profiles") stopShotsTimer();
-  if (name !== "skin") stopSkinView();
+  if (name !== "settings") stopSkinView();
   if (name !== "home") stopHomePanorama();
 
   if (name === "home") {
@@ -163,10 +165,9 @@ function setScreen(name) {
     fillSettings();
     openLogs();
     openNetwork();
+    if (settingsTab === "account") loadSkin();
   } else if (name === "bypass") {
     openZapret();
-  } else if (name === "skin") {
-    loadSkin();
   }
   requestAnimationFrame(() => {
     updateAllSegFills();
@@ -181,12 +182,15 @@ function renderTabs() {
     const locked = ["loaders"].includes(name) && !S.instance;
     tab.disabled = locked;
   });
+  const siteTab = $("#btn-site-profile");
+  if (siteTab) siteTab.classList.toggle("active", screen === "site");
   updateSegFill($("#tabs"));
   updateSegFill($("#bypass-tabs"));
 }
 
 function updateScreenHeads() {
   const meta = CONTENT_KINDS[mods.kind] || CONTENT_KINDS.mod;
+  const source = SOURCE_LABELS[mods.source] || "Modrinth";
   /* The version and loader shown here belong to the browser filters, not to
      the selected profile, so switching profiles never changes the search. */
   const target = mods.game ? `Minecraft ${mods.game}` : "all versions";
@@ -194,7 +198,7 @@ function updateScreenHeads() {
     && mods.loader !== "any" ? ` · ${mods.loader}` : "";
   if (!S.instance) {
     $("#mods-sub").textContent = mods.kind === "modpack"
-      ? `Modrinth · modpacks · ${target}${loaderPart} · installs as a new profile`
+      ? `${source} · modpacks · ${target}${loaderPart} · installs as a new profile`
       : `Select a profile to manage its ${meta.plural}.`;
     $("#loaders-sub").textContent = "Select a profile to install a loader.";
     return;
@@ -203,8 +207,8 @@ function updateScreenHeads() {
   const loader = inst.loader === "any"
     ? "vanilla" : (LOADER_LABELS[inst.loader] || inst.loader);
   $("#mods-sub").textContent = mods.kind === "modpack"
-    ? `Modrinth · ${meta.plural} · ${target}${loaderPart}`
-    : `Modrinth · ${meta.plural} · ${target}${loaderPart} · ${inst.name}`;
+    ? `${source} · ${meta.plural} · ${target}${loaderPart}`
+    : `${source} · ${meta.plural} · ${target}${loaderPart} · ${inst.name}`;
   $("#loaders-sub").textContent =
     `${inst.name} · Minecraft ${inst.base} · currently ${loader === "vanilla" ? inst.version : loader}`;
 }

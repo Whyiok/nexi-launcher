@@ -7,6 +7,7 @@ import zlib
 from pathlib import Path
 
 from .config import ELY_SKIN_TEXTURE_URL, USER_AGENT
+from .net import open_url
 
 
 def _skin_dimensions(data: bytes):
@@ -142,7 +143,7 @@ def _upload_skin(url, token, fields, skin, method="POST"):
     request.add_header(
         "Content-Type", f"multipart/form-data; boundary={boundary}")
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with open_url(request, timeout=60) as response:
             response.read()
             return response.status
     except urllib.error.HTTPError as exc:
@@ -174,7 +175,7 @@ def _ely_skin_png(account):
     def fetch(url, limit):
         request = urllib.request.Request(
             url, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(request, timeout=6) as response:
+        with open_url(request, timeout=6) as response:
             return response.read(limit)
 
     try:

@@ -3,6 +3,8 @@
 import json
 import urllib.request
 
+from .net import open_url
+
 
 MS_SCOPE = "XboxLive.signin offline_access"
 
@@ -72,7 +74,7 @@ def _http_json(url, payload=None, token=None, timeout=60, form=False):
     if token:
         request.add_header("Authorization", "Bearer " + token)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with open_url(request, timeout=timeout) as response:
             body = response.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as exc:
         raw = exc.read().decode("utf-8", "replace")

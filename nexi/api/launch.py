@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from ..ely_auth import ensure_authlib_injector
+from ..game_options import write_game_options
 from ..instances import (instance_game_dir, instance_label,
                          write_instance)
 from ..java_runtime import ensure_java
@@ -23,6 +24,13 @@ def quick_play_supported(version_id: str) -> bool:
     if not match:
         return False
     return (int(match.group(1)), int(match.group(2))) >= (1, 20)
+
+
+# Play time is reported to the Nexi site during the session, so a crash or a
+# force-close loses at most the last few minutes.
+PLAYTIME_SYNC_MINUTES = 5
+PLAYTIME_POLL_SECONDS = 2
+PRESENCE_HEARTBEAT_SECONDS = 60
 
 
 def world_for_quick_play(game_dir, world: str) -> str:
@@ -59,6 +67,84 @@ class LaunchApi:
 
     def _game_running(self):
         return bool(self._running_slugs())
+
+    def _store_playtime(self, slug, seconds):
+        """Add played seconds to the profile so its page can count them."""
+        seconds = int(seconds)
+        if seconds <= 0:
+            return
+        stored = False
+        with self._lock:
+            for instance in self.instances:
+                if instance.get("_slug") != slug:
+                    continue
+                try:
+                    total = int(instance.get("playtime") or 0)
+                except (TypeError, ValueError):
+                    total = 0
+                instance["playtime"] = max(0, total) + seconds
+                write_instance(instance["_root"], instance)
+                stored = True
+                break
+        if stored:
+            self._event("refresh")
+
+    def _track_playtime(self, process, slug):
+        """While the game runs, send played minutes and presence to the site."""
+        started = time.monotonic()
+        sent = 0
+        stored = 0
+        last_presence = started
+        presence_warned = not self._sync_presence(True, slug)
+        while process.poll() is None:
+            time.sleep(PLAYTIME_POLL_SECONDS)
+            now = time.monotonic()
+            if now - last_presence >= PRESENCE_HEARTBEAT_SECONDS:
+                last_presence = now
+                if not self._sync_presence(True, slug, quiet=presence_warned):
+                    presence_warned = True
+            elapsed = int(now - started)
+            # The page counter updates once a minute instead of on every poll.
+            if elapsed - stored >= 60:
+                self._store_playtime(slug, elapsed - stored)
+                stored = elapsed
+            played = elapsed // 60
+            if played - sent >= PLAYTIME_SYNC_MINUTES:
+                self._sync_playtime(played - sent, slug)
+                sent = played
+        elapsed = int(time.monotonic() - started)
+        if elapsed > stored:
+            self._store_playtime(slug, elapsed - stored)
+        played = elapsed // 60
+        if played > sent:
+            self._sync_playtime(played - sent, slug)
+        self._sync_presence(False, slug, quiet=True)
+
+    def _sync_presence(self, online, slug, quiet=False):
+        try:
+            result = self.nexi_send_presence(online)
+        except Exception as exc:
+            if not quiet:
+                log.warning("Presence update failed: %s", exc)
+            return False
+        if not result.get("ok"):
+            if not quiet:
+                log.info("Presence not updated for %r: %s", slug,
+                         result.get("error"))
+            return False
+        return True
+
+    def _sync_playtime(self, minutes, slug):
+        if minutes <= 0:
+            return
+        try:
+            result = self.nexi_send_playtime(minutes)
+        except Exception as exc:
+            log.warning("Play time sync failed: %s", exc)
+            return
+        if not result.get("ok"):
+            log.info("Play time not synced for %r: %s", slug,
+                     result.get("error"))
 
     def _kill_game(self, process):
         try:
@@ -157,6 +243,26 @@ class LaunchApi:
         # Settings is used. A pinned account that was removed falls back too.
         account = (self._account_by_id(instance.get("account", ""))
                    or self._active_account())
+        # A Nexi site account carries the Minecraft identity linked to it.
+        # When that identity is a local Microsoft/Ely.by account, sign in with
+        # that account; otherwise start offline with the linked nickname.
+        nexi_offline_name = ""
+        nexi_linked_type = ""
+        if account is not None and account["type"] == "nexi":
+            mc = account.get("mc")
+            mc = mc if isinstance(mc, dict) else {}
+            mc_type = str(mc.get("type") or "offline").strip().lower()
+            mc_name = str(mc.get("name") or account.get("name")
+                          or "").strip()[:16] or "Player"
+            linked = None
+            if mc_type in ("microsoft", "ely") and mc.get("uuid"):
+                linked = self._account_for_profile(
+                    mc_type, str(mc.get("uuid")))
+            if linked is not None:
+                account = linked
+            else:
+                nexi_offline_name = mc_name
+                nexi_linked_type = mc_type
         auth = None
         if account is not None and account["type"] == "microsoft":
             token = self._ms_refresh(account)
@@ -182,11 +288,21 @@ class LaunchApi:
                     "token": token, "xuid": "", "kind": "ely"}
             player = auth["name"]
         else:
-            player = (account["name"] if account is not None
-                      else self.player).strip() or "Player"
-            if account is None:
-                self.player = player
-                self._save()
+            if nexi_offline_name:
+                player = nexi_offline_name
+                if nexi_linked_type in ("microsoft", "ely"):
+                    label = {"microsoft": "Microsoft",
+                             "ely": "Ely.by"}[nexi_linked_type]
+                    self._game_line(
+                        f"Nexi account is linked to a {label} account that is "
+                        f"not signed in to this launcher — starting offline "
+                        f"as {player}.")
+            else:
+                player = (account["name"] if account is not None
+                          else self.player).strip() or "Player"
+                if account is None:
+                    self.player = player
+                    self._save()
         self._launching.add(slug)
         self._event("play", ok=True, starting=True, slug=slug,
                     message="Starting…")
@@ -214,6 +330,15 @@ class LaunchApi:
                 raise RuntimeError(f"Java is not available: {exc}") from exc
             game_dir = instance_game_dir(instance["_root"])
             game_dir.mkdir(parents=True, exist_ok=True)
+            # Per-profile defaults (GUI scale, FOV, …) go into options.txt
+            # before the game starts; other options are left untouched.
+            if isinstance(instance.get("game_defaults"), dict):
+                try:
+                    write_game_options(game_dir, instance["game_defaults"])
+                    self._game_line(
+                        "Game defaults written to options.txt.")
+                except OSError as exc:
+                    log.warning("Could not write options.txt: %s", exc)
             if auth and auth.get("kind") == "ely":
                 auth["authlib"] = str(ensure_authlib_injector())
             # Home's recent worlds launch straight into a save when the
@@ -277,6 +402,8 @@ class LaunchApi:
         with self._game_lock:
             self._game_processes[slug] = process
         threading.Thread(target=self._watch_game, args=(process, slug),
+                         daemon=True).start()
+        threading.Thread(target=self._track_playtime, args=(process, slug),
                          daemon=True).start()
         self._launching.discard(slug)
         message = f'{instance.get("name", "Minecraft")} is running.'

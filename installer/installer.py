@@ -45,6 +45,8 @@ EXE_NAME = "nexi.exe"
 UNINSTALLER_NAME = "Uninstall.exe"
 UNINSTALL_KEY = (r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
                  r"\NexiLauncher")
+# nexi://link?token=... is opened by the site when an account is linked.
+PROTOCOL_KEY = r"Software\Classes\nexi"
 WEBVIEW2_GUID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 WEBVIEW2_URL = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
 
@@ -219,12 +221,34 @@ def write_registry(target: Path) -> None:
         for name, kind, value in values:
             winreg.SetValueEx(key, name, 0, kind, value)
 
+    # The site opens nexi://link?token=... to hand a link request to the app.
+    try:
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, PROTOCOL_KEY, 0,
+                                winreg.KEY_WRITE) as key:
+            winreg.SetValueEx(key, "", 0, winreg.REG_SZ,
+                              "URL:Nexi Launcher protocol")
+            winreg.SetValueEx(key, "URL Protocol", 0, winreg.REG_SZ, "")
+            with winreg.CreateKeyEx(key, r"shell\open\command", 0,
+                                    winreg.KEY_WRITE) as command:
+                winreg.SetValueEx(command, "", 0, winreg.REG_SZ,
+                                  f'"{target / EXE_NAME}" "%1"')
+    except OSError as exc:
+        log(f"could not register the nexi:// protocol: {exc}")
+
 
 def remove_registry() -> None:
-    try:
-        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY)
-    except FileNotFoundError:
-        pass
+    keys = (PROTOCOL_KEY + r"\shell\open\command",
+            PROTOCOL_KEY + r"\shell\open",
+            PROTOCOL_KEY + r"\shell",
+            PROTOCOL_KEY,
+            UNINSTALL_KEY)
+    for path in keys:
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, path)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            log(f"could not remove registry key {path}: {exc}")
 
 
 # -------------------------------------------------------------------- shortcuts

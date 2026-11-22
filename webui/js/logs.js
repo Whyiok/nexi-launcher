@@ -56,6 +56,7 @@ function clearLogsView(state = logs) {
 async function openLogs() {
   stopLogsTimer();
   clearLogsView(logs);
+  logs.stick = true;
   const result = await call("logs_open");
   const sub = $("#logs-sub");
   sub.dataset.path = result.path || "";

@@ -8,6 +8,8 @@ from pathlib import Path
 from . import config
 from .api import LauncherApi
 from .logging_setup import log, setup_logging
+from .protocol import (LinkServer, forward_link, link_uri_from_args,
+                       register_protocol)
 
 
 def webui_path() -> Path:
@@ -26,6 +28,9 @@ def main():
 
     setup_logging()
     log.info("main: starting")
+    # The site opens nexi://link?token=... when an account is linked; keep the
+    # handler pointing at this exe (it may have moved after an update).
+    register_protocol()
     try:
         import webview
     except Exception:
@@ -33,18 +38,41 @@ def main():
         raise
 
     api = LauncherApi()
+    link_uri = link_uri_from_args(sys.argv[1:])
     page = webui_path()
     log.info("main: webui=%s exists=%s", page, page.is_file())
     window = webview.create_window(
         "Nexi Launcher", str(page), js_api=api,
         width=1180, height=780, min_size=(1000, 690),
-        background_color="#0a0a0a",
+        background_color="#030405",
         # The page draws its own title bar (logo, minimize, close); the
         # native frame would show a second one above it. easy_drag stays off so
         # only the .pywebview-drag-region strips move the window.
         frameless=True, easy_drag=False,
     )
     window.events.closing += api.on_close
+
+    def open_link(uri, activate):
+        # Called from the link server thread (or at startup with the URL
+        # Windows passed to this very process).
+        if activate:
+            try:
+                api.window_activate()
+            except Exception:
+                log.exception("main: could not activate the window")
+        if uri:
+            threading.Thread(target=api.nexi_handle_link, args=(uri,),
+                             name="nexi-link", daemon=True).start()
+
+    server = LinkServer(lambda uri: open_link(uri, True))
+    if not server.start():
+        # Another launcher is already running — hand it the link and leave.
+        if forward_link(link_uri):
+            log.info("main: nexi link forwarded to the running launcher")
+            return
+        log.warning("main: link port is busy but nobody answered")
+    if link_uri:
+        open_link(link_uri, False)
 
     def start_bypass():
         # Runs in its own thread: the UAC prompt must not block the window.

@@ -13,6 +13,7 @@ from pathlib import Path
 from .config import APP_NAME, DATA_DIR
 from .logging_setup import log
 from .ms_auth import MSRequestError, _http_json
+from .net import open_url
 
 
 ELY_AUTH_URL = "https://authserver.ely.by/auth/authenticate"
@@ -197,7 +198,7 @@ def ensure_authlib_injector() -> Path:
         AUTHLIB_URL, headers={"User-Agent": f"{APP_NAME}/1"})
     temp = target.with_name(target.name + ".part")
     try:
-        with urllib.request.urlopen(request, timeout=120) as response, \
+        with open_url(request, timeout=120) as response, \
                 open(temp, "wb") as handle:
             shutil.copyfileobj(response, handle)
         if temp.stat().st_size < 200_000:

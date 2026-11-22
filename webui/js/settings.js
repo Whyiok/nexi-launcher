@@ -1,20 +1,129 @@
 "use strict";
 
+/* ------------------------------------------------------ settings sections */
+
+let settingsTab = "account";
+/* The Logs section keeps its own small rail for each log source. */
+let logsTab = "launcher";
+
+function setSettingsTab(name, instant = false) {
+  const bar = $("#settings-tabs");
+  if (!bar) return;
+  const tabs = [...bar.querySelectorAll(":scope > [data-settings-tab]")];
+  const names = tabs.map((tab) => tab.dataset.settingsTab);
+  const target = names.includes(name) ? name : (names[0] || "account");
+  settingsTab = target;
+  for (const tab of tabs) {
+    const on = tab.dataset.settingsTab === target;
+    tab.classList.toggle("on", on);
+    tab.setAttribute("aria-selected", on ? "true" : "false");
+    tab.tabIndex = on ? 0 : -1;
+  }
+  $$(".settings-pane").forEach((pane) => {
+    pane.classList.toggle("active", pane.dataset.settingsPane === target);
+  });
+  updateSegFill(bar, instant);
+  // Logs only tail while their own section is on screen.
+  if (typeof stopLogsTimer === "function" && target !== "logs") {
+    stopLogsTimer();
+  }
+  if (screen === "settings" && target === "logs"
+      && typeof openLogs === "function") {
+    openLogs();
+  }
+  // The skin editor lives in the Accounts pane: it only animates and loads
+  // while that pane is actually visible.
+  if (typeof stopSkinView === "function"
+      && (screen !== "settings" || target !== "account")) {
+    stopSkinView();
+  }
+  if (screen === "settings" && target === "account"
+      && typeof loadSkin === "function") {
+    loadSkin();
+  }
+}
+
+function setLogsTab(name, instant = false) {
+  const bar = $("#logs-tabs");
+  if (!bar) return;
+  const tabs = [...bar.querySelectorAll(":scope > [data-logs-tab]")];
+  const names = tabs.map((tab) => tab.dataset.logsTab);
+  const target = names.includes(name) ? name : (names[0] || "launcher");
+  logsTab = target;
+  for (const tab of tabs) {
+    const on = tab.dataset.logsTab === target;
+    tab.classList.toggle("on", on);
+    tab.setAttribute("aria-selected", on ? "true" : "false");
+    tab.tabIndex = on ? 0 : -1;
+  }
+  $$(".logs-pane").forEach((pane) => {
+    pane.classList.toggle("active", pane.dataset.logsPane === target);
+  });
+  updateSegFill(bar, instant);
+  if (target === "launcher" && screen === "settings" && settingsTab === "logs"
+      && typeof openLogs === "function") {
+    openLogs();
+  } else if (typeof stopLogsTimer === "function") {
+    stopLogsTimer();
+  }
+  if (target === "network") {
+    const netConsole = $("#net-console");
+    if (netConsole) netConsole.scrollTop = netConsole.scrollHeight;
+  }
+}
+
+function bindLogsTabs() {
+  const bar = $("#logs-tabs");
+  if (!bar || bar.dataset.ready === "1") return;
+  bar.dataset.ready = "1";
+  bar.addEventListener("click", (event) => {
+    const tab = event.target.closest("[data-logs-tab]");
+    if (!tab || tab.parentElement !== bar) return;
+    setLogsTab(tab.dataset.logsTab);
+  });
+  bar.addEventListener("keydown", (event) => {
+    const forward = event.key === "ArrowRight" || event.key === "ArrowDown";
+    const backward = event.key === "ArrowLeft" || event.key === "ArrowUp";
+    if (!forward && !backward) return;
+    const tabs = [...bar.querySelectorAll(":scope > [data-logs-tab]")];
+    const index = tabs.findIndex((tab) => tab.dataset.logsTab === logsTab);
+    const step = forward ? 1 : -1;
+    const next = tabs[(index + step + tabs.length) % tabs.length];
+    if (!next) return;
+    event.preventDefault();
+    setLogsTab(next.dataset.logsTab);
+    next.focus();
+  });
+}
+
+function bindSettingsTabs() {
+  const bar = $("#settings-tabs");
+  if (!bar || bar.dataset.ready === "1") return;
+  bar.dataset.ready = "1";
+  bar.addEventListener("click", (event) => {
+    const tab = event.target.closest("[data-settings-tab]");
+    if (!tab || tab.parentElement !== bar) return;
+    setSettingsTab(tab.dataset.settingsTab);
+  });
+  bar.addEventListener("keydown", (event) => {
+    const forward = event.key === "ArrowDown" || event.key === "ArrowRight";
+    const backward = event.key === "ArrowUp" || event.key === "ArrowLeft";
+    if (!forward && !backward) return;
+    const tabs = [...bar.querySelectorAll(":scope > [data-settings-tab]")];
+    const index = tabs.findIndex(
+      (tab) => tab.dataset.settingsTab === settingsTab);
+    const step = forward ? 1 : -1;
+    const next = tabs[(index + step + tabs.length) % tabs.length];
+    if (!next) return;
+    event.preventDefault();
+    setSettingsTab(next.dataset.settingsTab);
+    next.focus();
+  });
+}
+
 /* -------------------------------------------------------------- settings */
 
 function fillSettings() {
-  $("#default-ram-value").textContent = `${S.default_ram} GB`;
-
-  const hasProfile = !!S.instance;
-  $("#ram-value").textContent = hasProfile ? `${S.ram} GB` : "—";
-  $("#ram-down").disabled = !hasProfile;
-  $("#ram-up").disabled = !hasProfile;
-  $("#ram-profile-name").textContent = hasProfile
-    ? `Memory for “${S.instance.name}”` : "Memory for this profile";
-  $("#ram-profile-hint").textContent = hasProfile
-    ? "Used when this profile starts the game."
-    : "Select a profile to change its memory.";
-
   const javaInput = $("#java-path");
   if (document.activeElement !== javaInput) javaInput.value = S.java || "";
   $("#btn-auto-java").disabled = !S.java;
@@ -29,9 +138,11 @@ function fillSettings() {
   fillAccount();
   fillTheme();
   fillBackground();
+  fillGameDefaults();
   fillZapret();
   if (typeof fillUpdate === "function") fillUpdate();
   if (typeof renderMirrorMode === "function") renderMirrorMode();
+  if (typeof renderNetworkSettings === "function") renderNetworkSettings();
 }
 
 function fillBackground() {
@@ -68,8 +179,15 @@ function fillTheme() {
     button.setAttribute("aria-checked",
                         button.dataset.langOption === language ? "true" : "false");
   });
+  const pet = PET_OPTIONS.includes(S.pet) ? S.pet : "axi";
+  $$("#pet-seg [data-pet-option]").forEach((button) => {
+    const on = button.dataset.petOption === pet;
+    button.classList.toggle("on", on);
+    button.setAttribute("aria-checked", on ? "true" : "false");
+  });
   updateSegFill($("#mode-seg"));
   updateSegFill($("#lang-seg"));
+  updateSegFill($("#pet-seg"));
 }
 
 function accountAvatar(account) {
@@ -108,18 +226,74 @@ function accountAvatar(account) {
   return avatar;
 }
 
+function siteSkinNode(type, name, uuid) {
+  const holder = document.createElement("span");
+  holder.className = "site-skin";
+  const initial = (name || "?").slice(0, 1).toUpperCase();
+  holder.textContent = initial;
+  if (type === "microsoft" && /^[0-9a-f]{32}$/i.test(uuid || "")) {
+    const img = document.createElement("img");
+    img.alt = "";
+    img.referrerPolicy = "no-referrer";
+    img.src = `https://mc-heads.net/avatar/${uuid}/64`;
+    img.addEventListener("error", () => {
+      img.remove();
+      holder.textContent = initial;
+    });
+    holder.replaceChildren(img);
+  } else if (type === "ely" && name) {
+    const url = "https://skinsystem.ely.by/skins/"
+      + encodeURIComponent(name) + ".png";
+    const probe = new Image();
+    probe.addEventListener("load", () => {
+      if (!holder.isConnected) return;
+      const head = document.createElement("div");
+      head.className = "skin-head";
+      head.style.backgroundImage = `url("${url}")`;
+      holder.replaceChildren(head);
+    });
+    probe.src = url;
+  }
+  return holder;
+}
+
+function renderSiteButton() {
+  const button = $("#btn-site-profile");
+  if (!button) return;
+  const accounts = S.accounts || [];
+  const nexi = accounts.find((account) => account.type === "nexi") || null;
+  const active = accounts.find((account) => account.active)
+    || accounts.find((account) => account.id === S.active_account) || null;
+  const linked = (nexi && nexi.mc) || {};
+  const linkedSkin = (linked.type === "microsoft"
+    && /^[0-9a-f]{32}$/i.test(linked.uuid || ""))
+    || (linked.type === "ely" && !!linked.name);
+  const source = linkedSkin ? linked : (active || {});
+  const type = source.type || "offline";
+  const uuid = source.uuid || "";
+  let name = source.name || "";
+  if (!name && nexi) name = nexi.name;
+  button.replaceChildren(siteSkinNode(type, name, uuid));
+  const title = nexi
+    ? "Open your profile on the Nexi site"
+    : "Sign in with Nexi to open your site profile";
+  button.title = title;
+  button.setAttribute("aria-label", title);
+}
+
 function renderAccountList(accounts) {
   const list = $("#account-list");
   if (!list) return;
   list.replaceChildren();
-  if (!accounts.length) {
+  const gameAccounts = accounts.filter((account) => account.type !== "nexi");
+  if (!gameAccounts.length) {
     const empty = document.createElement("p");
     empty.className = "hint";
     empty.textContent = "No accounts yet — add one below.";
     list.appendChild(empty);
     return;
   }
-  for (const account of accounts) {
+  for (const account of gameAccounts) {
     const row = document.createElement("div");
     row.className = "account-item" + (account.active ? " on" : "");
     row.dataset.accountId = account.id;
@@ -135,9 +309,16 @@ function renderAccountList(accounts) {
     name.textContent = account.name;
     const hint = document.createElement("span");
     hint.className = "hint";
-    hint.textContent = account.type === "microsoft"
-      ? "Microsoft account"
-      : account.type === "ely" ? "Ely.by account" : "Offline account";
+    if (account.type === "nexi") {
+      const mcName = account.mc && account.mc.name;
+      hint.textContent = "Nexi account"
+        + (account.handle ? ` · ${account.handle}` : "")
+        + (mcName ? ` · MC: ${mcName}` : "");
+    } else {
+      hint.textContent = account.type === "microsoft"
+        ? "Microsoft account"
+        : account.type === "ely" ? "Ely.by account" : "Offline account";
+    }
     text.append(name, hint);
     row.appendChild(text);
     if (account.active) {
@@ -168,7 +349,8 @@ function fillAccount() {
   const ms = S.ms || {};
   const ely = S.ely || {};
   const accounts = S.accounts || [];
-  const activeAccount = accounts.find((account) => account.active) || null;
+  const gameAccounts = accounts.filter((account) => account.type !== "nexi");
+  const activeAccount = gameAccounts.find((account) => account.active) || null;
   const provider = activeAccount ? activeAccount.type : "offline";
 
   const input = $("#ms-client-id");
@@ -183,6 +365,25 @@ function fillAccount() {
       : provider === "ely" ? "ely.by" : "offline";
 
   renderAccountList(accounts);
+
+  const nexiAccount = accounts.find((account) => account.type === "nexi")
+    || null;
+  const nexiStatus = $("#nexi-status");
+  if (nexiStatus) {
+    nexiStatus.textContent = nexiAccount ? "signed in" : "not signed in";
+  }
+  const showNexiProfile = !!nexiAccount && !nexiFlow.active;
+  $("#nexi-signed-out").classList.toggle(
+    "hidden", !!nexiAccount || nexiFlow.active);
+  $("#nexi-signin").classList.toggle(
+    "hidden", !!nexiAccount || nexiFlow.active);
+  $("#nexi-code-box").classList.toggle("hidden", !nexiFlow.active);
+  $("#nexi-profile").classList.toggle("hidden", !showNexiProfile);
+  if (showNexiProfile) fillNexiProfile(nexiAccount);
+  const baseUrl = $("#nexi-base-url");
+  if (baseUrl && document.activeElement !== baseUrl) {
+    baseUrl.value = (S.nexi && S.nexi.base_url) || "";
+  }
 
   $("#account-signed-out").classList.toggle("hidden", msFlow.active);
   $("#ms-code").classList.toggle("hidden", !msFlow.active);
@@ -231,7 +432,30 @@ function fillAccount() {
       + "application” (PKCE, no secret). A “Website” app also works — then "
       + "paste its Client Secret too. Enter them here once; everyone using "
       + "this copy of the launcher can then sign in with the button above.";
+  renderSiteButton();
   updateSegFill($("#account-methods"));
+}
+
+function fillNexiProfile(account) {
+  const mc = account.mc || {};
+  $("#nexi-avatar").textContent =
+    (account.name || "?").slice(0, 1).toUpperCase();
+  $("#nexi-name").textContent = account.name || "Nexi account";
+  const handle = [];
+  if (account.handle) handle.push(account.handle);
+  if (account.nexi_id) handle.push(`Nexi ID: ${account.nexi_id}`);
+  $("#nexi-handle").textContent = handle.join(" · ") || "—";
+
+  $("#nexi-mc-name").textContent = mc.name || "—";
+  const mcHint = [mc.label || "Offline", mc.custom ? "linked" : "default"];
+  if (mc.uuid) mcHint.push(mc.uuid);
+  $("#nexi-mc-hint").textContent = mcHint.join(" · ");
+
+  const linkBtn = $("#btn-nexi-link-mc");
+  const unlinkBtn = $("#btn-nexi-unlink-mc");
+  const linked = !!mc.custom;
+  linkBtn.textContent = linked ? "Change linked account" : "Link account";
+  unlinkBtn.classList.toggle("hidden", !linked);
 }
 
 function setAccountMethod(method) {
@@ -239,6 +463,245 @@ function setAccountMethod(method) {
   accountMethod = method;
   fillAccount();
   if (method === "ely") $("#ely-username").focus();
+}
+
+async function nexiLogin() {
+  const login = $("#nexi-login").value.trim();
+  const password = $("#nexi-password").value;
+  if (!login || !password) {
+    setStatus("Enter your Nexi ID and password.", true);
+    return;
+  }
+  const button = $("#btn-nexi-login");
+  button.disabled = true;
+  setStatus("Sending the sign-in code…");
+  const result = await call("nexi_login", login, password);
+  button.disabled = false;
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Nexi sign-in failed.", true);
+    return;
+  }
+  nexiFlow.active = true;
+  nexiFlow.login = login;
+  nexiFlow.email = result.email || "";
+  $("#nexi-password").value = "";
+  $("#nexi-code").value = "";
+  $("#nexi-code-hint").textContent = nexiFlow.email
+    ? `We sent a 6-digit code to ${nexiFlow.email}. It is valid for 15 minutes.`
+    : "We sent a 6-digit code to the e-mail on the account.";
+  fillAccount();
+  $("#nexi-code").focus();
+  setStatus("Enter the code from the e-mail.");
+}
+
+async function nexiVerify() {
+  const code = $("#nexi-code").value.trim();
+  if (!code) {
+    setStatus("Enter the 6-digit code from the e-mail.", true);
+    return;
+  }
+  const button = $("#btn-nexi-verify");
+  button.disabled = true;
+  const result = await call("nexi_verify", code, nexiFlow.login || "");
+  button.disabled = false;
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not confirm the code.", true);
+    return;
+  }
+  nexiFlow.active = false;
+  nexiFlow.login = "";
+  nexiFlow.email = "";
+  $("#nexi-code").value = "";
+  if (result.state) applyState(result.state);
+  else fillAccount();
+  setStatus(`Signed in as ${result.name || "your Nexi account"}.`);
+}
+
+async function nexiCancel() {
+  await call("nexi_cancel_login");
+  nexiFlow.active = false;
+  nexiFlow.login = "";
+  nexiFlow.email = "";
+  $("#nexi-code").value = "";
+  fillAccount();
+  setStatus("Nexi sign-in cancelled.");
+}
+
+async function nexiLogout() {
+  const result = await call("nexi_logout");
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not sign out of Nexi.", true);
+    return;
+  }
+  nexiFlow.active = false;
+  nexiFlow.login = "";
+  nexiFlow.email = "";
+  if (result.state) applyState(result.state);
+  setStatus("Signed out of Nexi.");
+}
+
+async function nexiRefresh() {
+  const result = await call("nexi_profile");
+  if (!result || !result.ok) {
+    setStatus((result && result.error)
+      || "Could not refresh the Nexi profile.", true);
+    if (result && result.state) applyState(result.state);
+    return;
+  }
+  if (result.state) applyState(result.state);
+  setStatus("Nexi profile refreshed.");
+}
+
+async function nexiLinkMc() {
+  const result = await call("nexi_link_start");
+  if (!result || !result.ok) {
+    setStatus((result && result.error)
+      || "Could not start linking the Minecraft account.", true);
+    if (result && result.state) applyState(result.state);
+    return;
+  }
+  if (result.state) applyState(result.state);
+  setStatus("Choose an account in the launcher window.");
+}
+
+/* The site opened nexi://link?token=... or the launcher asked the site for a
+   link: offer the accounts that are actually signed in here. */
+const nexiLink = { token: "", busy: false, selected: "" };
+
+function nexiLinkStatus(text, error = false) {
+  const node = $("#nexi-link-status");
+  if (!node) return;
+  node.textContent = text || "";
+  node.classList.toggle("hidden", !text);
+  node.classList.toggle("error", !!error);
+}
+
+function nexiLinkAccountType(account) {
+  return account.type === "microsoft" ? "Microsoft" : "Ely.by";
+}
+
+function syncNexiLinkButtons() {
+  const confirm = $("#btn-nexi-link-confirm");
+  if (!confirm) return;
+  const rows = $$("#nexi-link-accounts .nexi-link-account").length;
+  confirm.disabled = nexiLink.busy || !rows || !nexiLink.selected;
+}
+
+function renderNexiLinkAccounts(accounts) {
+  const box = $("#nexi-link-accounts");
+  if (!box) return;
+  box.replaceChildren();
+  if (!accounts.length) {
+    const empty = document.createElement("p");
+    empty.className = "nexi-link-empty";
+    empty.textContent = "No Microsoft or Ely.by account is signed in here. "
+      + "Sign in under Settings → Accounts, then start the link again.";
+    box.appendChild(empty);
+    return;
+  }
+  for (const account of accounts) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "nexi-link-account"
+      + (account.id === nexiLink.selected ? " on" : "");
+    row.dataset.accountId = account.id;
+    row.appendChild(accountAvatar(account));
+    const main = document.createElement("span");
+    main.className = "nexi-link-account-main";
+    const name = document.createElement("span");
+    name.className = "nexi-link-account-name";
+    name.textContent = account.name || "Player";
+    const type = document.createElement("span");
+    type.className = "nexi-link-account-type";
+    type.textContent = nexiLinkAccountType(account);
+    main.append(name, type);
+    row.appendChild(main);
+    row.addEventListener("click", () => {
+      nexiLink.selected = account.id;
+      renderNexiLinkAccounts(accounts);
+      nexiLinkStatus("");
+      syncNexiLinkButtons();
+    });
+    box.appendChild(row);
+  }
+}
+
+function showNexiLinkPrompt(ev) {
+  const modal = $("#nexi-link-modal");
+  if (!modal) return;
+  const accounts = Array.isArray(ev.accounts) ? ev.accounts : [];
+  nexiLink.token = String(ev.token || "");
+  nexiLink.busy = false;
+  nexiLink.selected = (accounts.find((account) => account.active)
+    || accounts[0] || {}).id || "";
+  const text = $("#nexi-link-text");
+  if (text) {
+    const who = String(ev.display_name || "Nexi ID");
+    const handle = ev.handle ? ` (${ev.handle})` : "";
+    text.textContent = `Link a Minecraft account to Nexi ID ${who}${handle}? `
+      + "Choose the account you are signed in with — it will be saved on "
+      + "the site.";
+  }
+  renderNexiLinkAccounts(accounts);
+  nexiLinkStatus("");
+  syncNexiLinkButtons();
+  document.body.classList.add("mirror-open");
+  modal.classList.remove("hidden");
+  const confirm = $("#btn-nexi-link-confirm");
+  if (confirm && !confirm.disabled) confirm.focus();
+}
+
+function closeNexiLinkPrompt() {
+  const modal = $("#nexi-link-modal");
+  if (modal) modal.classList.add("hidden");
+  document.body.classList.remove("mirror-open");
+  nexiLink.token = "";
+  nexiLink.selected = "";
+  nexiLink.busy = false;
+  nexiLinkStatus("");
+}
+
+async function nexiLinkConfirm() {
+  if (nexiLink.busy || !nexiLink.token || !nexiLink.selected) return;
+  nexiLink.busy = true;
+  syncNexiLinkButtons();
+  nexiLinkStatus("Linking…");
+  const result = await call("nexi_link_account", nexiLink.token,
+    nexiLink.selected);
+  nexiLink.busy = false;
+  if (!result || !result.ok) {
+    nexiLinkStatus((result && result.error)
+      || "Could not link the Minecraft account.", true);
+    syncNexiLinkButtons();
+    if (result && result.state) applyState(result.state);
+    return;
+  }
+  if (result.state) applyState(result.state);
+  closeNexiLinkPrompt();
+  setStatus(result.message || "Minecraft account linked.");
+}
+
+async function nexiUnlinkMc() {
+  const result = await call("nexi_unlink_minecraft");
+  if (!result || !result.ok) {
+    setStatus((result && result.error)
+      || "Could not unlink the Minecraft account.", true);
+    return;
+  }
+  if (result.state) applyState(result.state);
+  setStatus(result.message || "Minecraft link removed.");
+}
+
+async function saveNexiBaseUrl() {
+  const value = $("#nexi-base-url").value.trim();
+  const result = await call("set_nexi_base_url", value);
+  if (!result || !result.ok) {
+    setStatus((result && result.error)
+      || "Could not save the Nexi site address.", true);
+    return;
+  }
+  if (result.state) applyState(result.state);
+  setStatus("Nexi site address saved.");
 }
 
 async function elyLogin() {
@@ -421,6 +884,14 @@ function accountDragEnd() {
   const list = $("#account-list");
   if (!list) return;
   const ids = $$(".account-item", list).map((item) => item.dataset.accountId);
+  // The Nexi site account is not shown in the game list; keep it at the
+  // position it had so the backend receives the full account order.
+  const all = S.accounts || [];
+  for (const account of all) {
+    if (account.type !== "nexi") continue;
+    const pos = Math.min(all.indexOf(account), ids.length);
+    ids.splice(pos, 0, account.id);
+  }
   row.style.transition = "transform .18s var(--ease)";
   row.style.transform = "translateY(0)";
   setTimeout(() => {
@@ -484,6 +955,20 @@ async function changeLanguage(language) {
   setStatus(`Language: ${language === "ru" ? "Русский" : "English"}.`);
 }
 
+async function changePet(kind) {
+  if (!PET_OPTIONS.includes(kind)) return;
+  applyPet(kind);
+  const result = await call("set_pet", kind);
+  if (!result || !result.ok) {
+    setStatus((result && result.error)
+      || "Could not save the companion.", true);
+    if (result && result.state) applyState(result.state);
+    return;
+  }
+  if (result.state) applyState(result.state);
+  setStatus(`Companion: ${(PETS[kind] && PETS[kind].label) || kind}.`);
+}
+
 async function pickBackground() {
   if (S.busy) return;
   const result = await call("background_pick");
@@ -521,6 +1006,14 @@ async function removeAccount(accountId) {
   }
   msFlow.active = false;
   elyFlow.active = false;
+  if (account && account.type === "nexi") {
+    nexiFlow.active = false;
+    nexiFlow.login = "";
+    nexiFlow.email = "";
+  }
+  if (nexiLink.token && nexiLink.selected === accountId) {
+    closeNexiLinkPrompt();
+  }
   if (result.state) applyState(result.state);
   setStatus(account ? `Removed ${account.name}.` : "Account removed.");
 }
@@ -592,11 +1085,121 @@ async function msCancel() {
   setStatus("Microsoft sign-in cancelled.");
 }
 
-async function changeDefaultRam(delta) {
-  const value = Math.max(1, Math.min(16, Number(S.default_ram) + delta));
-  if (value === S.default_ram) return;
-  const result = await call("set_default_ram", value);
+/* ---------------------------------------------- per-profile game defaults */
+
+const GAME_DEFAULTS = {
+  gui_scale: 0, fov: 70, render_distance: 12,
+  brightness: 50, particles: 0, fps_limit: 260,
+};
+
+function normalizeGameDefaults(values) {
+  const data = { ...GAME_DEFAULTS };
+  if (values && typeof values === "object") {
+    for (const key of Object.keys(GAME_DEFAULTS)) {
+      const value = Number(values[key]);
+      if (Number.isFinite(value)) data[key] = Math.round(value);
+    }
+  }
+  return data;
+}
+
+function updateRangeFill(input) {
+  if (!input) return;
+  const min = Number(input.min) || 0;
+  const max = Number(input.max);
+  const value = Number(input.value);
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  input.style.setProperty("--fill", `${Math.max(0, Math.min(100, pct))}%`);
+}
+
+function renderDefaultsValues() {
+  const fov = $("#default-fov");
+  const distance = $("#default-distance");
+  const brightness = $("#default-brightness");
+  for (const input of [fov, distance, brightness]) updateRangeFill(input);
+  if (fov) $("#default-fov-value").textContent = `${fov.value}°`;
+  if (distance) $("#default-distance-value").textContent = distance.value;
+  if (brightness) {
+    $("#default-brightness-value").textContent = `${brightness.value}%`;
+  }
+}
+
+function fillGameDefaults() {
+  const hasProfile = !!S.instance;
+  const values = normalizeGameDefaults(S.instance && S.instance.defaults);
+  const fields = {
+    "#default-gui-scale": values.gui_scale,
+    "#default-particles": values.particles,
+    "#default-fps": values.fps_limit,
+    "#default-fov": values.fov,
+    "#default-distance": values.render_distance,
+    "#default-brightness": values.brightness,
+  };
+  for (const [selector, value] of Object.entries(fields)) {
+    const input = $(selector);
+    if (!input) continue;
+    // Never fight the pointer while a slider is being dragged.
+    if (document.activeElement !== input) input.value = String(value);
+    input.disabled = !hasProfile;
+  }
+  const label = $("#defaults-profile");
+  if (label) {
+    label.textContent = hasProfile ? S.instance.name : "No profile selected";
+  }
+  const apply = $("#btn-apply-defaults");
+  if (apply) apply.disabled = !hasProfile;
+  renderDefaultsValues();
+}
+
+function readGameDefaults() {
+  const value = (selector, fallback) => {
+    const input = $(selector);
+    return input ? input.value : fallback;
+  };
+  return normalizeGameDefaults({
+    gui_scale: value("#default-gui-scale", 0),
+    particles: value("#default-particles", 0),
+    fps_limit: value("#default-fps", 260),
+    fov: value("#default-fov", 70),
+    render_distance: value("#default-distance", 12),
+    brightness: value("#default-brightness", 50),
+  });
+}
+
+let defaultsSaveTimer = 0;
+
+function queueGameDefaultsSave() {
+  if (!S.instance) return;
+  clearTimeout(defaultsSaveTimer);
+  defaultsSaveTimer = setTimeout(saveGameDefaults, 250);
+}
+
+async function saveGameDefaults() {
+  clearTimeout(defaultsSaveTimer);
+  if (!S.instance) return;
+  const slug = S.instance.slug;
+  const result = await call("set_game_defaults", readGameDefaults());
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not save game defaults.",
+              true);
+    return;
+  }
+  // Adopt the saved state only while the same profile is still selected.
+  if (result.state && S.instance && S.instance.slug === slug) {
+    applyState(result.state);
+  }
+}
+
+async function applyGameDefaults() {
+  if (!S.instance) return;
+  const result = await call("apply_game_defaults", readGameDefaults());
+  if (!result || !result.ok) {
+    setStatus((result && result.error)
+      || "Could not write options.txt.", true);
+    return;
+  }
   if (result.state) applyState(result.state);
+  setStatus(result.message || "Game defaults written to options.txt.");
 }
 
 async function applyJavaPath() {

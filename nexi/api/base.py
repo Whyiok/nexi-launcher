@@ -10,10 +10,12 @@ import time
 import uuid
 from pathlib import Path
 
-from .. import config
-from ..config import DATA_DIR, ELY_OAUTH_REDIRECT_DEFAULT, MC, app_dir
+from .. import config, curseforge
+from ..config import (DATA_DIR, ELY_OAUTH_REDIRECT_DEFAULT, MC,
+                      NEXI_BASE_URL_DEFAULT, app_dir)
 from ..logging_setup import log
-from ..net import MIRROR_MODES, set_mirror_mode, set_mirror_notifier
+from ..net import (MIRROR_MODES, normalize_proxy, set_dns, set_mirror_mode,
+                   set_mirror_notifier, set_proxy)
 from ..util import _read_json, open_in_system
 
 
@@ -21,6 +23,7 @@ class BaseApi:
     RAM_MIN = 1
     RAM_MAX = 16
     THEMES = ("mint", "orange", "indigo")
+    PETS = ("axi", "clawd")
 
     def __init__(self):
         self.instances = []
@@ -42,6 +45,17 @@ class BaseApi:
         self.color_mode = mode if mode in ("dark", "light") else "dark"
         language = str(self._saved("language", "en") or "en").strip().lower()
         self.language = language if language in ("en", "ru") else "en"
+        # Nexi site used by the "Nexi" account method. Only the address is a
+        # preference; the account token lives in accounts.json.
+        nexi = self._saved("nexi", {})
+        if not isinstance(nexi, dict):
+            nexi = {}
+        self.nexi_base_url = str(nexi.get("base_url")
+                                 or NEXI_BASE_URL_DEFAULT).strip().rstrip("/")
+        self._nexi_pending = None
+        # Companion shown in the top bar; purely cosmetic.
+        pet = str(self._saved("pet", "axi") or "axi").strip().lower()
+        self.pet = pet if pet in self.PETS else "axi"
         # First-run setup is shown until the user finishes or skips it.
         self._onboarded = bool(self._saved("onboarded", False))
         self.java_path = str(self._saved("java", "") or "")
@@ -62,6 +76,13 @@ class BaseApi:
         mirror = str(self._saved("mirror", "auto") or "auto").strip().lower()
         self.mirror = mirror if mirror in MIRROR_MODES else "auto"
         set_mirror_mode(self.mirror)
+        # Proxy and custom DNS for the launcher's own connections only.
+        try:
+            self.proxy = normalize_proxy(self._saved("proxy", ""))
+        except ValueError:
+            self.proxy = ""
+        set_proxy(self.proxy)
+        self.dns = set_dns(self._saved("dns", ""))
         ms = self._saved("ms", {})
         if not isinstance(ms, dict):
             ms = {}
@@ -70,6 +91,10 @@ class BaseApi:
         # never in settings.json — that file is safe to copy or share.
         stored = self._read_accounts_file()
         self._accounts = self._load_accounts(ms, stored)
+        stored_cf = (stored or {}).get("curseforge")
+        stored_cf = stored_cf if isinstance(stored_cf, dict) else {}
+        self._curseforge_key = str(stored_cf.get("api_key", "") or "").strip()
+        curseforge.set_api_key(self._curseforge_key)
         ids = {account["id"] for account in self._accounts}
         saved_active = str((stored or {}).get("active_account")
                            or self._saved("active_account", "") or "")
@@ -131,9 +156,18 @@ class BaseApi:
         """Log every bridged call: if the UI hangs, the log shows the culprit."""
         for name, func in inspect.getmembers(type(self), inspect.isfunction):
             if name.startswith("_") or name in {
-                    "poll", "log_js", "ely_login", "set_ely_oauth"}:
-                # ely_login receives a password and set_ely_oauth a secret;
-                # never write either to the log.
+                    "poll", "log_js", "ely_login", "set_ely_oauth",
+                    "nexi_login", "nexi_verify", "nexi_handle_link",
+                    "nexi_link_start", "nexi_link_account",
+                    "set_proxy", "set_curseforge_key",
+                    "logs_open", "logs_read", "network_log"}:
+                # ely_login/nexi_login receive a password and set_ely_oauth a
+                # secret; never write any of them to the log. nexi_verify takes
+                # the e-mail code; the nexi_link* calls carry a short-lived
+                # one-time link token. logs_read/network_log are polled every
+                # second: tracing them would grow launcher.log forever with
+                # their own entries (the log panel tails the file, so it would
+                # scroll non-stop).
                 continue
             setattr(self, name, self._make_traced(name, func))
 
@@ -214,6 +248,7 @@ class BaseApi:
                 for account in self._accounts],
             "active_account": self._active_account_id,
             "ely": {"client_secret": self._ely_oauth_secret},
+            "curseforge": {"api_key": self._curseforge_key},
         }
         try:
             path = Path(self._accounts_path())
@@ -285,7 +320,7 @@ class BaseApi:
         if not isinstance(item, dict):
             return None
         kind = str(item.get("type", "") or "")
-        if kind not in ("microsoft", "ely", "offline"):
+        if kind not in ("microsoft", "ely", "offline", "nexi"):
             return None
         name = str(item.get("name", "") or "").strip()[:16]
         account = {
@@ -306,6 +341,25 @@ class BaseApi:
             account["refresh_token"] = str(
                 item.get("refresh_token", "") or "")
             account["kind"] = str(item.get("kind", "") or "")
+        elif kind == "nexi":
+            # Nexi site account: the signed token, the public profile and the
+            # Minecraft identity linked to it on the site.
+            account["token"] = str(item.get("token", "") or "")
+            account["nexi_id"] = str(item.get("nexi_id", "") or "")
+            account["account_name"] = str(
+                item.get("account_name", "") or "")
+            account["username"] = str(item.get("username", "") or "")
+            account["email"] = str(item.get("email", "") or "")
+            mc = item.get("mc")
+            mc = mc if isinstance(mc, dict) else {}
+            account["mc"] = {
+                "type": str(mc.get("type") or "offline").strip().lower(),
+                "label": str(mc.get("label") or ""),
+                "name": str(mc.get("name") or "")[:16],
+                "uuid": str(mc.get("uuid") or "").lower(),
+                "custom": bool(mc.get("custom")),
+                "linked_at": mc.get("linked_at") or None,
+            }
         variant = str(item.get("skin_variant", "") or "")
         if variant in ("classic", "slim"):
             account["skin_variant"] = variant
@@ -372,17 +426,25 @@ class BaseApi:
         return None
 
     def _account_public(self, account):
-        return {
+        public = {
             "id": account["id"],
             "type": account["type"],
             "name": account["name"],
             "uuid": account.get("uuid", ""),
             "active": account["id"] == self._active_account_id,
-            "signed_in": account["type"] == "offline" or bool(
-                account.get("uuid")
-                and (account.get("refresh_token")
-                     or account.get("access_token"))),
+            "signed_in": account["type"] == "offline" or (
+                account["type"] == "nexi" and bool(account.get("token")))
+            or bool(account.get("uuid")
+                    and (account.get("refresh_token")
+                         or account.get("access_token"))),
         }
+        if account["type"] == "nexi":
+            handle_name = (account.get("username") or account.get("nexi_id")
+                           or account.get("account_name") or "")
+            public["nexi_id"] = str(account.get("nexi_id", "") or "")
+            public["handle"] = f"@{handle_name}" if handle_name else ""
+            public["mc"] = dict(account.get("mc") or {})
+        return public
 
     def _account_label(self):
         account = self._active_account()
@@ -392,8 +454,16 @@ class BaseApi:
 
     def _upsert_account(self, account):
         """Store an account and make it active; returns the stored entry."""
-        existing = self._account_for_profile(
-            account["type"], account.get("uuid", ""))
+        if account.get("type") == "nexi":
+            # Two site accounts can share a Minecraft UUID (both may use the
+            # same offline nickname), so match them by their Nexi ID.
+            existing = next(
+                (item for item in self._accounts
+                 if item.get("type") == "nexi"
+                 and item.get("nexi_id") == account.get("nexi_id")), None)
+        else:
+            existing = self._account_for_profile(
+                account["type"], account.get("uuid", ""))
         if existing is not None:
             existing.update(account)
             stored = existing
@@ -413,15 +483,19 @@ class BaseApi:
                 "theme": self.theme,
                 "color_mode": self.color_mode,
                 "language": self.language,
+                "pet": self.pet,
                 "onboarded": bool(self._onboarded),
                 "java": self.java_path,
                 "instance": self.selected_slug,
                 "background": self._background,
                 "mirror": self.mirror,
+                "proxy": self.proxy,
+                "dns": self.dns,
                 "zapret": {"path": self._zapret_path,
                            "preset": self._zapret_preset,
                            "auto": bool(self._zapret_auto)},
                 "ms": {"client_id": self._ms_client_id},
+                "nexi": {"base_url": self.nexi_base_url},
                 "ely": {"oauth": {
                     "client_id": self._ely_oauth_client_id,
                     "redirect_uri": self._ely_oauth_redirect}}}
@@ -475,6 +549,17 @@ class BaseApi:
             self.language = language
             self._save()
         log.info("Language: %s", language)
+        return {"ok": True, "state": self.state()}
+
+    def set_pet(self, pet):
+        pet = str(pet or "").strip().lower()
+        if pet not in self.PETS:
+            return {"ok": False, "error": "Unknown companion.",
+                    "state": self.state()}
+        with self._lock:
+            self.pet = pet
+            self._save()
+        log.info("Companion: %s", pet)
         return {"ok": True, "state": self.state()}
 
     def complete_onboarding(self):

@@ -3,6 +3,7 @@
 from .base import BaseApi
 from .profiles import ProfilesApi
 from .accounts import AccountsApi
+from .nexi import NexiApi
 from .create import CreateApi
 from .mods import ModsApi
 from .content import ContentApi
@@ -21,6 +22,7 @@ class LauncherApi(
     BaseApi,
     ProfilesApi,
     AccountsApi,
+    NexiApi,
     CreateApi,
     ModsApi,
     ContentApi,

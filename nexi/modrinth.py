@@ -4,7 +4,7 @@ import json
 import urllib.request
 
 from .config import MODRINTH_API, USER_AGENT
-from .net import network_event, note_failed_host
+from .net import network_event, note_failed_host, open_url
 
 
 def modrinth_get(path: str, params=None, timeout: float = 45):
@@ -14,7 +14,7 @@ def modrinth_get(path: str, params=None, timeout: float = 45):
     request = urllib.request.Request(
         url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with open_url(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         note_failed_host("api.modrinth.com")
