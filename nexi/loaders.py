@@ -352,6 +352,21 @@ def ensure_launcher_profiles():
         pass
 
 
+class InstallerError(RuntimeError):
+    """Non-zero installer exit; ``transient`` marks network download failures."""
+
+    def __init__(self, code: int, transient: bool = False):
+        super().__init__(f"installer exited with code {code}")
+        self.transient = transient
+
+
+_TRANSIENT_MARKERS = (
+    "sockettimeoutexception", "connect timed out", "connection timed out",
+    "read timed out", "unknownhostexception", "connection reset",
+    "sslhandshakeexception", "failed to download",
+)
+
+
 def run_installer(java: str, installer: Path, log, cancel=None) -> None:
     ensure_launcher_profiles()
     if cancel is not None and cancel.is_set():
@@ -368,6 +383,7 @@ def run_installer(java: str, installer: Path, log, cancel=None) -> None:
         arguments, cwd=str(MC), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
+    transient = False
     stream = process.stdout
     if stream is not None:
         for raw in stream:
@@ -376,10 +392,40 @@ def run_installer(java: str, installer: Path, log, cancel=None) -> None:
                 raise InstallCancelled()
             line = raw.decode("utf-8", "replace").rstrip()
             if line:
+                if not transient:
+                    low = line.lower()
+                    transient = any(m in low for m in _TRANSIENT_MARKERS)
                 log(line)
     code = process.wait()
     if code != 0:
-        raise RuntimeError(f"installer exited with code {code}")
+        raise InstallerError(code, transient)
+
+
+def run_installer_with_retries(java: str, installer: Path, log, cancel=None,
+                               loader_key: str = "",
+                               patched: bool = False) -> None:
+    """Run the installer, retrying when its library downloads time out.
+
+    The installer keeps every library it saves, so a retry only fetches the
+    files that failed. For NeoForge a second failure switches the embedded
+    installer URLs to the BMCLAPI mirror before the last attempt.
+    """
+    attempts = 3
+    for attempt in range(1, attempts + 1):
+        try:
+            run_installer(java, installer, log, cancel)
+            return
+        except InstallerError as exc:
+            # A mirrored installer is retried even for an unknown failure:
+            # BMCLAPI redirects can end the run after most files were saved.
+            if attempt == attempts or not (exc.transient or patched):
+                raise
+            if (loader_key == "neoforge" and not patched and attempt >= 2
+                    and mirror_mode() != "never"):
+                patched = mirror_neoforge_installer(installer, log)
+            log("Some downloads timed out — retrying the installer; "
+                "libraries already saved are reused…")
+            time.sleep(1)
 
 
 def install_fabric(game_version: str, loader_version: str, log,
@@ -478,20 +524,13 @@ def install_loader(loader_key: str, game_version: str, loader_version: str,
         if from_mirror:
             log("The installer came from the BMCLAPI mirror.")
         patched = False
-        if loader_key == "neoforge" and (from_mirror or host_unreachable(url)):
+        if (loader_key == "neoforge" and mirror_mode() != "never"
+                and (from_mirror or host_unreachable(url))):
             patched = mirror_neoforge_installer(installer, log)
         log("Running the installer — it fetches libraries itself, so this "
             "can take a few minutes…")
-        try:
-            run_installer(java, installer, log, cancel)
-        except RuntimeError:
-            if not patched:
-                raise
-            # BMCLAPI serves some files through flaky redirects; the first
-            # pass can save everything and still report a download failure.
-            log("The installer stopped early; retrying with the files it "
-                "already downloaded…")
-            run_installer(java, installer, log, cancel)
+        run_installer_with_retries(java, installer, log, cancel,
+                                   loader_key, patched)
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 
