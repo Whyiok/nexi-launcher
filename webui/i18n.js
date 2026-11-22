@@ -713,6 +713,20 @@
     "zapret is not installed. Use “Download and enable” to install it.": "zapret не установлен. Нажмите «Скачать и включить», чтобы установить его.",
     "Could not turn the bypass on.": "Не удалось включить обход.",
 
+    /* First-run game and performance defaults */
+    "PERFORMANCE & GAME": "ПРОИЗВОДИТЕЛЬНОСТЬ И ИГРА",
+    "Tune Minecraft": "Настройте Minecraft",
+    "These values are saved as defaults for new profiles and written into options.txt before every launch.": "Эти значения сохранятся как настройки по умолчанию для новых сборок и будут записываться в options.txt перед каждым запуском.",
+    "Automatic setup": "Автоматическая настройка",
+    "Auto-configure": "Настроить автоматически",
+    "PERFORMANCE": "ПРОИЗВОДИТЕЛЬНОСТЬ",
+    "GAME": "ИГРА",
+    "MEMORY": "ПАМЯТЬ",
+    "FIELD OF VIEW": "УГОЛ ОБЗОРА",
+    "Checking this computer…": "Проверяем компьютер…",
+    "Could not detect this computer — pick the values manually.": "Не удалось определить параметры компьютера — выберите значения вручную.",
+    "Memory size was not detected — choose how much RAM Minecraft should use.": "Объём памяти не определён — выберите, сколько ОЗУ выделить Minecraft.",
+
     /* Site-initiated Minecraft account link */
     "Link a Minecraft account?": "Привязать аккаунт Minecraft?",
     "Link account": "Привязать аккаунт",
@@ -1080,6 +1094,21 @@
       `Этому аккаунту Microsoft нужно войти снова.${m[1]}`],
     [/^This Ely\.by account needs to sign in again\.(.*)$/, (m) =>
       `Этому аккаунту Ely.by нужно войти снова.${m[1]}`],
+
+    /* First-run setup: dynamic memory and recommendation lines */
+    [/^(\d+) GB$/, (m) => `${m[1]} ГБ`],
+    [/^(Recommended for this computer|Applied): (.+) GB RAM · (.+) chunks · (.+)\.$/, (m) => {
+      const lead = m[1] === "Applied"
+        ? "Применено" : "Рекомендация для этого компьютера";
+      const tail = m[4]
+        .replace("unlimited FPS", "без ограничения FPS")
+        .replace("(light)", "(лёгкий)")
+        .replace("(balanced)", "(сбалансированный)")
+        .replace("(quality)", "(качественный)");
+      return `${lead}: ${m[2]} ГБ ОЗУ · ${m[3]} чанков · ${tail}.`;
+    }],
+    [/^This computer has (.+) GB of RAM\. Leave room for Windows: (.+) GB is a good choice\.$/, (m) =>
+      `На этом компьютере ${m[1]} ГБ ОЗУ. Оставьте память для Windows: ${m[2]} ГБ — хороший выбор.`],
   ];
 
   const normalize = (value) => String(value).replace(/\s+/g, " ").trim();

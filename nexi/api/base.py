@@ -13,6 +13,7 @@ from pathlib import Path
 from .. import config, curseforge
 from ..config import (DATA_DIR, ELY_OAUTH_REDIRECT_DEFAULT, MC,
                       NEXI_BASE_URL_DEFAULT, app_dir)
+from ..game_options import normalize_defaults
 from ..logging_setup import log
 from ..net import (MIRROR_MODES, normalize_proxy, set_dns, set_mirror_mode,
                    set_mirror_notifier, set_proxy)
@@ -42,6 +43,10 @@ class BaseApi:
         except (TypeError, ValueError):
             default_ram = 2
         self.default_ram = max(self.RAM_MIN, min(self.RAM_MAX, default_ram))
+        # Chosen on the first-run screen, inherited by every new profile.
+        defaults = self._saved("default_game_options", None)
+        self.default_game_options = (normalize_defaults(defaults)
+                                     if isinstance(defaults, dict) else None)
         theme = str(self._saved("theme", "mint") or "mint").strip().lower()
         self.theme = theme if theme in self.THEMES else "mint"
         mode = str(self._saved("color_mode", "dark") or "dark").strip().lower()
@@ -503,6 +508,9 @@ class BaseApi:
                 "ely": {"oauth": {
                     "client_id": self._ely_oauth_client_id,
                     "redirect_uri": self._ely_oauth_redirect}}}
+        if isinstance(self.default_game_options, dict):
+            data["default_game_options"] = normalize_defaults(
+                self.default_game_options)
         try:
             Path(self._settings_path()).write_text(
                 json.dumps(data, indent=2), encoding="utf-8")

@@ -91,6 +91,10 @@
   <symbol id="i-check" viewBox="0 0 24 24">
     <path d="m5 12.6 4.4 4.4L19 6.8"/>
   </symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24">
+    <path d="m12 3.8 1.8 5.4 5.4 1.8-5.4 1.8L12 18.2l-1.8-5.4L4.8 11l5.4-1.8L12 3.8Z"/>
+    <path d="m18.4 15.2.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7.7-2.1Z"/>
+  </symbol>
   <symbol id="i-chev" viewBox="0 0 24 24">
     <path d="m6.5 9.5 5.5 5.5 5.5-5.5"/>
   </symbol>
@@ -1951,6 +1955,93 @@
                aria-label="Colour mode">
             <button type="button" data-wmode="dark">Dark</button>
             <button type="button" data-wmode="light">Light</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="welcome-step hidden" data-wstep="game">
+        <span class="eyebrow">PERFORMANCE &amp; GAME</span>
+        <h1 class="welcome-title">Tune Minecraft</h1>
+        <p class="welcome-sub">These values are saved as defaults for new
+          profiles and written into options.txt before every launch.</p>
+
+        <div class="welcome-auto">
+          <div class="setting-text">
+            <span class="setting-name">Automatic setup</span>
+            <p class="hint" id="welcome-setup-hint">Checking this computer…</p>
+          </div>
+          <button class="btn ghost" id="btn-welcome-auto" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg>
+            Auto-configure
+          </button>
+        </div>
+
+        <div class="welcome-group">
+          <span class="welcome-group-title">PERFORMANCE</span>
+          <div class="defaults-grid">
+            <div class="mini-field range-field">
+              <span class="field-label">MEMORY
+                <span class="range-value" id="welcome-ram-value">4 GB</span>
+              </span>
+              <input type="range" id="welcome-ram" min="1" max="16" step="1"
+                     aria-label="Memory for Minecraft">
+            </div>
+            <div class="mini-field range-field">
+              <span class="field-label">RENDER DISTANCE
+                <span class="range-value" id="welcome-distance-value">12</span>
+              </span>
+              <input type="range" id="welcome-distance" min="2" max="32"
+                     step="1" aria-label="Render distance">
+            </div>
+            <label class="mini-field">
+              <span class="field-label">PARTICLES</span>
+              <select class="input" id="welcome-particles">
+                <option value="0">All</option>
+                <option value="1">Decreased</option>
+                <option value="2">Minimal</option>
+              </select>
+            </label>
+            <label class="mini-field">
+              <span class="field-label">FPS LIMIT</span>
+              <select class="input" id="welcome-fps">
+                <option value="260">Unlimited</option>
+                <option value="60">60</option>
+                <option value="120">120</option>
+                <option value="144">144</option>
+                <option value="240">240</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint welcome-ram-hint" id="welcome-ram-hint"></p>
+        </div>
+
+        <div class="welcome-group">
+          <span class="welcome-group-title">GAME</span>
+          <div class="defaults-grid">
+            <div class="mini-field range-field">
+              <span class="field-label">FIELD OF VIEW
+                <span class="range-value" id="welcome-fov-value">70°</span>
+              </span>
+              <input type="range" id="welcome-fov" min="30" max="110" step="5"
+                     aria-label="Field of view">
+            </div>
+            <div class="mini-field range-field">
+              <span class="field-label">BRIGHTNESS
+                <span class="range-value" id="welcome-brightness-value">50%</span>
+              </span>
+              <input type="range" id="welcome-brightness" min="0" max="100"
+                     step="1" aria-label="Brightness">
+            </div>
+            <label class="mini-field">
+              <span class="field-label">GUI SCALE</span>
+              <select class="input" id="welcome-gui-scale">
+                <option value="0">Auto</option>
+                <option value="1">1×</option>
+                <option value="2">2×</option>
+                <option value="3">3×</option>
+                <option value="4">4×</option>
+              </select>
+            </label>
           </div>
         </div>
       </section>

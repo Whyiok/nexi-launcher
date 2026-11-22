@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 
 from ..config import LOADER_LABELS
+from ..game_options import normalize_defaults
 from ..instances import (
     backup_instance_worlds, create_instance, delete_instance,
     download_profile_icon, duplicate_instance, instance_base_version,
@@ -31,6 +32,13 @@ from ..versions import detect_loader, load_version, version_meta
 
 
 class CreateApi:
+    def _inherit_setup(self, instance):
+        """New profiles start with the options chosen at first launch."""
+        defaults = getattr(self, "default_game_options", None)
+        if isinstance(defaults, dict):
+            instance["game_defaults"] = normalize_defaults(defaults)
+            write_instance(instance["_root"], instance)
+
     def versions(self, force=False):
         try:
             manifest = fetch_version_manifest(force=bool(force))
@@ -106,6 +114,7 @@ class CreateApi:
             if cancel.is_set():
                 raise InstallCancelled()
             instance = create_instance(name, version_id, ram=self.default_ram)
+            self._inherit_setup(instance)
             log(f'Created profile "{instance["name"]}" — {instance["_root"]}')
             if not loader_key:
                 message = f'Created "{instance["name"]}".'
@@ -516,6 +525,7 @@ class CreateApi:
                     log(f"WARNING: Java could not be prepared: {exc}")
 
                 created = create_instance(name, base, ram=self.default_ram)
+                self._inherit_setup(created)
                 game_dir = instance_game_dir(created["_root"])
                 log(f'Created profile "{created["name"]}" — {created["_root"]}')
 

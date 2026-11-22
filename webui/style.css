@@ -3792,8 +3792,33 @@ body.account-dragging .account-grip { cursor: grabbing; }
 }
 .welcome-nav { display: flex; gap: 10px; margin-left: auto; }
 
+/* First-run game and performance defaults */
+.welcome-auto {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface-2);
+}
+.welcome-auto .setting-text { flex: 1; }
+.welcome-auto .hint { margin: 3px 0 0; }
+.welcome-group { margin-bottom: 18px; }
+.welcome-group:last-child { margin-bottom: 6px; }
+.welcome-group-title {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--faint);
+  font-size: 10.5px;
+  letter-spacing: .12em;
+}
+.welcome-ram-hint { margin: 12px 0 0; }
+
 @media (max-width: 560px) {
   .welcome-lang { grid-template-columns: 1fr; }
+  .welcome-auto { align-items: flex-start; flex-direction: column; }
 }
 
 /* The player's Nexi site profile is a normal screen, beside the build rail. */

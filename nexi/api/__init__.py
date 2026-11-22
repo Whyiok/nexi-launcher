@@ -1,6 +1,7 @@
 """pywebview bridge mixins composed into :class:`LauncherApi`."""
 
 from .base import BaseApi
+from .setup import SetupApi
 from .profiles import ProfilesApi
 from .accounts import AccountsApi
 from .nexi import NexiApi
@@ -20,6 +21,7 @@ from .update import UpdateApi
 
 class LauncherApi(
     BaseApi,
+    SetupApi,
     ProfilesApi,
     AccountsApi,
     NexiApi,
