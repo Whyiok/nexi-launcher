@@ -318,6 +318,13 @@
             <p class="hint hidden" id="friends-empty">No friends yet. Add
                people on the Nexi site and they will appear here.</p>
           </section>
+          <section id="shared-home" class="hidden">
+            <div class="friends-section-head">
+              <span class="eyebrow">SHARED BUILDS</span>
+              <span class="count" id="shared-home-count">0</span>
+            </div>
+            <div class="friends-list" id="shared-home-list"></div>
+          </section>
           <p class="hint hidden" id="friends-error"></p>
         </div>
       </aside>
@@ -580,6 +587,45 @@
                       </div>
                       <button class="btn primary sm" id="btn-apply-version"
                               type="button">Apply changes</button>
+                    </div>
+                    <div class="setting-block" id="shared-settings">
+                      <span class="field-label">SHARED BUILD</span>
+                      <p class="hint" id="shared-hint">Share this build with
+                         friends: the Minecraft version, loader and exact mods
+                         stay in sync. Worlds and screenshots stay yours.</p>
+                      <div class="shared-publish hidden" id="shared-publish">
+                        <input class="input" id="shared-name-input"
+                               maxlength="64" placeholder="Build name">
+                        <input class="input" id="shared-desc-input"
+                               maxlength="300"
+                               placeholder="Short description (optional)">
+                        <button class="btn primary sm" id="btn-shared-publish"
+                                type="button">Publish to friends</button>
+                      </div>
+                      <div class="shared-card hidden" id="shared-linked">
+                        <div class="shared-card-head">
+                          <div class="shared-card-text">
+                            <span class="shared-card-name" id="shared-name">—</span>
+                            <span class="hint" id="shared-meta">—</span>
+                          </div>
+                          <span class="shared-badge" id="shared-badge"></span>
+                        </div>
+                        <div class="pane-actions shared-actions">
+                          <button class="btn ghost sm" id="btn-shared-sync"
+                                  type="button">
+                            <svg class="icon"><use href="#i-refresh"/></svg>Sync now
+                          </button>
+                          <button class="btn ghost sm" id="btn-shared-save"
+                                  type="button">
+                            <svg class="icon"><use href="#i-edit"/></svg>Save changes
+                          </button>
+                          <button class="btn ghost sm" id="btn-shared-unpublish"
+                                  type="button">Stop sharing</button>
+                        </div>
+                        <div class="shared-members hidden"
+                             id="shared-members"></div>
+                      </div>
+                      <p class="hint shared-error hidden" id="shared-error"></p>
                     </div>
                     <div class="setting-row">
                       <div class="setting-text">
@@ -2181,6 +2227,7 @@
 <script src="js/home.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/friends.js"></script>
+<script src="js/shared.js"></script>
 <script src="js/create.js"></script>
 <script src="js/mods.js"></script>
 <script src="js/loaders.js"></script>

@@ -438,6 +438,9 @@ function syncDetailTabs() {
 function setDetailPane(name) {
   detail.pane = name;
   syncDetailTabs();
+  if (name === "settings" && typeof loadSharedCard === "function") {
+    loadSharedCard();
+  }
   if (name === "logs") openGameLogs();
   else stopGameLogsTimer();
   if (name === "screenshots") {

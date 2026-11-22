@@ -253,7 +253,7 @@
     "— and its": "— и",
     "if it has one — into the fields above and press Save.": "если он есть — в поля выше и нажмите Save.",
     "Press": "Нажмите",
-    "Add": "Add",
+    "Add": "Добавить",
     "Offline accounts skip signing in. The game uses the name you type here; skins come from the profile files.": "Оффлайн-аккаунты не требуют входа. Игра использует введённое имя; скины берутся из файлов сборки.",
     "No accounts yet — add one below.": "Аккаунтов пока нет — добавьте ниже.",
     "Microsoft account": "Аккаунт Microsoft",
@@ -320,6 +320,30 @@
     "Friend request declined.": "Заявка отклонена.",
     "Could not update the friend request.": "Не удалось обновить заявку в друзья.",
     "That friend request is invalid.": "Некорректная заявка в друзья.",
+    /* Shared builds */
+    "SHARED BUILD": "ОБЩАЯ СБОРКА",
+    "SHARED BUILDS": "ОБЩИЕ СБОРКИ",
+    "Share this build with friends: the Minecraft version, loader and exact mods stay in sync. Worlds and screenshots stay yours.": "Поделитесь сборкой с друзьями: версия Minecraft, загрузчик и точные версии модов будут совпадать. Миры и скриншоты остаются у каждого свои.",
+    "Sign in to Nexi from the Friends panel on the main menu to share this build.": "Войдите в Nexi в панели друзей в главном меню, чтобы делиться этой сборкой.",
+    "Friends you add receive the same version, loader and exact mods. Worlds and screenshots stay personal.": "Добавленные друзья получают ту же версию, загрузчик и точные моды. Миры и скриншоты остаются личными.",
+    "This build follows your friend — new mods and versions arrive automatically. Your worlds and screenshots are kept.": "Эта сборка следует за другом — новые моды и версии приходят автоматически. Миры и скриншоты сохраняются.",
+    "Build name": "Название сборки",
+    "Short description (optional)": "Короткое описание (необязательно)",
+    "Publish to friends": "Опубликовать для друзей",
+    "Sync now": "Синхронизировать",
+    "Stop sharing": "Прекратить делиться",
+    "Stop following": "Перестать следовать",
+    "Click again to confirm": "Нажмите ещё раз для подтверждения",
+    "Owner": "Автор",
+    "Deleted": "Удалена",
+    "In build": "В сборке",
+    "FRIENDS IN THIS BUILD": "ДРУЗЬЯ В СБОРКЕ",
+    "Add friends on the Nexi site — then you can include them here.": "Сначала добавьте друзей на сайте Nexi — потом их можно будет включить сюда.",
+    "The owner deleted this shared build.": "Автор удалил эту общую сборку.",
+    "The owner deleted this build. You can keep the files or stop following it.": "Автор удалил сборку. Можно оставить файлы или перестать следовать.",
+    "Friend added to the shared build.": "Друг добавлен в общую сборку.",
+    "Friend removed from the shared build.": "Друг убран из общей сборки.",
+    "The shared build was deleted — friends keep their files but stop receiving updates.": "Общая сборка удалена — у друзей останутся файлы, но обновления прекратятся.",
     "Browser sign-in is already waiting.": "Вход через браузер уже ожидает завершения.",
     "Browser sign-in timed out. Try again.": "Время входа через браузер истекло. Попробуйте снова.",
     "Sign-in state mismatch. Try again.": "Проверка входа не совпала. Попробуйте снова.",
@@ -811,6 +835,54 @@
 
   const RULES = [
     [/^Memory for “(.*)”$/, (m) => `Память для «${m[1]}»`],
+    /* Shared builds */
+    [/^By (.+)$/, (m) => `От ${m[1]}`],
+    [/^Minecraft (\S+) · ((?:Fabric|Forge|NeoForge|Quilt|vanilla)(?: [\w.+-]+)?) · (\d+) mods(?: · (\d+) packs)?(?: · rev (\d+))?$/, (m) =>
+      `Minecraft ${m[1]} · ${m[2]} · модов: ${m[3]}${m[4] ? ` · паков: ${m[4]}` : ""}${m[5] ? ` · рев. ${m[5]}` : ""}`],
+    [/^(.+) · MC (\S+) · (Fabric|Forge|NeoForge|Quilt|vanilla) · (\d+) mods(?: · (\d+) packs)?$/, (m) =>
+      `${m[1]} · MC ${m[2]} · ${m[3]} · модов: ${m[4]}${m[5] ? ` · паков: ${m[5]}` : ""}`],
+    [/^Applying “(.+)”…$/, (m) => `Применяем «${m[1]}»…`],
+    [/^Published "(.+)" to your friends\.$/, (m) =>
+      `Сборка «${m[1]}» опубликована для друзей.`],
+    [/^Shared build updated \(revision (\d+)\)\.$/, (m) =>
+      `Общая сборка обновлена (ревизия ${m[1]}).`],
+    [/^Shared build updated — friends get the new revision on their next check\.$/, () =>
+      "Общая сборка обновлена — друзья получат новую ревизию при следующей проверке."],
+    [/^The shared build is already up to date\.$/, () =>
+      "Общая сборка уже актуальна."],
+    [/^Updated to the latest revision\.$/, () =>
+      "Обновлено до последней ревизии."],
+    [/^Already up to date with the shared build\.$/, () =>
+      "Уже актуально — совпадает с общей сборкой."],
+    [/^Shared builds updated \((\d+) change\(s\)\)\.$/, (m) =>
+      `Общие сборки обновлены (изменений: ${m[1]}).`],
+    [/^Updated (\d+) item\(s\); (\d+) failed and will retry: (.+)$/, (m) =>
+      `Обновлено элементов: ${m[1]}; не удалось: ${m[2]}, повторим позже: ${m[3]}`],
+    [/^Added "(.+)" with (\d+) item\(s\) from the shared build\.(?: Removed (\d+) leftover item\(s\)\.)?$/, (m) =>
+      `Сборка «${m[1]}» добавлена, элементов: ${m[2]}.${m[3] ? ` Удалено лишних файлов: ${m[3]}.` : ""}`],
+    [/^Added "(.+)" — (\d+) item\(s\) downloaded, (\d+) will retry: (.+)$/, (m) =>
+      `Сборка «${m[1]}» добавлена — скачано: ${m[2]}, повторим позже: ${m[3]}. ${m[4]}`],
+    [/^Added "(.+)", but the files are not ready yet: (.+)\. It will retry automatically\.$/, (m) =>
+      `Сборка «${m[1]}» добавлена, но файлы ещё не готовы: ${m[2]}. Повторим автоматически.`],
+    [/^Stopped following "(.+)"\.$/, (m) => `Больше не следуем за «${m[1]}».`],
+    [/^This profile follows a friend's build\. Stop following it first to publish your own\.$/, () =>
+      "Эта сборка следует за сборкой друга. Сначала перестаньте следовать, чтобы опубликовать свою."],
+    [/^Shared build sync failed: (.+)$/, (m) =>
+      `Не удалось синхронизировать общую сборку: ${m[1]}`],
+    [/^That shared build is invalid\.$/, () => "Некорректная общая сборка."],
+    [/^That friend is invalid\.$/, () => "Некорректный друг."],
+    [/^This profile is not shared\.$/, () => "Эта сборка не является общей."],
+    [/^This profile is not linked to a shared build\.$/, () =>
+      "Эта сборка не привязана к общей сборке."],
+    [/^Publish this profile before adding friends\.$/, () =>
+      "Сначала опубликуйте эту сборку, потом добавляйте друзей."],
+    [/^Sign in to Nexi first\.$/, () => "Сначала войдите в Nexi."],
+    [/^This profile has no Minecraft version\.$/, () =>
+      "В этой сборке не указана версия Minecraft."],
+    [/^The shared build has no Minecraft version\.$/, () =>
+      "В общей сборке не указана версия Minecraft."],
+    [/^Another task is already running\.$/, () =>
+      "Уже выполняется другая задача."],
     [/^Link a Minecraft account to Nexi ID (.+?)\? Choose the account you are signed in with — it will be saved on the site\.$/, (m) =>
       `Привязать аккаунт Minecraft к Nexi ID ${m[1]}? Выберите аккаунт, под которым вы вошли, — он сохранится на сайте.`],
     /* Launcher update */
@@ -1148,6 +1220,7 @@
     }],
     [/^This computer has (.+) GB of RAM\. Leave room for Windows: (.+) GB is a good choice\.$/, (m) =>
       `На этом компьютере ${m[1]} ГБ ОЗУ. Оставьте память для Windows: ${m[2]} ГБ — хороший выбор.`],
+    [/^Downloading (.+)…$/, (m) => `Скачиваем ${m[1]}…`],
   ];
 
   const normalize = (value) => String(value).replace(/\s+/g, " ").trim();

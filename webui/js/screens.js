@@ -67,6 +67,7 @@ function applyState(next) {
   updateScreenHeads();
   fillSettings();
   if (screen === "settings" && settingsTab === "account") loadSkin();
+  if (typeof syncSharedAccount === "function") syncSharedAccount();
   if (screen === "home") {
     renderHome();
     maybeReloadHome();
@@ -149,6 +150,7 @@ function setScreen(name) {
     startHomePanorama();
     renderFriendsGate();
     loadFriends();
+    if (typeof loadSharedAvailable === "function") loadSharedAvailable();
   } else if (name === "profiles") {
     renderProfiles();
   } else if (name === "create") {

@@ -349,6 +349,7 @@ function bind() {
     if (event.key === "Enter") saveNexiBaseUrl();
   });
   bindFriends();
+  bindShared();
   $("#btn-ely-login").addEventListener("click", elyLogin);
   $("#btn-ely-browser").addEventListener("click", elyBrowserLogin);
   $("#btn-ely-cancel").addEventListener("click", elyCancel);

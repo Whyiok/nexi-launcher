@@ -104,6 +104,7 @@ function handleEvent(ev) {
         if (ev.state) applyState(ev.state);
         else refreshState();
         if (screen === "home") loadFriends();
+        if (typeof loadSharedAvailable === "function") loadSharedAvailable();
         setStatus(`Signed in to Nexi as ${ev.name || "your account"}.`);
       } else if (ev.status === "error") {
         friendsState.waiting = false;
@@ -188,7 +189,9 @@ function syncBusy() {
   for (const id of ["btn-new-profile", "btn-empty-create",
                     "btn-import-modpack", "btn-pane-update-all",
                     "btn-pane-backup", "btn-pane-icon", "btn-pane-banner",
-                    "btn-pane-edit", "btn-pick-background"]) {
+                    "btn-pane-edit", "btn-pick-background",
+                    "btn-shared-publish", "btn-shared-save",
+                    "btn-shared-sync", "btn-shared-unpublish"]) {
     const node = $("#" + id);
     if (node) node.disabled = busy;
   }

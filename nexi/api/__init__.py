@@ -5,6 +5,7 @@ from .setup import SetupApi
 from .profiles import ProfilesApi
 from .accounts import AccountsApi
 from .nexi import NexiApi
+from .shared import SharedApi
 from .create import CreateApi
 from .mods import ModsApi
 from .content import ContentApi
@@ -25,6 +26,7 @@ class LauncherApi(
     ProfilesApi,
     AccountsApi,
     NexiApi,
+    SharedApi,
     CreateApi,
     ModsApi,
     ContentApi,

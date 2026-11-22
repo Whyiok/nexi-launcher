@@ -74,6 +74,11 @@ class ProfilesApi:
         banner = profile_banner_path(
             instance["_root"], instance.get("banner"))
         account = self._account_by_id(instance.get("account", ""))
+        shared = instance.get("shared")
+        shared = shared if isinstance(shared, dict) else {}
+        link = ({key: shared.get(key) for key in (
+            "build_id", "owner", "revision", "name", "owner_name")}
+            if shared.get("build_id") else {})
         return {
             "slug": instance.get("_slug", ""),
             "name": instance.get("name", ""),
@@ -106,6 +111,7 @@ class ProfilesApi:
             "path": str(instance_game_dir(instance["_root"])),
             "icon": profile_icon_data_url(
                 instance["_root"], instance.get("icon")),
+            "shared": link,
         }
 
     def state(self):
