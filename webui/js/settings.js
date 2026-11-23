@@ -508,7 +508,8 @@ async function nexiBrowserLogin() {
 }
 
 async function nexiVerify() {
-  const code = $("#nexi-code").value.trim();  if (!code) {
+  const code = $("#nexi-code").value.trim();
+  if (!code) {
     setStatus("Enter the 6-digit code from the e-mail.", true);
     return;
   }
