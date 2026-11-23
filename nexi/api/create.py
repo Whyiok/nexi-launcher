@@ -2,7 +2,6 @@
 
 import json
 import os
-import subprocess
 import threading
 import zipfile
 from pathlib import Path
@@ -23,7 +22,7 @@ from ..modpacks import (
     _curseforge_loader, _download_curseforge_manifest,
     _download_modpack_files, _extract_zip, _modpack_loader,
 )
-from ..util import InstallCancelled, _version_key
+from ..util import InstallCancelled, _version_key, pick_file
 from ..vanilla import (
     fetch_version_manifest, install_vanilla, manifest_entry,
     verify_version_files, version_installed,
@@ -401,24 +400,16 @@ class CreateApi:
         """Native file picker for a .mrpack or .zip modpack."""
         if os.name != "nt":
             return {"ok": False, "error": "Type the path to the modpack file."}
-        script = (
-            "Add-Type -AssemblyName System.Windows.Forms | Out-Null; "
-            "$d = New-Object System.Windows.Forms.OpenFileDialog; "
-            "$d.Title = 'Select a modpack'; "
-            "$d.Filter = 'Modpacks (*.mrpack;*.zip)|*.mrpack;*.zip|"
-            "Modrinth packs (*.mrpack)|*.mrpack|Zip archives (*.zip)|*.zip|"
-            "All files (*.*)|*.*'; "
-            "if ($d.ShowDialog() -eq 'OK') { [Console]::Out.Write($d.FileName) }"
-        )
         try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-STA", "-Command", script],
-                capture_output=True, text=True, timeout=600,
-                creationflags=subprocess.CREATE_NO_WINDOW)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+            picked = pick_file(
+                "Select a modpack",
+                (("Modpacks", "*.mrpack;*.zip"),
+                 ("Modrinth packs", "*.mrpack"),
+                 ("Zip archives", "*.zip"),
+                 ("All files", "*.*")))
+        except OSError as exc:
             return {"ok": False,
                     "error": f"Could not open the file picker: {exc}"}
-        picked = (result.stdout or "").strip()
         if not picked:
             return {"ok": False, "cancelled": True}
         return {"ok": True, "path": picked}

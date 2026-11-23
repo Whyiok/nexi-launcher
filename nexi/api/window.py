@@ -45,6 +45,34 @@ class WindowApi:
             return {"ok": False, "maximized": False}
         return {"ok": True, "maximized": self._is_maximized(window)}
 
+    @staticmethod
+    def _fit_to_work_area(native):
+        """Keep the taskbar visible when the frameless window is maximized.
+
+        A borderless WinForms form maximized by Windows grows to the whole
+        monitor rectangle, which covers the taskbar. ``MaximizedBounds`` tells
+        WinForms to use the monitor's working area instead, so the maximized
+        window stops above the taskbar.
+        """
+        if native is None:
+            return False
+        try:
+            import clr  # noqa: F401  (loaded by pywebview)
+            import System.Windows.Forms as WinForms
+            from System import Func, Type
+
+            def apply():
+                native.MaximizedBounds = (
+                    WinForms.Screen.FromControl(native).WorkingArea)
+
+            if getattr(native, "InvokeRequired", False):
+                native.Invoke(Func[Type](apply))
+            else:
+                apply()
+            return True
+        except Exception:
+            return False
+
     def window_toggle_maximize(self):
         window = self._app_window()
         if window is None:
@@ -53,6 +81,9 @@ class WindowApi:
         if maximized:
             window.restore()
         else:
+            # Set the bounds before maximizing: afterwards Windows has already
+            # sized the borderless window over the taskbar.
+            self._fit_to_work_area(getattr(window, "native", None))
             window.maximize()
         return {"ok": True, "maximized": not maximized}
 

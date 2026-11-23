@@ -5,19 +5,21 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import time
+import urllib.parse
 from pathlib import Path
 
 from ..config import ELY_SKIN_SITE, SKINS_DIR
 from ..logging_setup import log
 from ..ms_auth import MC_SKIN_URL
+from ..net import http_get, _host_is_private
 from ..skin_images import (
     _default_skin_png, _ely_skin_png, _skin_dimensions, _upload_skin,
 )
-from ..util import open_in_system
+from ..util import open_in_system, pick_file
 
 SKIN_HISTORY_LIMIT = 24
+SITE_SKIN_MAX_BYTES = 1024 * 1024
 HISTORY_DIR = SKINS_DIR / "history"
 _HISTORY_HASH = re.compile(r"^[0-9a-f]{16}$")
 
@@ -273,22 +275,14 @@ class SkinsApi:
                              "use the link on this page."}
         if os.name != "nt":
             return {"ok": False, "error": "The image picker needs Windows."}
-        script = (
-            "Add-Type -AssemblyName System.Windows.Forms | Out-Null; "
-            "$d = New-Object System.Windows.Forms.OpenFileDialog; "
-            "$d.Title = 'Select a Minecraft skin'; "
-            "$d.Filter = 'Minecraft skin (*.png)|*.png|All files (*.*)|*.*'; "
-            "if ($d.ShowDialog() -eq 'OK') { [Console]::Out.Write($d.FileName) }"
-        )
         try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-STA", "-Command", script],
-                capture_output=True, text=True, timeout=600,
-                creationflags=subprocess.CREATE_NO_WINDOW)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+            picked = pick_file(
+                "Select a Minecraft skin",
+                (("Minecraft skin", "*.png"), ("All files", "*.*")),
+                default_ext="png")
+        except OSError as exc:
             return {"ok": False,
                     "error": f"Could not open the file picker: {exc}"}
-        picked = (result.stdout or "").strip()
         if not picked:
             return {"ok": False, "cancelled": True}
         try:
@@ -366,3 +360,92 @@ class SkinsApi:
         log.info("Skin applied for account %s", account["name"])
         return {"ok": True,
                 "message": f"Skin applied to {account['name']}."}
+
+    # ------------------------------------------------- skins handed by the site
+    #
+    # The Nexi site editor can open ``nexi://skin?url=...``: the launcher
+    # downloads that PNG, stores it as the account's chosen skin and opens the
+    # skin page. Applying it stays an explicit click, so nothing is uploaded
+    # without the user asking.
+
+    def _skin_source_allowed(self, parsed):
+        """Whether a ``nexi://skin`` download may come from *parsed*'s host.
+
+        Local and LAN addresses are accepted because that is how the site is
+        normally opened; everything else must match the site address saved in
+        the launcher settings.
+        """
+        host = (parsed.hostname or "").strip().rstrip(".").lower()
+        if not host:
+            return False
+        if _host_is_private(host):
+            return True
+        base = str(getattr(self, "nexi_base_url", "") or "").strip()
+        try:
+            site = urllib.parse.urlparse(base)
+        except ValueError:
+            return False
+        site_host = (site.hostname or "").strip().rstrip(".").lower()
+        return bool(site_host) and host == site_host
+
+    def skin_from_site(self, url="", variant="", name="", account_id=""):
+        """Save a skin handed over by the Nexi site."""
+        account = self._skin_account(account_id)
+        if account is None or account.get("type") != "microsoft":
+            # The site does not know launcher account ids, so a handover goes
+            # to the first signed-in Microsoft account instead of whatever
+            # account happens to be active.
+            with self._lock:
+                account = next((item for item in self._accounts
+                                if item.get("type") == "microsoft"
+                                and (item.get("refresh_token")
+                                     or item.get("access_token"))), None)
+        if account is None:
+            return {"ok": False,
+                    "error": "Sign in with a Microsoft account first — skins "
+                             "from the site are applied to it."}
+        url = str(url or "").strip()
+        try:
+            parsed = urllib.parse.urlparse(url)
+        except ValueError:
+            parsed = None
+        if (parsed is None or parsed.scheme not in ("http", "https")
+                or not parsed.netloc or parsed.username or parsed.password):
+            return {"ok": False,
+                    "error": "The skin link from the site is broken."}
+        if not self._skin_source_allowed(parsed):
+            # The nexi:// handler can be triggered by any web page, so only the
+            # configured site (or a local/LAN address, which is how a
+            # self-hosted site is usually opened) may hand over a skin.
+            log.warning("Rejected a skin handover from %s", parsed.hostname)
+            return {"ok": False,
+                    "error": "The skin link does not come from your Nexi site."}
+        try:
+            data = http_get(url, timeout=20)
+        except Exception as exc:
+            log.warning("Skin download from the site failed: %s", exc)
+            return {"ok": False,
+                    "error": f"Could not download the skin: {exc}"}
+        if len(data) > SITE_SKIN_MAX_BYTES:
+            return {"ok": False, "error": "The skin file is too large."}
+        if _skin_dimensions(data) not in ((64, 64), (64, 32)):
+            return {"ok": False,
+                    "error": "The site sent an invalid skin file."}
+        try:
+            SKINS_DIR.mkdir(parents=True, exist_ok=True)
+            self._skin_path(account).write_bytes(data)
+        except OSError as exc:
+            return {"ok": False, "error": f"Could not save the skin: {exc}"}
+        chosen = "slim" if str(variant).lower() == "slim" else "classic"
+        with self._lock:
+            account["skin_variant"] = chosen
+            self._save()
+        label = str(name or "").strip()[:40] or account.get("name", "")
+        self._history_add(data, chosen, label)
+        log.info("Skin from the site saved for account %s", account["name"])
+        self._event(
+            "nexi_skin", ok=True, account=account["id"], name=label,
+            variant=chosen,
+            message="Skin loaded from the site. Press \"Apply to account\" "
+                    "to use it in game.")
+        return {"ok": True, "account": account["id"]}

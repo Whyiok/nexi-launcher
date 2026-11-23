@@ -650,9 +650,46 @@ class NexiApi:
                     and (account.get("refresh_token")
                          or account.get("access_token"))]
 
+    # ------------------------------------------------------- skins from the site
+    # The skin editor on the Nexi site uploads the drawn PNG to the site and
+    # opens ``nexi://skin?url=...&model=...&name=...``. The launcher downloads
+    # that PNG and opens the skin page, where "Apply" still needs a click.
+
+    @staticmethod
+    def _nexi_skin_from_uri(uri):
+        """Query values of a ``nexi://skin?...`` URL, or None for other links."""
+        try:
+            parsed = urllib.parse.urlparse(str(uri or "").strip())
+        except ValueError:
+            return None
+        if parsed.scheme.lower() not in ("nexi", "nexilauncher"):
+            return None
+        if (parsed.netloc or "").strip().lower() != "skin":
+            return None
+        values = urllib.parse.parse_qs(parsed.query or "")
+
+        def value(key):
+            return str((values.get(key) or [""])[0]).strip()
+
+        return {
+            "url": value("url"),
+            "variant": value("model") or value("variant"),
+            "name": value("name"),
+            "account_id": value("account"),
+        }
+
     def nexi_handle_link(self, uri):
-        """A ``nexi://link`` URL arrived (startup or a second instance)."""
+        """A ``nexi://`` URL arrived (startup or a second instance)."""
         self._nexi_adopt_link_base(uri)
+        skin = self._nexi_skin_from_uri(uri)
+        if skin is not None:
+            log.info("Nexi skin link received from the site")
+            result = self.skin_from_site(**skin)
+            if not result.get("ok"):
+                message = (result.get("error")
+                           or "Could not load the skin from the site.")
+                self._event("nexi_skin", ok=False, error=message)
+            return result
         token = self._nexi_link_token_from_uri(uri)
         if not token:
             log.warning("Nexi link ignored: no token in %r", str(uri)[:120])

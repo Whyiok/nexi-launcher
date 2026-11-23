@@ -1,14 +1,13 @@
 """zapret (DPI bypass) endpoints."""
 
 import re
-import subprocess
 import threading
 from pathlib import Path
 
 from ..config import DATA_DIR
 from ..logging_setup import log
 from ..net import clear_failed_hosts, failed_hosts
-from ..util import InstallCancelled, open_in_system
+from ..util import InstallCancelled, open_in_system, pick_folder
 from ..zapret import (
     ZAPRET_DOMAINS, ZAPRET_SITE, detect_install, elevate_apply,
     find_missing, install_bundle, is_windows, merge_domains,
@@ -99,25 +98,12 @@ class ZapretApi:
         if not is_windows():
             return {"ok": False, "error": "Folder picking is Windows-only."}
         current = detect_install(self._zapret_path)
-        initial = (current.get("root") or self._zapret_path or "").replace("'", "''")
-        start = f"$d.SelectedPath = '{initial}'; " if initial else ""
-        script = (
-            "Add-Type -AssemblyName System.Windows.Forms | Out-Null; "
-            "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
-            "$d.Description = 'Select the zapret folder'; "
-            "$d.ShowNewFolderButton = $false; "
-            + start +
-            "if ($d.ShowDialog() -eq 'OK') { [Console]::Out.Write($d.SelectedPath) }"
-        )
+        initial = current.get("root") or self._zapret_path or ""
         try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-STA", "-Command", script],
-                capture_output=True, text=True, timeout=600,
-                creationflags=subprocess.CREATE_NO_WINDOW)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+            picked = pick_folder("Select the zapret folder", initial)
+        except OSError as exc:
             return {"ok": False,
                     "error": f"Could not open the folder picker: {exc}"}
-        picked = (result.stdout or "").strip()
         if not picked:
             return {"ok": False, "cancelled": True}
         checked = detect_install(picked, prefer_saved=True)

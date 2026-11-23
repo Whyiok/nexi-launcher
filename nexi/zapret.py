@@ -16,7 +16,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import tempfile
 import time
 import zipfile
@@ -31,7 +30,6 @@ from .util import InstallCancelled
 
 ZAPRET_REPO = "Flowseal/zapret-discord-youtube"
 SERVICE_NAME = "zapret"
-SERVICE_KEY = rf"HKLM:\SYSTEM\CurrentControlSet\Services\{SERVICE_NAME}"
 STRATEGY_VALUE = "zapret-discord-youtube"
 ZAPRET_SITE = f"https://github.com/{ZAPRET_REPO}"
 RELEASE_API = f"https://api.github.com/repos/{ZAPRET_REPO}/releases/latest"
@@ -95,39 +93,74 @@ def is_admin() -> bool:
         return False
 
 
-def _run_ps(script: str, timeout: float = 25.0) -> str:
-    """Run a short read-only PowerShell query and decode its UTF-8 output."""
-    if not is_windows():
-        return ""
-    command = "[Console]::OutputEncoding=[Text.Encoding]::UTF8; " + script
-    try:
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-             "-Command", command],
-            capture_output=True, timeout=timeout,
-            creationflags=subprocess.CREATE_NO_WINDOW)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        log.debug("zapret: PowerShell query failed: %s", exc)
-        return ""
-    return result.stdout.decode("utf-8", "replace").strip()
+# Service state is read with the Windows service API and the process list with
+# the toolhelp snapshot instead of shelling out to PowerShell. Both are read-
+# only, cheap, and — unlike a hidden PowerShell process polling every few
+# seconds — do not look like malware to antivirus heuristics.
+
+_SERVICE_STATES = {1: "stopped", 2: "running", 3: "stopped", 4: "running"}
+
+_ERROR_SERVICE_DOES_NOT_EXIST = 1060
+
+_SC_MANAGER_CONNECT = 0x0001
+_SERVICE_QUERY_STATUS = 0x0004
+_SC_STATUS_PROCESS_INFO = 0
+
+_TH32CS_SNAPPROCESS = 0x00000002
+
+
+class _SERVICE_STATUS_PROCESS(ctypes.Structure):
+    _fields_ = [
+        ("dwServiceType", wintypes.DWORD),
+        ("dwCurrentState", wintypes.DWORD),
+        ("dwControlsAccepted", wintypes.DWORD),
+        ("dwWin32ExitCode", wintypes.DWORD),
+        ("dwServiceSpecificExitCode", wintypes.DWORD),
+        ("dwCheckPoint", wintypes.DWORD),
+        ("dwWaitHint", wintypes.DWORD),
+        ("dwProcessId", wintypes.DWORD),
+        ("dwServiceFlags", wintypes.DWORD),
+    ]
+
+
+class _PROCESSENTRY32W(ctypes.Structure):
+    _fields_ = [
+        ("dwSize", wintypes.DWORD),
+        ("cntUsage", wintypes.DWORD),
+        ("th32ProcessID", wintypes.DWORD),
+        ("th32DefaultHeapID", ctypes.c_void_p),
+        ("th32ModuleID", wintypes.DWORD),
+        ("cntThreads", wintypes.DWORD),
+        ("th32ParentProcessID", wintypes.DWORD),
+        ("pcPriClassBase", ctypes.c_long),
+        ("dwFlags", wintypes.DWORD),
+        ("szExeFile", wintypes.WCHAR * 260),
+    ]
 
 
 def _service_info() -> dict:
     """ImagePath/strategy from the service registry (readable without admin)."""
-    script = (
-        "$p = Get-ItemProperty -LiteralPath "
-        f"'{SERVICE_KEY}' -ErrorAction SilentlyContinue; "
-        "if ($p) { [pscustomobject]@{"
-        "ImagePath = $p.ImagePath; "
-        f"Strategy = $p.'{STRATEGY_VALUE}'"
-        " } | ConvertTo-Json -Compress }"
-    )
-    raw = _run_ps(script)
-    if not raw.startswith("{"):
+    if not is_windows():
         return {}
     try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
+        import winreg
+
+        with winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                rf"SYSTEM\CurrentControlSet\Services\{SERVICE_NAME}", 0,
+                winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
+            info = {}
+            try:
+                info["ImagePath"] = str(winreg.QueryValueEx(key, "ImagePath")[0])
+            except OSError:
+                pass
+            try:
+                info["Strategy"] = str(
+                    winreg.QueryValueEx(key, STRATEGY_VALUE)[0])
+            except OSError:
+                pass
+            return info
+    except OSError:
         return {}
 
 
@@ -135,14 +168,47 @@ def service_state() -> str:
     """'running' | 'stopped' | 'absent' | 'unknown'."""
     if not is_windows():
         return "absent"
-    out = _run_ps(
-        f"(Get-Service -Name '{SERVICE_NAME}' -ErrorAction SilentlyContinue)"
-        ".Status.ToString()").lower()
-    if out in ("running", "stopped", "startpending", "stoppending"):
-        return "running" if out in ("running", "startpending") else "stopped"
-    if out:
+    try:
+        advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
+        advapi32.OpenSCManagerW.argtypes = [
+            wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+        advapi32.OpenSCManagerW.restype = wintypes.HANDLE
+        advapi32.OpenServiceW.argtypes = [
+            wintypes.HANDLE, wintypes.LPCWSTR, wintypes.DWORD]
+        advapi32.OpenServiceW.restype = wintypes.HANDLE
+        advapi32.QueryServiceStatusEx.argtypes = [
+            wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD)]
+        advapi32.QueryServiceStatusEx.restype = wintypes.BOOL
+        advapi32.CloseServiceHandle.argtypes = [wintypes.HANDLE]
+        advapi32.CloseServiceHandle.restype = wintypes.BOOL
+
+        manager = advapi32.OpenSCManagerW(None, None, _SC_MANAGER_CONNECT)
+        if not manager:
+            return "unknown"
+        try:
+            service = advapi32.OpenServiceW(manager, SERVICE_NAME,
+                                            _SERVICE_QUERY_STATUS)
+            if not service:
+                if ctypes.get_last_error() == _ERROR_SERVICE_DOES_NOT_EXIST:
+                    return "absent"
+                return "unknown"
+            try:
+                status = _SERVICE_STATUS_PROCESS()
+                needed = wintypes.DWORD()
+                if not advapi32.QueryServiceStatusEx(
+                        service, _SC_STATUS_PROCESS_INFO,
+                        ctypes.byref(status), ctypes.sizeof(status),
+                        ctypes.byref(needed)):
+                    return "unknown"
+                return _SERVICE_STATES.get(int(status.dwCurrentState),
+                                           "unknown")
+            finally:
+                advapi32.CloseServiceHandle(service)
+        finally:
+            advapi32.CloseServiceHandle(manager)
+    except (OSError, AttributeError):
         return "unknown"
-    return "absent"
 
 
 def service_strategy() -> str:
@@ -153,9 +219,37 @@ def service_strategy() -> str:
 def process_running() -> bool:
     if not is_windows():
         return False
-    out = _run_ps(
-        "@(Get-Process -Name 'winws' -ErrorAction SilentlyContinue).Count")
-    return out not in ("", "0")
+    try:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateToolhelp32Snapshot.argtypes = [
+            wintypes.DWORD, wintypes.DWORD]
+        kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+        kernel32.Process32FirstW.argtypes = [
+            wintypes.HANDLE, ctypes.POINTER(_PROCESSENTRY32W)]
+        kernel32.Process32FirstW.restype = wintypes.BOOL
+        kernel32.Process32NextW.argtypes = [
+            wintypes.HANDLE, ctypes.POINTER(_PROCESSENTRY32W)]
+        kernel32.Process32NextW.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+
+        snapshot = kernel32.CreateToolhelp32Snapshot(_TH32CS_SNAPPROCESS, 0)
+        if not snapshot or snapshot == ctypes.c_void_p(-1).value:
+            return False
+        try:
+            entry = _PROCESSENTRY32W()
+            entry.dwSize = ctypes.sizeof(entry)
+            if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+                return False
+            while True:
+                if str(entry.szExeFile).lower() == "winws.exe":
+                    return True
+                if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                    return False
+        finally:
+            kernel32.CloseHandle(snapshot)
+    except (OSError, AttributeError):
+        return False
 
 
 def parse_image_path(value: str):
@@ -697,8 +791,12 @@ def elevate_apply(root: Path, preset: str, list_path, pending_domains,
         # errors that never reach our own log) in a readable file.
         params = (f'/c powershell.exe -NoProfile -ExecutionPolicy Bypass '
                   f'-File "{script_file}" > "{console_file}" 2>&1')
-        rc, handle = _launch_elevated(
-            params, os.environ.get("COMSPEC", "cmd.exe"))
+        comspec = str(os.environ.get("COMSPEC", "") or "")
+        if not comspec.lower().endswith("cmd.exe") or not os.path.isfile(
+                comspec):
+            comspec = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"),
+                                   "System32", "cmd.exe")
+        rc, handle = _launch_elevated(params, comspec)
         if rc:
             cancelled = rc in (5, 31, 1223)
             return {"ok": False, "cancelled": cancelled,

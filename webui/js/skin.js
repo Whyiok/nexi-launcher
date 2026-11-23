@@ -584,6 +584,22 @@ async function applySkin() {
   await loadSkin();
 }
 
+/* A skin handed over by the Nexi site (``nexi://skin?...``) has already been
+   saved for the account by the backend; open the skin page so it can be
+   reviewed and applied with one click. */
+async function openSkinFromSite(ev) {
+  if (ev && ev.account) skin.account = ev.account;
+  await refreshState();
+  setSettingsTab("account", true);
+  setScreen("settings");
+  await loadSkin();
+  const variant = ev && ev.variant === "slim" ? "Slim" : "Classic";
+  const name = (ev && ev.name) || "Skin";
+  setStatus(ev && ev.message
+    ? ev.message
+    : `${name} (${variant}) is ready — press “Apply to account”.`);
+}
+
 /* ------------------------------------------------------------ skin history */
 
 function skinHistoryDate(seconds) {

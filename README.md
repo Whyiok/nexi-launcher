@@ -3,7 +3,7 @@
 A lightweight custom Minecraft launcher for Windows. The backend is Python,
 the interface is plain HTML/CSS/JS rendered with
 [pywebview](https://pywebview.flowrl.com/) (Edge WebView2), and the release
-build is a single `nexi.exe` produced by PyInstaller.
+build is a single `Nexi-Portable.exe` produced by PyInstaller.
 
 > Unofficial project. Not affiliated with Mojang, Microsoft or Modrinth.
 > You still need to own a copy of Minecraft to play online.
@@ -12,8 +12,8 @@ build is a single `nexi.exe` produced by PyInstaller.
 
 [**Download the latest release →**](https://github.com/Whyiok/nexi-launcher/releases/latest)
 
-Get `nexi.exe` from the Releases page and run it — no Python installation is
-needed. If you prefer an installed copy, download `NexiLauncher-Setup.exe`
+Get `Nexi-Portable.exe` from the Releases page and run it — no Python
+installation is needed. If you prefer an installed copy, download `NexiLauncher-Setup.exe`
 instead: it installs per user into `%LOCALAPPDATA%\Programs\Nexi Launcher`,
 adds Start Menu and (optionally) desktop shortcuts plus an entry in Windows
 Settings → Apps, and never asks for administrator rights. Windows 10/11 x64
@@ -112,7 +112,7 @@ python -m PyInstaller "build/Nexi Launcher.spec" `
     --distpath _dist --workpath _build_tmp --noconfirm
 ```
 
-The result is `_dist\nexi.exe` (onefile, no console window).
+The result is `_dist\Nexi-Portable.exe` (onefile, no console window).
 
 ### Build the installer
 
@@ -120,10 +120,10 @@ The result is `_dist\nexi.exe` (onefile, no console window).
 .\build_installer.ps1
 ```
 
-This rebuilds `nexi.exe`, then packs it into `_dist\NexiLauncher-Setup.exe`
+This rebuilds `Nexi-Portable.exe`, then packs it into `_dist\NexiLauncher-Setup.exe`
 (also copied to the project root). The setup is a one-file PyInstaller
-executable as well: it carries `nexi.exe` inside, and a copy of itself becomes
-`Uninstall.exe` in the install folder. It installs per user, so no
+executable as well: it carries `Nexi-Portable.exe` inside, and a copy of itself
+becomes `Uninstall.exe` in the install folder. It installs per user, so no
 administrator rights are needed, and it also accepts `--silent`,
 `--silent-uninstall` and `--uninstall` on the command line.
 
@@ -169,7 +169,7 @@ webui/app.js              UI logic, talks to Python via window.pywebview.api
 build/Nexi Launcher.spec  PyInstaller spec (bundles the webui folder)
 build.ps1                 convenience build script
 installer/installer.py    per-user setup and uninstaller (Tk UI, silent mode)
-build_installer.ps1       builds nexi.exe and NexiLauncher-Setup.exe
+build_installer.ps1       builds Nexi-Portable.exe and NexiLauncher-Setup.exe
 ```
 
 Each module imports only what it needs; the bridge mixins are combined in
@@ -206,7 +206,8 @@ kept the tokens inside `settings.json`; the launcher moves them into
   `api.modrinth.com` is blocked the browser shows a clear error instead of
   hanging.
 - The launcher is Windows-only: it relies on WinForms/WebView2 through
-  pywebview and on PowerShell dialogs for file picking.
+  pywebview. File and folder pickers use the native Win32 common dialogs, so
+  the app does not spawn hidden PowerShell processes.
 
 ## License
 

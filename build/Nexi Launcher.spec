@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='nexi',
+    name='Nexi-Portable',
     icon='../assets/nexi.ico',
     version='../assets/version_info.txt',
     debug=False,

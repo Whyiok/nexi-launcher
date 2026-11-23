@@ -3,7 +3,6 @@
 import json
 import os
 import shutil
-import subprocess
 import time
 import urllib.request
 from pathlib import Path
@@ -24,7 +23,7 @@ from ..instances import (
 from ..modpacks import _zip_member_target
 from ..modrinth import modrinth_get
 from ..ms_auth import MS_CLIENT_ID_DEFAULT
-from ..util import copy_image_to_clipboard, open_in_system
+from ..util import copy_image_to_clipboard, open_in_system, pick_file
 from ..version import VERSION
 from ..versions import (
     detect_loader, game_version_of, load_version, version_meta,
@@ -560,23 +559,14 @@ class ProfilesApi:
             return {"ok": False, "error": "Select a profile first."}
         if os.name != "nt":
             return {"ok": False, "error": "The image picker needs Windows."}
-        script = (
-            "Add-Type -AssemblyName System.Windows.Forms | Out-Null; "
-            "$d = New-Object System.Windows.Forms.OpenFileDialog; "
-            "$d.Title = 'Select a profile icon'; "
-            "$d.Filter = 'Images (*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp)|"
-            "*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp|All files (*.*)|*.*'; "
-            "if ($d.ShowDialog() -eq 'OK') { [Console]::Out.Write($d.FileName) }"
-        )
         try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-STA", "-Command", script],
-                capture_output=True, text=True, timeout=600,
-                creationflags=subprocess.CREATE_NO_WINDOW)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+            picked = pick_file(
+                "Select a profile icon",
+                (("Images", "*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp"),
+                 ("All files", "*.*")))
+        except OSError as exc:
             return {"ok": False,
                     "error": f"Could not open the file picker: {exc}"}
-        picked = (result.stdout or "").strip()
         if not picked:
             return {"ok": False, "cancelled": True}
         return self._apply_profile_icon(instance["_root"], Path(picked))
@@ -640,26 +630,17 @@ class ProfilesApi:
             return {"ok": False, "error": "Select a profile first."}
         if os.name != "nt":
             return {"ok": False, "error": "The image picker needs Windows."}
-        script = (
-            "Add-Type -AssemblyName System.Windows.Forms | Out-Null; "
-            "$d = New-Object System.Windows.Forms.OpenFileDialog; "
-            "$d.Title = 'Select a build banner'; "
-            "$d.Filter = 'Images and videos (*.png;*.jpg;*.jpeg;*.webp;*.gif;"
-            "*.mp4;*.webm)|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.mp4;*.webm|"
-            "Images (*.png;*.jpg;*.jpeg;*.webp;*.gif)|"
-            "*.png;*.jpg;*.jpeg;*.webp;*.gif|"
-            "Video (*.mp4;*.webm)|*.mp4;*.webm|All files (*.*)|*.*'; "
-            "if ($d.ShowDialog() -eq 'OK') { [Console]::Out.Write($d.FileName) }"
-        )
         try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-STA", "-Command", script],
-                capture_output=True, text=True, timeout=600,
-                creationflags=subprocess.CREATE_NO_WINDOW)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+            picked = pick_file(
+                "Select a build banner",
+                (("Images and videos",
+                  "*.png;*.jpg;*.jpeg;*.webp;*.gif;*.mp4;*.webm"),
+                 ("Images", "*.png;*.jpg;*.jpeg;*.webp;*.gif"),
+                 ("Video", "*.mp4;*.webm"),
+                 ("All files", "*.*")))
+        except OSError as exc:
             return {"ok": False,
                     "error": f"Could not open the file picker: {exc}"}
-        picked = (result.stdout or "").strip()
         if not picked:
             return {"ok": False, "cancelled": True}
         return self._apply_profile_banner(instance["_root"], Path(picked))

@@ -1,11 +1,11 @@
 ﻿"""Nexi Launcher setup and uninstaller.
 
 The file is built into a single self-contained ``NexiLauncher-Setup.exe`` that
-carries ``nexi.exe`` inside it (see ``build_installer.ps1``). It installs the
-launcher per user, so no administrator rights are needed:
+carries ``Nexi-Portable.exe`` inside it (see ``build_installer.ps1``). It
+installs the launcher per user, so no administrator rights are needed:
 
     %LOCALAPPDATA%\\Programs\\Nexi Launcher\\
-        nexi.exe
+        Nexi-Portable.exe
         Uninstall.exe        a copy of this setup exe
 
 A Start Menu shortcut is always created, a desktop shortcut is optional, and an
@@ -36,12 +36,14 @@ import tempfile
 import threading
 import time
 import traceback
+import uuid
 import winreg
+from ctypes import wintypes
 from pathlib import Path
 
 APP_NAME = "Nexi Launcher"
-VERSION = "1.7.4"
-EXE_NAME = "nexi.exe"
+VERSION = "1.8.0"
+EXE_NAME = "Nexi-Portable.exe"
 UNINSTALLER_NAME = "Uninstall.exe"
 UNINSTALL_KEY = (r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
                  r"\NexiLauncher")
@@ -64,7 +66,7 @@ class InstallerError(Exception):
 
 
 class AppRunning(InstallerError):
-    """nexi.exe is running and the installed copy could not be replaced."""
+    """Nexi-Portable.exe is running and the installed copy could not be replaced."""
 
 
 # --------------------------------------------------------------------- logging
@@ -96,7 +98,7 @@ def _payload_path() -> Path:
                       _project_root() / "_dist" / EXE_NAME):
         if candidate.is_file():
             return candidate
-    raise InstallerError("nexi.exe is missing from the setup bundle.")
+    raise InstallerError("Nexi-Portable.exe is missing from the setup bundle.")
 
 
 def _asset_path(name: str) -> Path | None:
@@ -253,30 +255,123 @@ def remove_registry() -> None:
 
 # -------------------------------------------------------------------- shortcuts
 
-def _ps_quote(value) -> str:
-    return "'" + str(value).replace("'", "''") + "'"
+# Shortcuts are created through the shell's IShellLink COM object. The old
+# implementation shelled out to PowerShell with a hidden window, which made
+# the setup exe look suspicious to antivirus heuristics for no benefit.
+
+_CLSCTX_INPROC_SERVER = 1
+_CLSID_SHELLLINK = "00021401-0000-0000-C000-000000000046"
+_IID_ISHELLLINKW = "000214F9-0000-0000-C000-000000000046"
+_IID_IPERSISTFILE = "0000010B-0000-0000-C000-000000000046"
+
+
+class _GUID(ctypes.Structure):
+    _fields_ = [
+        ("Data1", wintypes.DWORD),
+        ("Data2", wintypes.WORD),
+        ("Data3", wintypes.WORD),
+        ("Data4", ctypes.c_ubyte * 8),
+    ]
+
+    @classmethod
+    def parse(cls, text: str) -> "_GUID":
+        value = uuid.UUID(text)
+        guid = cls()
+        guid.Data1 = value.time_low
+        guid.Data2 = value.time_mid
+        guid.Data3 = value.time_hi_version
+        for index, byte in enumerate(value.bytes[8:]):
+            guid.Data4[index] = byte
+        return guid
+
+
+def _com_call(interface, index: int, *argtypes):
+    """Bind one vtable slot of a COM interface to a callable."""
+    table = ctypes.cast(
+        interface, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p)))[0]
+    address = ctypes.cast(table[index], ctypes.c_void_p).value
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p,
+                                   *argtypes)
+    return prototype(address)
+
+
+def _com_release(interface) -> None:
+    try:
+        _com_call(interface, 2)(interface)  # IUnknown::Release
+    except (OSError, ValueError):
+        pass
+
+
+def _write_shortcut(link: Path, target: Path) -> None:
+    ole32 = ctypes.WinDLL("ole32", use_last_error=True)
+    ole32.CoCreateInstance.argtypes = [
+        ctypes.POINTER(_GUID), ctypes.c_void_p, wintypes.DWORD,
+        ctypes.POINTER(_GUID), ctypes.POINTER(ctypes.c_void_p)]
+    ole32.CoCreateInstance.restype = ctypes.c_long
+
+    initialised = ole32.CoInitializeEx(None, 2) in (0, 1)
+    shell_link = ctypes.c_void_p()
+    persist = ctypes.c_void_p()
+    try:
+        clsid = _GUID.parse(_CLSID_SHELLLINK)
+        iid = _GUID.parse(_IID_ISHELLLINKW)
+        hr = ole32.CoCreateInstance(ctypes.byref(clsid), None,
+                                    _CLSCTX_INPROC_SERVER,
+                                    ctypes.byref(iid),
+                                    ctypes.byref(shell_link))
+        if hr < 0 or not shell_link:
+            raise InstallerError(
+                "Could not create the shortcut (COM error "
+                f"0x{hr & 0xFFFFFFFF:08x}).")
+
+        target_text = str(target)
+        link_text = str(link)
+
+        def set_string(index, value):
+            result = _com_call(shell_link, index, wintypes.LPCWSTR)(
+                shell_link, value)
+            if result < 0:
+                raise InstallerError(
+                    f"Could not fill in the shortcut (0x{result & 0xFFFFFFFF:08x}).")
+
+        set_string(20, target_text)                    # IShellLinkW::SetPath
+        set_string(9, str(target.parent))              # SetWorkingDirectory
+        set_string(7, APP_NAME)                        # SetDescription
+        icon_result = _com_call(
+            shell_link, 17, wintypes.LPCWSTR, ctypes.c_int)(
+            shell_link, target_text, 0)                # SetIconLocation
+        if icon_result < 0:
+            raise InstallerError(
+                f"Could not set the shortcut icon "
+                f"(0x{icon_result & 0xFFFFFFFF:08x}).")
+
+        iid_persist = _GUID.parse(_IID_IPERSISTFILE)
+        hr = _com_call(shell_link, 0, ctypes.POINTER(_GUID),
+                       ctypes.POINTER(ctypes.c_void_p))(
+            shell_link, ctypes.byref(iid_persist), ctypes.byref(persist))
+        if hr < 0 or not persist:
+            raise InstallerError(
+                f"Could not save the shortcut (0x{hr & 0xFFFFFFFF:08x}).")
+        hr = _com_call(persist, 6, wintypes.LPCWSTR, wintypes.BOOL)(
+            persist, link_text, True)                  # IPersistFile::Save
+        if hr < 0:
+            raise InstallerError(
+                f"Could not save the shortcut (0x{hr & 0xFFFFFFFF:08x}).")
+    finally:
+        if persist:
+            _com_release(persist)
+        if shell_link:
+            _com_release(shell_link)
+        if initialised:
+            ole32.CoUninitialize()
 
 
 def create_shortcut(link: Path, target: Path) -> None:
-    script = (
-        "$ErrorActionPreference='Stop';"
-        "$shell=New-Object -ComObject WScript.Shell;"
-        f"$s=$shell.CreateShortcut({_ps_quote(link)});"
-        f"$s.TargetPath={_ps_quote(target)};"
-        f"$s.WorkingDirectory={_ps_quote(target.parent)};"
-        f"$s.IconLocation={_ps_quote(str(target) + ',0')};"
-        f"$s.Description={_ps_quote(APP_NAME)};"
-        "$s.Save()"
-    )
-    result = subprocess.run(
-        ["powershell.exe", "-NoProfile", "-NonInteractive",
-         "-WindowStyle", "Hidden", "-Command", script],
-        creationflags=CREATE_NO_WINDOW, capture_output=True, text=True,
-        timeout=90)
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip()
+    try:
+        _write_shortcut(Path(link), Path(target))
+    except OSError as exc:
         raise InstallerError(
-            f"Could not create the shortcut {link.name}: {detail}")
+            f"Could not create the shortcut {Path(link).name}: {exc}") from exc
 
 
 # ------------------------------------------------------------------- processes
@@ -473,7 +568,19 @@ def _schedule_self_delete() -> None:
 
 def cleanup_main(target: str) -> int:
     """Internal: wait for the uninstaller to exit, then delete the folder."""
-    folder = Path(target)
+    try:
+        folder = _validate_dir(target)
+    except InstallerError as exc:
+        # --cleanup is invoked with a path; never let a wrong one wipe an
+        # arbitrary directory.
+        log(f"cleanup: refusing {target!r}: {exc}")
+        _schedule_self_delete()
+        return 1
+    if folder.exists() and not ((folder / UNINSTALLER_NAME).is_file()
+                                or (folder / EXE_NAME).is_file()):
+        log(f"cleanup: {folder} does not look like a Nexi installation")
+        _schedule_self_delete()
+        return 1
     deadline = time.time() + 40
     while folder.exists() and time.time() < deadline:
         try:

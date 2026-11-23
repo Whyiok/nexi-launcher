@@ -4,7 +4,6 @@ import inspect
 import json
 import os
 import queue
-import subprocess
 import threading
 import time
 import uuid
@@ -17,7 +16,7 @@ from ..game_options import normalize_defaults
 from ..logging_setup import log
 from ..net import (MIRROR_MODES, normalize_proxy, set_dns, set_mirror_mode,
                    set_mirror_notifier, set_proxy)
-from ..util import _read_json, open_in_system
+from ..util import _read_json, open_in_system, pick_file
 
 
 class BaseApi:
@@ -615,31 +614,24 @@ class BaseApi:
         return {"ok": True, "state": self.state()}
 
     def pick_java(self):
-        """Native Windows file picker in its own STA process.
+        """Native Windows file picker for the Java executable.
 
         pywebview dialogs must run on the GUI thread, while JS API calls run
-        on worker threads, so the picker is opened through PowerShell instead.
+        on worker threads, so the Windows common dialog is opened directly
+        through ctypes instead of the bridge dialog API.
         """
         if os.name != "nt":
             return {"ok": False,
                     "error": "Type the path to the Java executable."}
-        script = (
-            "Add-Type -AssemblyName System.Windows.Forms | Out-Null; "
-            "$d = New-Object System.Windows.Forms.OpenFileDialog; "
-            "$d.Title = 'Select javaw.exe'; "
-            "$d.Filter = 'Java executables (javaw.exe;java.exe)|"
-            "javaw.exe;java.exe|All files (*.*)|*.*'; "
-            "if ($d.ShowDialog() -eq 'OK') { [Console]::Out.Write($d.FileName) }"
-        )
         try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-STA", "-Command", script],
-                capture_output=True, text=True, timeout=600,
-                creationflags=subprocess.CREATE_NO_WINDOW)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+            picked = pick_file(
+                "Select javaw.exe",
+                (("Java executables", "javaw.exe;java.exe"),
+                 ("All files", "*.*")),
+                default_ext="exe")
+        except OSError as exc:
             return {"ok": False,
                     "error": f"Could not open the file picker: {exc}"}
-        picked = (result.stdout or "").strip()
         if not picked:
             return {"ok": False, "cancelled": True}
         return self.set_java(picked)

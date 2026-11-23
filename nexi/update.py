@@ -1,9 +1,9 @@
 """Check GitHub for a newer release and replace the running launcher.
 
-The updater deliberately downloads only the ``nexi.exe`` asset published in the
-official repository, verifies the SHA-256 digest GitHub returns for that asset,
-and then lets a tiny detached batch file swap the executable once this process
-has exited. User data in ``%APPDATA%\\NexiLauncher`` is never touched.
+The updater deliberately downloads only the release executable published in
+the official repository, verifies the SHA-256 digest GitHub returns for that
+asset, and then lets a tiny detached batch file swap the executable once this
+process has exited. User data in ``%APPDATA%\\NexiLauncher`` is never touched.
 """
 
 from __future__ import annotations
@@ -27,7 +27,10 @@ from .version import VERSION
 RELEASE_REPO = "Whyiok/nexi-launcher"
 LATEST_RELEASE_API = (
     f"https://api.github.com/repos/{RELEASE_REPO}/releases/latest")
-ASSET_NAME = "nexi.exe"
+ASSET_NAME = "Nexi-Portable.exe"
+# Builds published before the rename look for the old asset name, so releases
+# keep carrying a ``nexi.exe`` copy as well.
+ASSET_NAMES = (ASSET_NAME, "nexi.exe")
 USER_AGENT = f"NexiLauncher/{VERSION}"
 
 CREATE_NO_WINDOW = 0x08000000
@@ -90,9 +93,12 @@ def check_latest(current: str = VERSION) -> dict:
         raise UpdateError("The latest release has no version tag.")
     available = is_newer(version, current)
     asset = None
-    for item in data.get("assets") or []:
-        if isinstance(item, dict) and item.get("name") == ASSET_NAME:
-            asset = item
+    for name in ASSET_NAMES:
+        for item in data.get("assets") or []:
+            if isinstance(item, dict) and item.get("name") == name:
+                asset = item
+                break
+        if asset is not None:
             break
     if available and asset is None:
         raise UpdateError(
@@ -133,15 +139,23 @@ def _sha256(path: Path) -> str:
 
 
 def verify_asset(path: Path, digest: str) -> None:
+    """Refuse an update that has no usable SHA-256 from the release.
+
+    GitHub publishes a ``sha256:`` digest for every release asset. Failing
+    closed means a truncated, swapped or MITM'd download is never run, even if
+    the release metadata was incomplete.
+    """
     expected = str(digest or "").strip().lower()
-    if not expected:
-        return
     if expected.startswith("sha256:"):
         expected = expected[7:]
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
-        return
+        path.unlink(missing_ok=True)
+        raise UpdateError(
+            "The release does not publish a SHA-256 checksum for the "
+            "download, so it was not installed.")
     actual = _sha256(path)
     if actual != expected:
+        path.unlink(missing_ok=True)
         raise UpdateError("The downloaded update failed the integrity check.")
 
 

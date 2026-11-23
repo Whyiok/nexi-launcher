@@ -93,6 +93,14 @@ function handleEvent(ev) {
           "Nexi link");
       }
       break;
+    case "nexi_skin":
+      if (ev.ok) {
+        if (typeof openSkinFromSite === "function") openSkinFromSite(ev);
+      } else {
+        showErrorToast(ev.error || "Could not load the skin from the site.",
+          "Nexi skin");
+      }
+      break;
     case "nexi_login":
       if (ev.status === "waiting") {
         friendsState.waiting = true;

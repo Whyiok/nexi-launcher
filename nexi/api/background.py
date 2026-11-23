@@ -8,12 +8,12 @@ read ``file://`` paths).
 
 import os
 import shutil
-import subprocess
 from pathlib import Path
 
 from .. import media
 from ..config import BACKGROUNDS_DIR
 from ..logging_setup import log
+from ..util import pick_file
 
 BACKGROUND_KINDS = {".gif": "image", ".mp4": "video", ".webm": "video"}
 
@@ -39,24 +39,17 @@ class BackgroundApi:
         if os.name != "nt":
             return {"ok": False,
                     "error": "The background picker needs Windows."}
-        script = (
-            "Add-Type -AssemblyName System.Windows.Forms | Out-Null; "
-            "$d = New-Object System.Windows.Forms.OpenFileDialog; "
-            "$d.Title = 'Select a background'; "
-            "$d.Filter = 'Backgrounds (*.gif;*.mp4;*.webm)|*.gif;*.mp4;*.webm|"
-            "GIF (*.gif)|*.gif|Video (*.mp4;*.webm)|*.mp4;*.webm|"
-            "All files (*.*)|*.*'; "
-            "if ($d.ShowDialog() -eq 'OK') { [Console]::Out.Write($d.FileName) }"
-        )
         try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-STA", "-Command", script],
-                capture_output=True, text=True, timeout=600,
-                creationflags=subprocess.CREATE_NO_WINDOW)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+            picked = pick_file(
+                "Select a background",
+                (("Backgrounds", "*.gif;*.mp4;*.webm"),
+                 ("GIF", "*.gif"),
+                 ("Video", "*.mp4;*.webm"),
+                 ("All files", "*.*")))
+        except OSError as exc:
             return {"ok": False,
                     "error": f"Could not open the file picker: {exc}"}
-        picked = (result.stdout or "").strip().strip('"')
+        picked = picked.strip().strip('"')
         if not picked:
             return {"ok": False, "cancelled": True}
         source = Path(picked)
