@@ -125,9 +125,9 @@ def _run_open_dialog(title: str, filters, default_ext: str) -> str:
     info = _OPENFILENAMEW()
     info.lStructSize = ctypes.sizeof(_OPENFILENAMEW)
     info.hwndOwner = owner
-    info.lpstrFilter = filter_text
+    info.lpstrFilter = ctypes.cast(filter_text, ctypes.c_wchar_p)
     info.nFilterIndex = 1
-    info.lpstrFile = buffer
+    info.lpstrFile = ctypes.cast(buffer, ctypes.c_wchar_p)
     info.nMaxFile = len(buffer)
     info.lpstrTitle = title
     info.lpstrDefExt = default_ext or None
@@ -227,7 +227,7 @@ def _run_folder_dialog(title: str, initial: str) -> str:
     info = _BROWSEINFOW()
     info.hwndOwner = ctypes.windll.user32.GetForegroundWindow()
     info.pidlRoot = root
-    info.pszDisplayName = display
+    info.pszDisplayName = ctypes.cast(display, ctypes.c_wchar_p)
     info.lpszTitle = title
     info.ulFlags = (_BIF_RETURNONLYFSDIRS | _BIF_EDITBOX
                     | _BIF_NEWDIALOGSTYLE)
