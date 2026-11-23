@@ -16,12 +16,12 @@ VSVersionInfo(
         '040904B0',
         [StringStruct('CompanyName', 'Nexi Launcher'),
          StringStruct('FileDescription', 'Nexi Launcher'),
-         StringStruct('FileVersion', '1.8.1.0'),
+         StringStruct('FileVersion', '1.8.2.0'),
          StringStruct('InternalName', 'Nexi Launcher'),
          StringStruct('LegalCopyright', 'Nexi Launcher'),
          StringStruct('OriginalFilename', 'NexiLauncher.exe'),
          StringStruct('ProductName', 'Nexi Launcher'),
-         StringStruct('ProductVersion', '1.8.1.0')])
+         StringStruct('ProductVersion', '1.8.2.0')])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

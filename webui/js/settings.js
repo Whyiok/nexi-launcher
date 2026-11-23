@@ -495,9 +495,20 @@ async function nexiLogin() {
   setStatus("Enter the code from the e-mail.");
 }
 
+async function nexiBrowserLogin() {
+  const button = $("#btn-nexi-browser");
+  if (button) button.disabled = true;
+  setStatus("Waiting for Nexi sign-in in the browser…");
+  const result = await call("nexi_browser_login");
+  if (!result || !result.ok) {
+    if (button) button.disabled = false;
+    setStatus((result && result.error) || "Could not start browser sign-in.",
+      true);
+  }
+}
+
 async function nexiVerify() {
-  const code = $("#nexi-code").value.trim();
-  if (!code) {
+  const code = $("#nexi-code").value.trim();  if (!code) {
     setStatus("Enter the 6-digit code from the e-mail.", true);
     return;
   }

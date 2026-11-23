@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .. import config, curseforge
 from ..config import (DATA_DIR, ELY_OAUTH_REDIRECT_DEFAULT, MC,
-                      NEXI_BASE_URL_DEFAULT, app_dir)
+                      NEXI_BASE_URL_DEFAULT, NEXI_BASE_URL_LEGACY, app_dir)
 from ..game_options import normalize_defaults
 from ..logging_setup import log
 from ..net import (MIRROR_MODES, normalize_proxy, set_dns, set_mirror_mode,
@@ -59,6 +59,12 @@ class BaseApi:
             nexi = {}
         self.nexi_base_url = str(nexi.get("base_url")
                                  or NEXI_BASE_URL_DEFAULT).strip().rstrip("/")
+        # Older builds saved the loopback address as the default, which only
+        # works on the machine that hosts the site. Move those installs to the
+        # shared LAN address so friends can sign in too.
+        nexi_migrated = self.nexi_base_url in NEXI_BASE_URL_LEGACY
+        if nexi_migrated:
+            self.nexi_base_url = NEXI_BASE_URL_DEFAULT
         self._nexi_pending = None
         self._nexi_login_thread = None
         self._nexi_login_stop = threading.Event()
@@ -152,6 +158,8 @@ class BaseApi:
             self._save_accounts()
             self._save()
             self._scrub_legacy_settings()
+        if nexi_migrated:
+            self._save()
         self.refresh_instances(select=self.selected_slug)
         self._install_trace()
         log.info("api ready: player=%r ram=%s default_ram=%s java=%r "

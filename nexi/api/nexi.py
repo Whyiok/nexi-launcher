@@ -791,7 +791,7 @@ class NexiApi:
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             return {"ok": False,
                     "error": "Enter a full http(s) address, for example "
-                             "http://127.0.0.1:5000.",
+                             "http://192.168.0.32:5000.",
                     "state": self.state()}
         with self._lock:
             self.nexi_base_url = value

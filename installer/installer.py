@@ -44,7 +44,7 @@ from ctypes import wintypes
 from pathlib import Path
 
 APP_NAME = "Nexi Launcher"
-VERSION = "1.8.1"
+VERSION = "1.8.2"
 EXE_NAME = "NexiLauncher.exe"
 # The setup used to install a single-file build under this name; it is removed
 # on upgrade so a folder does not end up with two launchers in it.

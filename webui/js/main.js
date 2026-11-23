@@ -324,6 +324,7 @@ function bind() {
     if (button) setAccountMethod(button.dataset.method);
   });
   $("#btn-nexi-login").addEventListener("click", nexiLogin);
+  $("#btn-nexi-browser").addEventListener("click", nexiBrowserLogin);
   $("#btn-nexi-verify").addEventListener("click", nexiVerify);
   $("#btn-nexi-cancel").addEventListener("click", nexiCancel);
   $("#btn-nexi-logout").addEventListener("click", nexiLogout);

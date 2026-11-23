@@ -29,6 +29,9 @@ function applyTheme(theme) {
   if (friendsLogo) {
     friendsLogo.src = THEME_BRAND_ICONS[next] || THEME_BRAND_ICONS.mint;
   }
+  for (const logo of document.querySelectorAll(".nexi-id-logo")) {
+    logo.src = THEME_BRAND_ICONS[next] || THEME_BRAND_ICONS.mint;
+  }
   startOrb();
   if (typeof refreshHomePanorama === "function") refreshHomePanorama();
 }

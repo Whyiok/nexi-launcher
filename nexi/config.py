@@ -164,9 +164,17 @@ MAX_LOG_BACKLOG = 200_000
 ELY_OAUTH_REDIRECT_DEFAULT = "http://localhost:26206/ely-callback"
 
 
-# Nexi site used for account sign-in. Kept editable in Settings → Accounts
-# because the site can run locally or on a public domain.
-NEXI_BASE_URL_DEFAULT = "http://127.0.0.1:5000"
+# Nexi site used for account sign-in. The default is the LAN address of the
+# site, so every launcher in the local network can sign in, not only the
+# machine that hosts it. Kept editable in Settings → Accounts for a public
+# domain.
+NEXI_BASE_URL_DEFAULT = "http://192.168.0.32:5000"
+
+
+# Addresses older builds saved as the default. They only work on the machine
+# hosting the site, so they are treated as "not chosen" and replaced with
+# ``NEXI_BASE_URL_DEFAULT``.
+NEXI_BASE_URL_LEGACY = ("http://127.0.0.1:5000", "http://localhost:5000")
 
 
 ELY_JAVA_AGENT = "ely.by"

@@ -1144,12 +1144,21 @@
                 <input class="input" id="nexi-password" type="password"
                        autocomplete="current-password">
               </label>
-              <button class="btn primary" id="btn-nexi-login" type="button">
-                Sign in
-              </button>
+              <div class="input-row">
+                <button class="btn primary" id="btn-nexi-login" type="button">
+                  Sign in
+                </button>
+                <button class="nexi-id-btn" id="btn-nexi-browser"
+                        type="button">
+                  <img class="nexi-id-logo" alt="" src="star_icon.svg">Sign in
+                  through the site
+                </button>
+              </div>
               <p class="hint">A 6-digit code arrives by e-mail and confirms the
                  sign-in. The password goes only to the Nexi site and is never
                  stored.</p>
+              <p class="hint">“Sign in through the site” opens the Nexi site in
+                 your browser — nothing to type in the launcher.</p>
             </div>
 
             <div class="ely-form hidden" id="nexi-code-box">
@@ -1220,15 +1229,16 @@
                   <div class="input-row">
                     <input class="input" id="nexi-base-url" spellcheck="false"
                            autocomplete="off"
-                           placeholder="http://127.0.0.1:5000">
+                           placeholder="http://192.168.0.32:5000">
                     <button class="btn ghost" id="btn-save-nexi-url"
                             type="button">
                       Save
                     </button>
                   </div>
                 </label>
-                <p class="hint">Used for Nexi sign-in and profile sync. Change it
-                   if the site runs on another address or domain.</p>
+                <p class="hint">Used for Nexi sign-in and profile sync. The
+                   default 192.168.0.32:5000 works for every launcher in the
+                   local network; change it if the site runs elsewhere.</p>
               </details>
             </div>
           </div>

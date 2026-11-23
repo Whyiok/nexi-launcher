@@ -102,6 +102,10 @@ function handleEvent(ev) {
       }
       break;
     case "nexi_login":
+      if (ev.status !== "waiting") {
+        const browserBtn = document.getElementById("btn-nexi-browser");
+        if (browserBtn) browserBtn.disabled = false;
+      }
       if (ev.status === "waiting") {
         friendsState.waiting = true;
         friendsStatus("Waiting for you to sign in in the browser…");
