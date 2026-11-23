@@ -154,7 +154,9 @@ function loadEditBuilds() {
 function syncVersionEditor() {
   const mc = $("#edit-version");
   if (!mc) return;
-  const busy = vedit.busy || !!S.busy;
+  // Only this editor's own save locks it; background downloads elsewhere
+  // must not freeze the profile settings.
+  const busy = vedit.busy;
   mc.disabled = busy;
   $("#edit-loader").disabled = busy;
   $("#edit-build").disabled = busy || vedit.loader === "any";
@@ -182,7 +184,7 @@ function fillVersionEditor(force = false) {
 }
 
 async function applyVersionChange() {
-  if (!S.instance || vedit.busy || S.busy) return;
+  if (!S.instance || vedit.busy) return;
   const mc = $("#edit-version").value || vedit.mc;
   const loaderKey = vedit.loader === "any" ? null : vedit.loader;
   const build = loaderKey ? ($("#edit-build").value || "") : null;
@@ -421,7 +423,7 @@ async function createProfile() {
 }
 
 async function duplicateProfile() {
-  if (!S.instance || S.busy) return;
+  if (!S.instance || S.busy === "duplicate") return;
   S.busy = "duplicate";
   syncBusy();
   setStatus("Copying the profile — worlds and logs are skipped…");
@@ -433,7 +435,7 @@ async function duplicateProfile() {
 }
 
 async function backupWorlds() {
-  if (!S.instance || S.busy) return;
+  if (!S.instance || S.busy === "backup") return;
   S.busy = "backup";
   syncBusy();
   setStatus("Packing the worlds…");
@@ -444,7 +446,7 @@ async function backupWorlds() {
 }
 
 async function verifyFiles() {
-  if (!S.instance || S.busy) return;
+  if (!S.instance || S.busy === "verify") return;
   S.busy = "verify";
   syncBusy();
   setStatus("Checking game files — this can take a minute…");
@@ -455,7 +457,7 @@ async function verifyFiles() {
 }
 
 async function importModpack() {
-  if (S.busy) return;
+  if (S.busy === "import") return;
   const picked = await call("pick_modpack");
   if (picked.cancelled) {
     setStatus("Import cancelled.");

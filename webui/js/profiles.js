@@ -137,7 +137,7 @@ const profileDrag = { card: null, startY: 0, grab: 0, shift: 0, active: false,
                       suppressClick: false };
 
 function profileDragStart(event) {
-  if (event.button !== 0 || S.busy) return;
+  if (event.button !== 0) return;
   const card = event.target.closest(".profile-card");
   if (!card || !card.dataset.slug) return;
   profileDrag.card = card;
@@ -347,7 +347,7 @@ function fillDetailBanner(inst) {
   }
   if (head) head.classList.toggle("has-banner", !!inst.banner);
   const clear = $("#btn-pane-clear-banner");
-  if (clear) clear.disabled = !!S.busy || !inst.banner;
+  if (clear) clear.disabled = !inst.banner;
 }
 
 function fillDetail(inst, options = {}) {
@@ -674,7 +674,7 @@ function renderDetailPanes() {
       row.appendChild(text);
       const button = elem("button", "btn danger sm", "Uninstall");
       button.type = "button";
-      button.disabled = !!S.busy;
+      button.disabled = !!mods.busy;
       button.addEventListener("click", () => uninstallPaneMod(mod));
       row.appendChild(button);
       modsList.appendChild(row);
@@ -713,11 +713,10 @@ function renderDetailPanes() {
 
   renderShots();
 
-  $("#btn-pane-clear-icon").disabled = !!S.busy
-    || !S.instance || !S.instance.icon;
+  $("#btn-pane-clear-icon").disabled = !S.instance || !S.instance.icon;
   const browseMods = $("#btn-pane-browse-mods");
   if (browseMods) {
-    browseMods.disabled = !!S.busy || !modsAllowed();
+    browseMods.disabled = !modsAllowed();
     browseMods.title = modsAllowed() ? ""
       : "This profile is vanilla — install a mod loader first";
   }
@@ -753,7 +752,7 @@ function renderPackPane(kind, listId, subId, data, loading, emptyText) {
 }
 
 async function uninstallPaneMod(mod) {
-  if (!S.instance || S.busy) return;
+  if (!S.instance || mods.busy) return;
   const result = await call("mods_uninstall", mod.project_id || "",
                             mod.filename || "");
   if (!result.ok) {
@@ -766,7 +765,7 @@ async function uninstallPaneMod(mod) {
 }
 
 async function updatePaneMods() {
-  if (!S.instance || S.busy) return;
+  if (!S.instance || mods.busy) return;
   setStatus("Checking installed mods…");
   const result = await call("mods_update_all", S.instance.loader);
   setStatus(result.message || result.error || "Done.", !result.ok);
@@ -822,7 +821,7 @@ async function clearProfileIcon() {
 }
 
 async function setProfileBanner() {
-  if (!S.instance || S.busy) return;
+  if (!S.instance) return;
   const result = await call("set_profile_banner");
   if (result.cancelled) return;
   if (result.error) {

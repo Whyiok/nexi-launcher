@@ -154,7 +154,7 @@ function fillBackground() {
   const clear = $("#btn-clear-background");
   if (clear) clear.disabled = !active;
   const pick = $("#btn-pick-background");
-  if (pick) pick.disabled = !!S.busy;
+  if (pick) pick.disabled = false;
 }
 
 function fillTheme() {
@@ -983,7 +983,6 @@ async function changePet(kind) {
 }
 
 async function pickBackground() {
-  if (S.busy) return;
   const result = await call("background_pick");
   if (!result || !result.ok) {
     if (result && result.cancelled) return;

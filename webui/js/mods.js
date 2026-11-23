@@ -405,7 +405,7 @@ function syncBatch() {
   // Modpacks install as separate profiles, so they are never batched.
   const count = mods.kind === "modpack" ? 0 : mods.checked.size;
   button.classList.toggle("hidden", count === 0);
-  button.disabled = !!mods.busy || !!S.busy
+  button.disabled = !!mods.busy
     || (mods.kind === "mod" && !modsAllowed());
   button.textContent = `Install selected (${count})`;
 }
@@ -542,11 +542,12 @@ async function refreshModStatus() {
 }
 
 function syncMods() {
-  const busy = mods.busy || mods.statusLoading || !!S.busy;
+  const busy = mods.busy || mods.statusLoading;
   const hasHit = mods.selected >= 0 && !!mods.hits[mods.selected];
   const installed = hasHit && !!mods.installed && mods.kind !== "modpack";
   const needsProfile = mods.kind !== "modpack";
-  $("#btn-mod-search").disabled = busy || (needsProfile && !S.instance);
+  // Browsing stays available while a download from another screen runs.
+  $("#btn-mod-search").disabled = needsProfile && !S.instance;
   $("#btn-mod-install").classList.toggle("hidden", installed);
   // Nothing selected means nothing to manage: no Uninstall row.
   $("#mod-manage").classList.toggle("hidden",

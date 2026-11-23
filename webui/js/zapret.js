@@ -232,7 +232,7 @@ async function openZapret() {
 }
 
 async function zapretApply(extra = "") {
-  if (S.busy) return;
+  if (S.busy === "zapret") return;
   const status = zap.status || {};
   const needsDownload = !status.found;
   if (extra) zap.pendingExtra = extra;
@@ -276,7 +276,7 @@ async function zapretApply(extra = "") {
 }
 
 async function zapretStop() {
-  if (S.busy) return;
+  if (S.busy === "zapret") return;
   setZapretStatus("Stopping the bypass…");
   const result = await call("zapret_stop");
   if (result && result.status) {
@@ -290,7 +290,7 @@ async function zapretStop() {
 }
 
 async function zapretPickFolder() {
-  if (S.busy) return;
+  if (S.busy === "zapret") return;
   const result = await call("zapret_pick_folder");
   if (result && result.ok && result.status) {
     zap.status = result.status;
@@ -302,7 +302,7 @@ async function zapretPickFolder() {
 }
 
 async function zapretSetPreset(value) {
-  if (S.busy) return;
+  if (S.busy === "zapret") return;
   const result = await call("zapret_set_preset", value);
   if (result && result.ok && result.status) {
     zap.status = result.status;

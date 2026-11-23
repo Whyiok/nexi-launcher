@@ -191,34 +191,38 @@ function setProgress(done, total) {
 function syncBusy() {
   const creating = S.busy === "create";
   const installing = S.busy === "loaders";
-  const busy = !!S.busy;
-  $("#btn-create").disabled = busy;
-  $("#btn-refresh-versions").disabled = busy || versions.loading;
-  $("#btn-refresh-builds").disabled = busy || builds.loading;
+  // Downloads and installs run in the background. Lock only the control
+  // that started the task, so browsing, edits, settings and launching stay
+  // usable while something is being fetched.
+  $("#btn-create").disabled = creating;
+  $("#btn-refresh-versions").disabled = versions.loading;
+  $("#btn-refresh-builds").disabled = builds.loading;
   $("#btn-cancel-create").classList.toggle("hidden", !creating);
   $("#btn-cancel-loader").classList.toggle("hidden", !installing);
-  $("#btn-install-loader").disabled = busy || lb.loading || lb.selected < 0;
+  $("#btn-install-loader").disabled =
+    installing || lb.loading || lb.selected < 0;
   for (const id of ["btn-new-profile", "btn-empty-create",
-                    "btn-import-modpack", "btn-pane-update-all",
-                    "btn-pane-backup", "btn-pane-icon", "btn-pane-banner",
+                    "btn-import-modpack", "btn-pane-icon", "btn-pane-banner",
                     "btn-pane-edit", "btn-pick-background",
                     "btn-shared-publish", "btn-shared-save",
                     "btn-shared-sync", "btn-shared-unpublish"]) {
     const node = $("#" + id);
-    if (node) node.disabled = busy;
+    if (node) node.disabled = false;
   }
-  if (!modsAllowed()) {
-    const updateMods = $("#btn-pane-update-all");
-    if (updateMods) updateMods.disabled = true;
+  const updateMods = $("#btn-pane-update-all");
+  if (updateMods) {
+    updateMods.disabled = !modsAllowed() || S.busy === "mods";
   }
+  const ownTask = { duplicate: "duplicate", backup: "backup",
+                    verify: "verify" };
   $$("#profile-menu [data-profile-action]").forEach((node) => {
-    node.disabled = busy;
+    node.disabled = S.busy === (ownTask[node.dataset.profileAction] || "");
   });
   const clearIcon = $("#btn-pane-clear-icon");
-  if (clearIcon) clearIcon.disabled = busy || !S.instance || !S.instance.icon;
+  if (clearIcon) clearIcon.disabled = !S.instance || !S.instance.icon;
   const clearBanner = $("#btn-pane-clear-banner");
   if (clearBanner) {
-    clearBanner.disabled = busy || !S.instance || !S.instance.banner;
+    clearBanner.disabled = !S.instance || !S.instance.banner;
   }
   syncVersionEditor();
   syncPlay();

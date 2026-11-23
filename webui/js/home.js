@@ -96,7 +96,7 @@ function renderHomePlay() {
   if (!button) return;
   const running = !!last && isInstanceRunning(last.slug);
   const starting = !!last && isInstanceStarting(last.slug);
-  button.disabled = !last || starting || (!!S.busy && !running);
+  button.disabled = !last || starting;
   button.classList.toggle("running", running);
   $("#home-play-label").textContent = running
     ? "Stop" : (starting ? "Starting…" : "Play");
@@ -269,7 +269,7 @@ async function homeStart(slug, world = "") {
     renderHome();
     return;
   }
-  if (isInstanceStarting(slug) || S.busy) return;
+  if (isInstanceStarting(slug)) return;
   await selectProfileSilently(slug);
   markStarting(slug);
   renderHome();
