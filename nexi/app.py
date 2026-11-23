@@ -22,6 +22,12 @@ def webui_path() -> Path:
 
 
 def main():
+    # The downloaded build starts with --nexi-finish-update to swap files
+    # after this process exits; it must not open a window or touch settings.
+    from .update import finish_update
+    if finish_update(sys.argv[1:]):
+        return
+
     # One-time moves of old data must run before the API opens the folders.
     config.migrate_legacy_files()
     config.migrate_legacy_instances()

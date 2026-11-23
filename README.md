@@ -112,7 +112,17 @@ python -m PyInstaller "build/Nexi Launcher.spec" `
     --distpath _dist --workpath _build_tmp --noconfirm
 ```
 
-The result is `_dist\Nexi-Portable.exe` (onefile, no console window).
+The script builds two variants of the same launcher:
+
+- `_dist\Nexi-Portable.exe` — one file, no console window, for the portable
+  download;
+- `_dist\NexiLauncher\NexiLauncher.exe` — a folder build that loads its
+  runtime files from `_internal` next to the exe, packaged as
+  `_dist\NexiLauncher.zip` and used by the installer. Installed copies update
+  from that zip.
+
+If a signing certificate is configured (see `sign.ps1`), both executables are
+signed before packaging.
 
 ### Build the installer
 
@@ -120,9 +130,9 @@ The result is `_dist\Nexi-Portable.exe` (onefile, no console window).
 .\build_installer.ps1
 ```
 
-This rebuilds `Nexi-Portable.exe`, then packs it into `_dist\NexiLauncher-Setup.exe`
+This rebuilds the folder build, then packs it into `_dist\NexiLauncher-Setup.exe`
 (also copied to the project root). The setup is a one-file PyInstaller
-executable as well: it carries `Nexi-Portable.exe` inside, and a copy of itself
+executable as well: it carries the launcher folder inside, and a copy of itself
 becomes `Uninstall.exe` in the install folder. It installs per user, so no
 administrator rights are needed, and it also accepts `--silent`,
 `--silent-uninstall` and `--uninstall` on the command line.
@@ -166,10 +176,12 @@ webui/index.html          single-page UI
 webui/style.css           design tokens and layout
 webui/i18n.js             English/Russian interface dictionary and DOM translator
 webui/app.js              UI logic, talks to Python via window.pywebview.api
-build/Nexi Launcher.spec  PyInstaller spec (bundles the webui folder)
-build.ps1                 convenience build script
+build/Nexi Launcher.spec  single-file PyInstaller spec (bundles the webui folder)
+build/Nexi App.spec       folder (onedir) spec used by the installer
+build.ps1                 convenience build script for both variants
+sign.ps1                  optional Authenticode signing for built executables
 installer/installer.py    per-user setup and uninstaller (Tk UI, silent mode)
-build_installer.ps1       builds Nexi-Portable.exe and NexiLauncher-Setup.exe
+build_installer.ps1       builds both launcher variants and NexiLauncher-Setup.exe
 ```
 
 Each module imports only what it needs; the bridge mixins are combined in

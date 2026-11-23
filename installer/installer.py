@@ -1,11 +1,13 @@
 ﻿"""Nexi Launcher setup and uninstaller.
 
 The file is built into a single self-contained ``NexiLauncher-Setup.exe`` that
-carries ``Nexi-Portable.exe`` inside it (see ``build_installer.ps1``). It
-installs the launcher per user, so no administrator rights are needed:
+carries the folder build of the launcher inside it (see
+``build_installer.ps1``). It installs the launcher per user, so no
+administrator rights are needed:
 
     %LOCALAPPDATA%\\Programs\\Nexi Launcher\\
-        Nexi-Portable.exe
+        NexiLauncher.exe
+        _internal\\          (the runtime files beside the exe)
         Uninstall.exe        a copy of this setup exe
 
 A Start Menu shortcut is always created, a desktop shortcut is optional, and an
@@ -42,8 +44,11 @@ from ctypes import wintypes
 from pathlib import Path
 
 APP_NAME = "Nexi Launcher"
-VERSION = "1.8.0"
-EXE_NAME = "Nexi-Portable.exe"
+VERSION = "1.8.1"
+EXE_NAME = "NexiLauncher.exe"
+# The setup used to install a single-file build under this name; it is removed
+# on upgrade so a folder does not end up with two launchers in it.
+LEGACY_EXE_NAME = "Nexi-Portable.exe"
 UNINSTALLER_NAME = "Uninstall.exe"
 UNINSTALL_KEY = (r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
                  r"\NexiLauncher")
@@ -54,6 +59,21 @@ WEBVIEW2_URL = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
 
 CREATE_NO_WINDOW = 0x08000000
 DETACHED_PROCESS = 0x00000008
+
+# PyInstaller one-file builds pass their extraction folder to child processes.
+# Anything started from the setup must not inherit that path: when the setup
+# exits it deletes the folder, and the child would fail with "Failed to load
+# Python DLL ...\\_MEI...\\python314.dll".
+_PYI_ENV_VARS = ("_PYI_APPLICATION_HOME_DIR", "_PYI_PARENT_PROCESS_LEVEL",
+                 "_PYI_SPLASH_IPC", "_PYI_ARCHIVE_FILE", "_MEIPASS2")
+
+
+def _child_environment() -> dict:
+    env = dict(os.environ)
+    for name in _PYI_ENV_VARS:
+        env.pop(name, None)
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    return env
 
 # CSIDL values for SHGetFolderPathW; the shell resolves the real per-user
 # folders, including a desktop redirected into OneDrive.
@@ -66,7 +86,7 @@ class InstallerError(Exception):
 
 
 class AppRunning(InstallerError):
-    """Nexi-Portable.exe is running and the installed copy could not be replaced."""
+    """The installed launcher is running and could not be replaced."""
 
 
 # --------------------------------------------------------------------- logging
@@ -92,13 +112,14 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def _payload_path() -> Path:
-    for candidate in (_bundle_dir() / EXE_NAME,
-                      _project_root() / EXE_NAME,
-                      _project_root() / "_dist" / EXE_NAME):
-        if candidate.is_file():
+def _payload_dir() -> Path:
+    """Folder build of the launcher bundled with this setup."""
+    for candidate in (_bundle_dir() / "app",
+                      _project_root() / "_dist" / "NexiLauncher"):
+        if (candidate / EXE_NAME).is_file():
             return candidate
-    raise InstallerError("Nexi-Portable.exe is missing from the setup bundle.")
+    raise InstallerError("The launcher files are missing from the setup "
+                         "bundle.")
 
 
 def _asset_path(name: str) -> Path | None:
@@ -188,19 +209,21 @@ def _can_update(installed_version: str) -> bool:
 def _guess_install_dir() -> str:
     if getattr(sys, "frozen", False):
         parent = Path(sys.executable).parent
-        if (parent / EXE_NAME).is_file():
+        if (parent / EXE_NAME).is_file() or (
+                parent / LEGACY_EXE_NAME).is_file():
             return str(parent)
     return ""
 
 
 def _is_installed(target: Path) -> bool:
-    return bool(registered_dir()) or (target / EXE_NAME).is_file()
+    return (bool(registered_dir()) or (target / EXE_NAME).is_file()
+            or (target / LEGACY_EXE_NAME).is_file())
 
 
 # --------------------------------------------------------------- registry part
 
 def write_registry(target: Path) -> None:
-    size_kb = sum(item.stat().st_size for item in target.iterdir()
+    size_kb = sum(item.stat().st_size for item in target.rglob("*")
                   if item.is_file()) // 1024
     uninstaller = target / UNINSTALLER_NAME
     with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY, 0,
@@ -377,26 +400,31 @@ def create_shortcut(link: Path, target: Path) -> None:
 # ------------------------------------------------------------------- processes
 
 def launcher_running(target: Path) -> bool:
-    exe = Path(target) / EXE_NAME
-    if not exe.is_file():
-        return False
-    try:
-        with open(exe, "r+b"):
-            return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
+    """True when the installed launcher (either build) is running."""
+    for name in (EXE_NAME, LEGACY_EXE_NAME):
+        exe = Path(target) / name
+        if not exe.is_file():
+            continue
+        try:
+            with open(exe, "r+b"):
+                continue
+        except PermissionError:
+            return True
+        except OSError:
+            continue
+    return False
 
 
 def kill_launcher() -> None:
-    subprocess.run(["taskkill", "/IM", EXE_NAME, "/F"],
-                   creationflags=CREATE_NO_WINDOW, capture_output=True)
+    for name in (EXE_NAME, LEGACY_EXE_NAME):
+        subprocess.run(["taskkill", "/IM", name, "/F"],
+                       creationflags=CREATE_NO_WINDOW, capture_output=True)
 
 
 def _spawn_launcher(target: Path) -> None:
     subprocess.Popen([str(Path(target) / EXE_NAME)], cwd=str(target),
-                     creationflags=DETACHED_PROCESS, close_fds=True)
+                     creationflags=DETACHED_PROCESS, close_fds=True,
+                     env=_child_environment())
 
 
 def _rmtree_retry(path: Path, timeout: float = 20.0) -> bool:
@@ -433,19 +461,32 @@ def install(target: Path, desktop: bool, launch: bool,
     """
     target = Path(target)
     target.mkdir(parents=True, exist_ok=True)
-    payload = _payload_path()
+    payload = _payload_dir()
 
     _progress(progress, 8)
     destination = target / EXE_NAME
+
+    def copy_payload() -> None:
+        shutil.copytree(payload, target, dirs_exist_ok=True)
+
     try:
-        shutil.copy2(payload, destination)
-    except PermissionError:
+        copy_payload()
+    except OSError:
         if not force_kill:
             raise AppRunning(str(target)) from None
         log("launcher is running; closing it before the copy")
         kill_launcher()
         time.sleep(0.8)
-        shutil.copy2(payload, destination)
+        copy_payload()
+
+    # An installation made by an older setup keeps its single-file launcher;
+    # remove it so the folder has exactly one executable to start.
+    legacy = target / LEGACY_EXE_NAME
+    if legacy.is_file():
+        try:
+            legacy.unlink()
+        except OSError as exc:
+            log(f"could not remove the old launcher copy: {exc}")
 
     _progress(progress, 45)
     shutil.copy2(_uninstaller_source(), target / UNINSTALLER_NAME)
@@ -529,7 +570,7 @@ def _finalize_removal(target: Path) -> bool:
         shutil.copy2(sys.executable, temporary)
         subprocess.Popen([str(temporary), "--cleanup", str(target)],
                          creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS,
-                         close_fds=True)
+                         close_fds=True, env=_child_environment())
         return True
     if not _rmtree_retry(target, timeout=25):
         raise InstallerError(f"Could not delete {target}.")
@@ -577,7 +618,8 @@ def cleanup_main(target: str) -> int:
         _schedule_self_delete()
         return 1
     if folder.exists() and not ((folder / UNINSTALLER_NAME).is_file()
-                                or (folder / EXE_NAME).is_file()):
+                                or (folder / EXE_NAME).is_file()
+                                or (folder / LEGACY_EXE_NAME).is_file()):
         log(f"cleanup: {folder} does not look like a Nexi installation")
         _schedule_self_delete()
         return 1

@@ -1,17 +1,14 @@
 # Build the self-contained Windows installer.
 # Usage:  .\build_installer.ps1
 #
-# Rebuilds Nexi-Portable.exe first, then packs it (plus the icon and the
-# launcher's round star icon) into a single NexiLauncher-Setup.exe. The setup
-# installs per user, so it never needs administrator rights.
+# Builds both launcher variants first (see build.ps1), then packs the folder
+# build into a single NexiLauncher-Setup.exe. The setup installs per user, so
+# it never needs administrator rights.
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-python -m PyInstaller "build/Nexi Launcher.spec" `
-    --distpath _dist --workpath _build_tmp --noconfirm
+& "$PSScriptRoot\build.ps1"
 if ($LASTEXITCODE -ne 0) { throw "Launcher build failed with exit code $LASTEXITCODE" }
-
-Copy-Item "_dist/Nexi-Portable.exe" "Nexi-Portable.exe" -Force
 
 # Absolute sources: the generated spec is written to _installer_tmp, and
 # PyInstaller resolves relative --add-data paths against the spec's folder.
@@ -23,12 +20,14 @@ python -m PyInstaller "installer/installer.py" `
     --icon "$root\assets\nexi.ico" `
     --version-file "$root\installer\version_info_setup.txt" `
     --specpath _installer_tmp `
-    --add-data "$root\_dist\Nexi-Portable.exe;." `
+    --add-data "$root\_dist\NexiLauncher;app" `
     --add-data "$root\assets\nexi.ico;." `
     --add-data "$root\webui\star_icon_rounded.png;." `
     --add-data "$root\installer\web;web" `
     --distpath _dist --workpath _installer_tmp
 if ($LASTEXITCODE -ne 0) { throw "Installer build failed with exit code $LASTEXITCODE" }
+
+& "$PSScriptRoot\sign.ps1" -Path @("$PSScriptRoot\_dist\NexiLauncher-Setup.exe")
 
 Copy-Item "_dist/NexiLauncher-Setup.exe" "NexiLauncher-Setup.exe" -Force
 Write-Host "Built: $PSScriptRoot\NexiLauncher-Setup.exe"

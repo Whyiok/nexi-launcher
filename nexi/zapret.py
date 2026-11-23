@@ -788,8 +788,11 @@ def elevate_apply(root: Path, preset: str, list_path, pending_domains,
     handle = None
     try:
         # cmd.exe keeps the helper's console output (including script-load
-        # errors that never reach our own log) in a readable file.
-        params = (f'/c powershell.exe -NoProfile -ExecutionPolicy Bypass '
+        # errors that never reach our own log) in a readable file. The policy
+        # is set to RemoteSigned rather than Bypass: the script was written
+        # locally, so it runs without carrying the "Bypass" flag that
+        # behavioural antivirus engines treat as a backdoor marker.
+        params = (f'/c powershell.exe -NoProfile -ExecutionPolicy RemoteSigned '
                   f'-File "{script_file}" > "{console_file}" 2>&1')
         comspec = str(os.environ.get("COMSPEC", "") or "")
         if not comspec.lower().endswith("cmd.exe") or not os.path.isfile(

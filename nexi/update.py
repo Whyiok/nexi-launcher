@@ -1,22 +1,29 @@
 """Check GitHub for a newer release and replace the running launcher.
 
 The updater deliberately downloads only the release executable published in
-the official repository, verifies the SHA-256 digest GitHub returns for that
-asset, and then lets a tiny detached batch file swap the executable once this
-process has exited. User data in ``%APPDATA%\\NexiLauncher`` is never touched.
+the official repository and verifies the SHA-256 digest GitHub returns for
+that asset. The swap itself is done by the *downloaded* build: it is started
+with ``--nexi-finish-update`` (or ``--nexi-apply-dir`` for the installed
+folder build), waits for this process to exit and only then replaces the
+files, so no batch file or shell is involved. User data in
+``%APPDATA%\\NexiLauncher`` is never touched.
 """
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
+import zipfile
 from pathlib import Path
 
 from .logging_setup import log
@@ -28,13 +35,49 @@ RELEASE_REPO = "Whyiok/nexi-launcher"
 LATEST_RELEASE_API = (
     f"https://api.github.com/repos/{RELEASE_REPO}/releases/latest")
 ASSET_NAME = "Nexi-Portable.exe"
-# Builds published before the rename look for the old asset name, so releases
-# keep carrying a ``nexi.exe`` copy as well.
-ASSET_NAMES = (ASSET_NAME, "nexi.exe")
+ASSET_NAMES = (ASSET_NAME,)
+# Installed builds run from a folder (exe plus ``_internal``) and update from
+# the zipped folder asset instead of the single-file executable.
+DIR_ASSET_NAME = "NexiLauncher.zip"
+DIR_ASSET_NAMES = (DIR_ASSET_NAME,)
 USER_AGENT = f"NexiLauncher/{VERSION}"
 
 CREATE_NO_WINDOW = 0x08000000
 DETACHED_PROCESS = 0x00000008
+
+# Internal command line used when the downloaded build performs the swap.
+HELPER_FLAG = "--nexi-finish-update"
+DIR_HELPER_FLAG = "--nexi-apply-dir"
+HELPER_FLAGS = (HELPER_FLAG, DIR_HELPER_FLAG)
+
+
+def is_onedir() -> bool:
+    """True when this process runs from an installed folder build."""
+    try:
+        return (Path(sys.executable).resolve().parent / "_internal").is_dir()
+    except OSError:
+        return False
+
+
+def expected_asset_names() -> tuple:
+    return DIR_ASSET_NAMES if is_onedir() else ASSET_NAMES
+
+
+# PyInstaller one-file builds tell child processes where their extraction
+# folder is. A launcher started from a frozen parent would therefore inherit
+# the *old* ``%TEMP%\\_MEI...`` path, which is deleted when that parent exits,
+# and fail with "Failed to load Python DLL ...\\_MEI...\\python314.dll". These
+# variables are removed before starting another build so it unpacks itself.
+_PYI_ENV_VARS = ("_PYI_APPLICATION_HOME_DIR", "_PYI_PARENT_PROCESS_LEVEL",
+                 "_PYI_SPLASH_IPC", "_PYI_ARCHIVE_FILE", "_MEIPASS2")
+
+
+def child_environment() -> dict:
+    env = dict(os.environ)
+    for name in _PYI_ENV_VARS:
+        env.pop(name, None)
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    return env
 
 
 class UpdateError(Exception):
@@ -92,8 +135,9 @@ def check_latest(current: str = VERSION) -> dict:
     if not version:
         raise UpdateError("The latest release has no version tag.")
     available = is_newer(version, current)
+    names = expected_asset_names()
     asset = None
-    for name in ASSET_NAMES:
+    for name in names:
         for item in data.get("assets") or []:
             if isinstance(item, dict) and item.get("name") == name:
                 asset = item
@@ -102,7 +146,7 @@ def check_latest(current: str = VERSION) -> dict:
             break
     if available and asset is None:
         raise UpdateError(
-            f"The latest release does not include {ASSET_NAME}.")
+            f"The latest release does not include {names[0]}.")
     url = ""
     size = 0
     digest = ""
@@ -160,16 +204,17 @@ def verify_asset(path: Path, digest: str) -> None:
 
 
 def download_update(info: dict, on_progress=None, cancel=None) -> Path:
-    """Download the release executable into a private temporary folder."""
+    """Download the release asset into a private temporary folder."""
     if cancel is not None and cancel.is_set():
         raise InstallCancelled()
     version = str(info.get("latest") or "").strip() or "latest"
     url = str(info.get("url") or "").strip()
     if not url:
         raise UpdateError("The update has no download address.")
+    suffix = ".zip" if is_onedir() else ".exe"
     folder = Path(tempfile.gettempdir()) / "NexiLauncherUpdate"
     folder.mkdir(parents=True, exist_ok=True)
-    target = folder / f"nexi-{version}.exe"
+    target = folder / f"nexi-{version}{suffix}"
     try:
         size = int(info.get("size") or 0)
     except (TypeError, ValueError):
@@ -210,8 +255,44 @@ def can_replace_running_exe() -> tuple:
     return True, ""
 
 
+def _extract_update(archive: Path) -> Path:
+    """Unpack the folder build into a fresh temp directory."""
+    folder = archive.parent / f"app-{archive.stem}"
+    if folder.exists():
+        shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True, exist_ok=True)
+    root = folder.resolve()
+    try:
+        with zipfile.ZipFile(archive) as bundle:
+            for info in bundle.infolist():
+                name = info.filename.replace("\\", "/")
+                if not name or name.endswith("/"):
+                    continue
+                parts = Path(name).parts
+                if name.startswith("/") or ".." in parts:
+                    raise UpdateError(
+                        "The downloaded update contains unsafe paths.")
+                destination = (root / name).resolve()
+                if os.path.commonpath([str(destination), str(root)]) != str(root):
+                    raise UpdateError(
+                        "The downloaded update contains unsafe paths.")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                with bundle.open(info) as source, open(destination, "wb") as out:
+                    shutil.copyfileobj(source, out)
+    except (zipfile.BadZipFile, OSError) as exc:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise UpdateError(f"The downloaded update is not a valid archive: "
+                          f"{exc}") from exc
+    exe = root / "NexiLauncher.exe"
+    if not exe.is_file() or not (root / "_internal").is_dir():
+        shutil.rmtree(folder, ignore_errors=True)
+        raise UpdateError("The downloaded archive does not contain the "
+                          "launcher.")
+    return root
+
+
 def apply_update(downloaded: Path) -> None:
-    """Start a detached helper that swaps the exe after this process exits."""
+    """Start the downloaded build, which swaps the files once we exit."""
     ok, reason = can_replace_running_exe()
     if not ok:
         raise UpdateError(reason)
@@ -219,54 +300,173 @@ def apply_update(downloaded: Path) -> None:
     downloaded = Path(downloaded).resolve()
     if not downloaded.is_file():
         raise UpdateError("The downloaded update is missing.")
-    batch = Path(tempfile.gettempdir()) / f"NexiUpdate-{os.getpid()}.cmd"
-    script = (
-        "@echo off\r\n"
-        "setlocal\r\n"
-        'set "SRC=%NEXI_UPDATE_SRC%"\r\n'
-        'set "DST=%NEXI_UPDATE_DST%"\r\n'
-        'set "NEW=%DST%.new"\r\n'
-        "set tries=0\r\n"
-        ":copy\r\n"
-        'copy /y "%SRC%" "%NEW%" >nul 2>&1\r\n'
-        "if not errorlevel 1 goto move\r\n"
-        "set /a tries+=1\r\n"
-        "if %tries% geq 240 goto fail\r\n"
-        "ping -n 2 127.0.0.1 >nul\r\n"
-        "goto copy\r\n"
-        ":move\r\n"
-        'move /y "%NEW%" "%DST%" >nul 2>&1\r\n'
-        "if not errorlevel 1 goto done\r\n"
-        "set /a tries+=1\r\n"
-        "if %tries% geq 240 goto fail\r\n"
-        "ping -n 2 127.0.0.1 >nul\r\n"
-        "goto move\r\n"
-        ":done\r\n"
-        'start "" "%DST%"\r\n'
-        'del /f /q "%SRC%" >nul 2>&1\r\n'
-        '(goto) 2>nul & del /f /q "%~f0"\r\n'
-        "exit /b 0\r\n"
-        ":fail\r\n"
-        'del /f /q "%NEW%" >nul 2>&1\r\n'
-        'start "" "%DST%"\r\n'
-        'del /f /q "%SRC%" >nul 2>&1\r\n'
-        '(goto) 2>nul & del /f /q "%~f0"\r\n'
-        "exit /b 1\r\n"
-    )
+    if downloaded.suffix.lower() == ".zip":
+        # The new folder build lives in a temp directory of its own; it copies
+        # itself over the installation after the old process is gone.
+        exe = _extract_update(downloaded) / "NexiLauncher.exe"
+        argv = [str(exe), DIR_HELPER_FLAG, str(target.parent),
+                str(os.getpid())]
+    else:
+        argv = [str(downloaded), HELPER_FLAG, str(target), str(os.getpid())]
     try:
-        batch.write_text(script, encoding="ascii")
-    except OSError as exc:
-        raise UpdateError(f"Could not write the updater script: {exc}") from exc
-    env = dict(os.environ)
-    env["NEXI_UPDATE_SRC"] = str(downloaded)
-    env["NEXI_UPDATE_DST"] = str(target)
-    try:
-        subprocess.Popen(
-            ["cmd.exe", "/d", "/c", str(batch)],
-            env=env,
-            creationflags=CREATE_NO_WINDOW | DETACHED_PROCESS,
-            close_fds=True,
-        )
+        subprocess.Popen(argv, creationflags=CREATE_NO_WINDOW
+                         | DETACHED_PROCESS, close_fds=True,
+                         env=child_environment())
     except OSError as exc:
         raise UpdateError(f"Could not start the updater: {exc}") from exc
     log.info("update: replacement of %s scheduled", target)
+
+
+# ------------------------------------------------------------ update helper
+#
+# These functions run inside the newly downloaded build. They wait for the old
+# launcher to exit, replace the files and start the result. Keeping the work in
+# the new executable avoids the self-replacing batch file that antivirus
+# sandboxes read as dropper behaviour.
+
+def parse_helper_args(argv) -> tuple | None:
+    """``[flag, target, pid]`` -> ``(flag, target, pid)`` or None."""
+    if len(argv) != 3 or argv[0] not in HELPER_FLAGS:
+        return None
+    try:
+        pid = int(argv[2])
+    except (TypeError, ValueError):
+        return None
+    if pid <= 0:
+        return None
+    target = str(argv[1] or "").strip()
+    if not target or not os.path.isabs(target):
+        return None
+    return argv[0], target, pid
+
+
+_KERNEL32 = None
+
+
+def _kernel32():
+    """kernel32 with 64-bit-safe prototypes for the process helpers."""
+    global _KERNEL32
+    if _KERNEL32 is not None:
+        return _KERNEL32
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL,
+                                     wintypes.DWORD]
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    _KERNEL32 = kernel32
+    return kernel32
+
+
+def _pid_alive(pid: int) -> bool:
+    kernel32 = _kernel32()
+    synchronize = 0x00100000
+    handle = kernel32.OpenProcess(synchronize, False, pid)
+    if not handle:
+        return False
+    try:
+        return kernel32.WaitForSingleObject(handle, 0) == 0x102
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _wait_for_exit(pid: int, timeout: float = 180.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while _pid_alive(pid):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.25)
+    return True
+
+
+def _replace_exe(target: Path) -> None:
+    source = Path(sys.executable).resolve()
+    if target.suffix.lower() != ".exe":
+        raise UpdateError("The update target is not an executable.")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staged = target.with_name(target.name + ".new")
+    deadline = time.monotonic() + 120
+    while True:
+        try:
+            shutil.copyfile(source, staged)
+        except OSError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.5)
+            continue
+        break
+    while True:
+        try:
+            os.replace(staged, target)
+            return
+        except OSError as exc:
+            if time.monotonic() >= deadline:
+                staged.unlink(missing_ok=True)
+                raise UpdateError(f"Could not replace {target}: {exc}") from exc
+            time.sleep(0.5)
+
+
+def _replace_dir(target: Path) -> None:
+    source = Path(sys.executable).resolve().parent
+    if not (source / "_internal").is_dir() or not (
+            source / "NexiLauncher.exe").is_file():
+        raise UpdateError("The downloaded update is incomplete.")
+    if source == target.resolve():
+        raise UpdateError("The update source and target are the same folder.")
+    target.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + 180
+    while True:
+        try:
+            shutil.copytree(source, target, dirs_exist_ok=True)
+            return
+        except OSError as exc:
+            if time.monotonic() >= deadline:
+                raise UpdateError(
+                    f"Could not replace {target}: {exc}") from exc
+            time.sleep(0.5)
+
+
+def _start_installed(mode: str, target: Path) -> None:
+    exe = target if mode == HELPER_FLAG else target / "NexiLauncher.exe"
+    for attempt in range(3):
+        try:
+            subprocess.Popen([str(exe)], cwd=str(exe.parent),
+                             creationflags=DETACHED_PROCESS,
+                             close_fds=True, env=child_environment())
+            return
+        except OSError:
+            if attempt == 2:
+                log.exception("update helper: could not restart %s", exe)
+                return
+            time.sleep(1.0)
+
+
+def finish_update(argv) -> bool:
+    """Handle a helper invocation; returns True when nothing else should run."""
+    parsed = parse_helper_args(argv)
+    if parsed is None:
+        return False
+    try:
+        from .logging_setup import setup_logging
+        setup_logging()
+    except Exception:
+        pass
+    mode, target, pid = parsed
+    log.info("update helper: waiting for the old launcher to exit")
+    if not _wait_for_exit(pid):
+        log.warning("update helper: the old launcher is still running")
+        return True
+    destination = Path(target)
+    try:
+        if mode == HELPER_FLAG:
+            _replace_exe(destination)
+        else:
+            _replace_dir(destination)
+        log.info("update helper: installed %s", destination)
+    except Exception:
+        log.exception("update helper: could not install the update")
+    _start_installed(mode, destination)
+    return True
