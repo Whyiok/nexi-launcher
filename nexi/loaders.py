@@ -17,7 +17,8 @@ from .java_runtime import java_executable
 from .net import (download_file, download_with_retry, host_unreachable,
                   http_get, mirror_mode)
 from .util import InstallCancelled
-from .versions import list_versions, load_version, version_meta
+from .versions import (list_versions, load_version, neoforge_loader_version,
+                       neoforge_runtime_paths, version_meta)
 
 
 FABRIC_META = "https://meta.fabricmc.net/v2"
@@ -471,6 +472,63 @@ def install_fabric(game_version: str, loader_version: str, log,
     return version_id
 
 
+def neoforge_runtime_missing(version_id: str) -> list:
+    """NeoForge runtime jars that are absent, as paths.
+
+    These are the universal jar (the "neoforge" system mod), the
+    installer-generated client overlay and the NeoForm srg/extra game jars.
+    None of them is listed in the version JSON, so the regular file check
+    never sees them.
+    """
+    if not neoforge_loader_version(version_id):
+        return []
+    try:
+        version = load_version(version_meta(version_id))
+    except (OSError, ValueError):
+        return []
+    return [path for path in neoforge_runtime_paths(version)
+            if not path.is_file()]
+
+
+def neoforge_runtime_installed(version_id: str) -> bool:
+    """True when the jars the version JSON does not mention are on disk.
+
+    A profile whose JSON exists but whose runtime jars were never downloaded
+    (an interrupted installer, a reused stale profile) starts and then aborts
+    with "Missing mandatory dependency: minecraft/neoforge".
+    """
+    return not neoforge_runtime_missing(version_id)
+
+
+def repair_neoforge_runtime(version_id: str, java: str, log,
+                            cancel=None) -> bool:
+    """Rebuild a NeoForge profile whose runtime jars are missing."""
+    if not neoforge_loader_version(version_id):
+        return True
+    if neoforge_runtime_installed(version_id):
+        return True
+    url = loader_installer_url("neoforge", "", neoforge_loader_version(version_id))
+    temp_root = Path(tempfile.mkdtemp(prefix="mc-neoforge-repair-"))
+    installer = temp_root / "installer.jar"
+    try:
+        def mirror_notice(host):
+            log(f"{host} is unreachable — switching to the BMCLAPI mirror…")
+
+        log(f"NeoForge {neoforge_loader_version(version_id)} is missing its "
+            f"runtime jars — running the installer again…")
+        from_mirror = download_with_retry(
+            url, installer, cancel=cancel, on_fallback=mirror_notice)
+        patched = False
+        if (mirror_mode() != "never"
+                and (from_mirror or host_unreachable(url))):
+            patched = mirror_neoforge_installer(installer, log)
+        run_installer_with_retries(java, installer, log, cancel,
+                                   "neoforge", patched)
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+    return neoforge_runtime_installed(version_id)
+
+
 def find_loader_profile(loader_key: str, game_version: str, loader_version: str):
     wanted = loader_version.lower()
     for vid, _meta in list_versions():
@@ -478,6 +536,8 @@ def find_loader_profile(loader_key: str, game_version: str, loader_version: str)
         if loader_key == "forge" and "neoforge" in low:
             continue
         if loader_key in low and wanted in low:
+            if loader_key == "neoforge" and not neoforge_runtime_installed(vid):
+                continue
             return vid
     return None
 
@@ -535,16 +595,29 @@ def install_loader(loader_key: str, game_version: str, loader_version: str,
         shutil.rmtree(temp_root, ignore_errors=True)
 
     new_ids = sorted(installed_version_ids() - before)
+    profile = ""
     for vid in new_ids:
         low = vid.lower()
         if loader_key == "neoforge":
             if "neoforge" in low:
-                return vid
+                profile = vid
+                break
         elif loader_key in low and "neoforge" not in low:
-            return vid
-    if new_ids:
-        return new_ids[0]
-    return find_loader_profile(loader_key, game_version, loader_version)
+            profile = vid
+            break
+    if not profile and new_ids:
+        profile = new_ids[0]
+    if not profile:
+        profile = find_loader_profile(loader_key, game_version, loader_version)
+    if (profile and loader_key == "neoforge"
+            and not neoforge_runtime_installed(profile)):
+        # The installer writes the profile before it saves the universal and
+        # client jars; if those downloads failed, run it once more.
+        if not repair_neoforge_runtime(profile, java, log, cancel):
+            raise RuntimeError(
+                "NeoForge installed its profile but the universal/client jars "
+                "are missing. Check the network or the bypass and try again.")
+    return profile
 
 
 def console_java_for(version_id: str) -> str:

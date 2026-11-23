@@ -9,7 +9,8 @@ from .config import ARCH, MC, OS_NAME
 from .loaders import maven_path
 from .net import _download_many, _download_with_retry, http_get
 from .util import InstallCancelled
-from .versions import _for_this_machine, client_jar, rule_allows, version_meta
+from .versions import (_for_this_machine, client_jar, load_version,
+                       neoforge_runtime_paths, rule_allows, version_meta)
 
 
 VERSION_MANIFEST_URLS = (
@@ -287,7 +288,17 @@ def verify_version_files(version_id: str, log=lambda _text: None,
             seen.add(key)
             jobs.append((url, target, size, sha1))
 
-    log(f"Checking {len(jobs)} files for {version_id}…")
+    # Loader runtime jars live outside the version JSON, so the jobs above
+    # never cover them. Collect them so a modpack whose NeoForge jars are
+    # missing reports it here instead of failing at launch.
+    runtime_paths = []
+    try:
+        runtime_paths = neoforge_runtime_paths(
+            load_version(version_meta(version_id)))
+    except (OSError, ValueError):
+        runtime_paths = []
+
+    log(f"Checking {len(jobs) + len(runtime_paths)} files for {version_id}…")
     missing = []
     for index, (url, target, size, sha1) in enumerate(jobs, 1):
         if cancel is not None and cancel.is_set():
@@ -306,4 +317,27 @@ def verify_version_files(version_id: str, log=lambda _text: None,
         _download_many(missing, log, progress, cancel)
     else:
         log("All files are intact.")
-    return {"checked": len(jobs), "fixed": len(missing)}
+
+    runtime_missing = [path for path in runtime_paths if not path.is_file()]
+    if runtime_missing:
+        from .loaders import console_java, repair_neoforge_runtime
+
+        log("NeoForge runtime files are missing: "
+            + ", ".join(path.name for path in runtime_missing)
+            + " — running the installer…")
+        try:
+            repaired = repair_neoforge_runtime(
+                version_id, console_java(load_version(version_meta(version_id))),
+                log, cancel)
+        except InstallCancelled:
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"NeoForge runtime files could not be restored: {exc}") from exc
+        if not repaired:
+            raise RuntimeError(
+                "NeoForge runtime files are still missing after running the "
+                "installer.")
+        log("NeoForge runtime files restored.")
+    return {"checked": len(jobs) + len(runtime_paths),
+            "fixed": len(missing) + len(runtime_missing)}

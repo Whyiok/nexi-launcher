@@ -354,7 +354,7 @@ class CreateApi:
                                           self._cancel_event)
             checked, fixed = result["checked"], result["fixed"]
             if fixed:
-                message = (f"Checked {checked} files — re-downloaded {fixed} "
+                message = (f"Checked {checked} files — fixed {fixed} "
                            f"missing or damaged file(s).")
             else:
                 message = f"Checked {checked} files — everything is intact."

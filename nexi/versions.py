@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import uuid
 import zipfile
@@ -47,6 +48,50 @@ def version_meta(version_id: str) -> Path:
         if candidate is not None:
             return candidate
     return meta
+
+
+def neoforge_loader_version(version_id: str) -> str:
+    """The loader build in a ``neoforge-21.1.264`` profile id."""
+    match = re.match(r"^neoforge-(.+)$", str(version_id or "").strip(),
+                     re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
+def fml_argument(version: dict, name: str) -> str:
+    """Value of a ``--fml.*`` game argument, e.g. ``--fml.mcVersion``."""
+    game = (version.get("arguments") or {}).get("game", [])
+    for index, item in enumerate(game):
+        if isinstance(item, str) and item == name and index + 1 < len(game):
+            return str(game[index + 1])
+    return ""
+
+
+def neoforge_runtime_paths(version: dict) -> list:
+    """Jars NeoForge resolves through maven lookups, not the classpath.
+
+    Since NeoForge 21.x the version JSON lists only helper libraries. FML
+    finds the "neoforge" system mod (the universal jar) itself, and builds the
+    game module from the NeoForm ``srg`` jar plus the installer-generated
+    ``client`` overlay, using ``-DlibraryDirectory`` and the ``--fml.*``
+    arguments. These jars must exist on disk but must stay off the launch
+    classpath: BootstrapLauncher would turn them into an automatic module
+    named "neoforge" that exports ``net.minecraft.*`` too, and the game dies
+    with "Modules minecraft and neoforge export package ... to module
+    mixin_synthetic".
+    """
+    loader = neoforge_loader_version(version.get("id"))
+    mc_version = fml_argument(version, "--fml.mcVersion")
+    neoform = fml_argument(version, "--fml.neoFormVersion")
+    if not loader or not mc_version or not neoform:
+        return []
+    folder = MC / "libraries" / "net" / "neoforged" / "neoforge" / loader
+    paths = [folder / f"neoforge-{loader}-{classifier}.jar"
+             for classifier in ("universal", "client")]
+    neoforge = f"{mc_version}-{neoform}"
+    base = MC / "libraries" / "net" / "minecraft" / "client" / neoforge
+    paths += [base / f"client-{neoforge}-{classifier}.jar"
+              for classifier in ("srg", "extra")]
+    return paths
 
 
 def load_version(meta: Path) -> dict:

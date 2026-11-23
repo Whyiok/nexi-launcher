@@ -12,6 +12,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
@@ -797,6 +798,16 @@ def download_file(url: str, target: Path, size=None, cancel=None, timeout=180,
                         on_progress(done, total)
                 if total:
                     on_progress(done, total)
+        # A blocked mirror can answer 200 with an HTML error page. Saving that
+        # as a jar makes the game and the installers fail with a cryptic
+        # "not a zip file", so reject it here and let the retry move on.
+        if target.suffix.lower() in (".jar", ".zip"):
+            try:
+                with zipfile.ZipFile(part) as archive:
+                    archive.infolist()
+            except zipfile.BadZipFile as exc:
+                raise OSError(
+                    f"{target.name} is not a valid archive") from exc
         part.replace(target)
     except BaseException:
         part.unlink(missing_ok=True)

@@ -13,6 +13,8 @@ from ..game_options import write_game_options
 from ..instances import (instance_game_dir, instance_label, instance_mods_dir,
                          write_instance)
 from ..java_runtime import ensure_java
+from ..loaders import (console_java, neoforge_runtime_missing,
+                       repair_neoforge_runtime)
 from ..logging_setup import log
 from ..vanilla import fetch_missing_libraries
 from ..versions import (build_command, game_version_of, load_version,
@@ -480,6 +482,24 @@ class LaunchApi:
                     self._game_line(
                         "This version cannot open a world directly — "
                         "starting the main menu.")
+            profile_id = version.get("id") or Path(meta).stem
+            if neoforge_runtime_missing(profile_id):
+                # NeoForge's universal/client/srg jars are not in the version
+                # JSON, so a profile installed elsewhere can lack them. Only
+                # the installer can rebuild them (the client jar is not on
+                # maven), so run it before the game starts.
+                self._game_line(
+                    "NeoForge runtime files are missing — running the "
+                    "installer…")
+                try:
+                    if not repair_neoforge_runtime(
+                            profile_id, console_java(version),
+                            self._game_line):
+                        raise RuntimeError("the jars are still missing")
+                except Exception as exc:
+                    log.warning("NeoForge repair failed: %s", exc)
+                    raise RuntimeError(
+                        f"Could not rebuild the NeoForge files: {exc}") from exc
             command, missing = build_command(
                 version, meta, player, int(self.ram), game_dir, auth=auth,
                 extra_args=extra_args)
