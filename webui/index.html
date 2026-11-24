@@ -899,6 +899,10 @@
           <svg class="icon"><use href="#i-gear"/></svg><span>Launcher</span>
         </button>
         <button type="button" role="tab" aria-selected="false" tabindex="-1"
+                data-settings-tab="bypass">
+          <svg class="icon"><use href="#i-world"/></svg><span>Bypass</span>
+        </button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1"
                 data-settings-tab="logs">
           <svg class="icon"><use href="#i-logs"/></svg><span>Logs</span>
         </button>
@@ -1653,7 +1657,9 @@
             </div>
           </div>
         </section>
+      </div>
 
+      <div class="settings-pane" data-settings-pane="bypass" role="tabpanel">
         <section class="card settings-card wide" id="zapret-card">
           <div class="card-head">
             <span class="eyebrow">BYPASS (ZAPRET)</span>

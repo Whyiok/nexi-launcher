@@ -185,7 +185,7 @@ function setScreen(name) {
     openNetwork();
     if (settingsTab === "account") loadSkin();
     if (openBypass) {
-      setSettingsTab("network", true);
+      setSettingsTab("bypass", true);
       openZapret();
     }
   }
