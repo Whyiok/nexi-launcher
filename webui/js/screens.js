@@ -106,6 +106,13 @@ function ensureScreenData() {
 /* --------------------------------------------------------------- screens */
 
 function setScreen(name) {
+  /* The bypass lives in Settings → Network now, but older callers (the
+     mirror prompt, the first-run flow) still ask for the "bypass" screen. */
+  let openBypass = false;
+  if (name === "bypass") {
+    name = "settings";
+    openBypass = true;
+  }
   if (["mods", "loaders"].includes(name) && !S.instance) {
     setStatus("Create or select a profile first.");
     name = "profiles";
@@ -177,8 +184,10 @@ function setScreen(name) {
     openLogs();
     openNetwork();
     if (settingsTab === "account") loadSkin();
-  } else if (name === "bypass") {
-    openZapret();
+    if (openBypass) {
+      setSettingsTab("network", true);
+      openZapret();
+    }
   }
   requestAnimationFrame(() => {
     updateAllSegFills();
@@ -187,7 +196,7 @@ function setScreen(name) {
 }
 
 function renderTabs() {
-  $$("#tabs .tab, #bypass-tabs .tab").forEach((tab) => {
+  $$("#tabs .tab").forEach((tab) => {
     const name = tab.dataset.screen;
     tab.classList.toggle("active", name === screen);
     const locked = ["loaders"].includes(name) && !S.instance;
@@ -196,7 +205,6 @@ function renderTabs() {
   const siteTab = $("#btn-site-profile");
   if (siteTab) siteTab.classList.toggle("active", screen === "site");
   updateSegFill($("#tabs"));
-  updateSegFill($("#bypass-tabs"));
 }
 
 function updateScreenHeads() {

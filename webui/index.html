@@ -163,15 +163,6 @@
                draggable="false">
         </button>
       </span>
-      <nav class="tabs bypass-tabs" id="bypass-tabs" aria-label="Bypass">
-        <button class="tab" data-screen="bypass" type="button">
-          <svg class="icon"><use href="#i-world"/></svg><span>Bypass</span>
-        </button>
-      </nav>
-      <button class="topbar-update" id="btn-title-update" type="button"
-              title="Check for updates" aria-label="Check for updates">
-        <svg class="icon"><use href="#i-refresh"/></svg><span>Update</span>
-      </button>
     </div>
     <nav class="tabs" id="tabs" aria-label="Sections">
       <button class="tab" data-screen="home" type="button">
@@ -1662,75 +1653,7 @@
             </div>
           </div>
         </section>
-      </div>
 
-      <div class="settings-pane" data-settings-pane="logs" role="tabpanel">
-        <section class="card settings-card wide">
-          <div class="card-head">
-            <span class="eyebrow">LOGS</span>
-            <div class="seg" id="logs-tabs" role="tablist"
-                 aria-label="Log source">
-              <button class="on" type="button" role="tab"
-                      aria-selected="true" data-logs-tab="launcher">
-                <svg class="icon"><use href="#i-logs"/></svg><span>Launcher</span>
-              </button>
-              <button type="button" role="tab" aria-selected="false"
-                      tabindex="-1" data-logs-tab="network">
-                <svg class="icon"><use href="#i-network"/></svg><span>Network</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="logs-pane active" data-logs-pane="launcher"
-               role="tabpanel">
-            <div class="logs-row">
-              <span class="count path" id="logs-sub">logs\launcher.log</span>
-              <div class="pane-actions">
-                <button class="btn ghost" id="btn-open-logs-folder"
-                        type="button"><svg class="icon"><use href="#i-folder"/></svg>Folder</button>
-                <button class="btn ghost" id="btn-open-log-file"
-                        type="button"><svg class="icon"><use href="#i-logs"/></svg>File</button>
-                <button class="btn ghost" id="btn-clear-logs"
-                        type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear view</button>
-              </div>
-            </div>
-            <div class="log console settings-log" id="log-console"></div>
-            <p class="hint">Diagnostic log of the launcher itself. It rotates
-               automatically and never contains passwords or account tokens.</p>
-          </div>
-
-          <div class="logs-pane" data-logs-pane="network" role="tabpanel">
-            <div class="logs-row">
-              <span class="count">Every host the launcher tried to reach</span>
-              <div class="pane-actions">
-                <button class="btn ghost" id="btn-net-copy"
-                        type="button"><svg class="icon"><use href="#i-copy"/></svg>Copy report</button>
-                <button class="btn ghost" id="btn-net-clear"
-                        type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear log</button>
-              </div>
-            </div>
-            <div class="log console settings-log" id="net-console"></div>
-            <p class="hint">Downloads and what came back. When something fails,
-               copy this report — it shows exactly which host is blocked on this
-               network.</p>
-          </div>
-        </section>
-      </div>
-      </div>
-      </div>
-    </section>
-
-    <!-- Bypass ---------------------------------------------------------- -->
-    <section class="screen" id="screen-bypass">
-      <div class="screen-head">
-        <div>
-          <h1 class="screen-title">Bypass</h1>
-          <p class="screen-sub">Network bypass (zapret) for blocked Minecraft
-             servers and mod sites. Changes are saved automatically.</p>
-        </div>
-      </div>
-
-      <div class="settings-grid">
         <section class="card settings-card wide" id="zapret-card">
           <div class="card-head">
             <span class="eyebrow">BYPASS (ZAPRET)</span>
@@ -1806,6 +1729,61 @@
             </div>
           </div>
         </section>
+      </div>
+
+      <div class="settings-pane" data-settings-pane="logs" role="tabpanel">
+        <section class="card settings-card wide">
+          <div class="card-head">
+            <span class="eyebrow">LOGS</span>
+            <div class="seg" id="logs-tabs" role="tablist"
+                 aria-label="Log source">
+              <button class="on" type="button" role="tab"
+                      aria-selected="true" data-logs-tab="launcher">
+                <svg class="icon"><use href="#i-logs"/></svg><span>Launcher</span>
+              </button>
+              <button type="button" role="tab" aria-selected="false"
+                      tabindex="-1" data-logs-tab="network">
+                <svg class="icon"><use href="#i-network"/></svg><span>Network</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="logs-pane active" data-logs-pane="launcher"
+               role="tabpanel">
+            <div class="logs-row">
+              <span class="count path" id="logs-sub">logs\launcher.log</span>
+              <div class="pane-actions">
+                <button class="btn ghost" id="btn-open-logs-folder"
+                        type="button"><svg class="icon"><use href="#i-folder"/></svg>Folder</button>
+                <button class="btn ghost" id="btn-open-log-file"
+                        type="button"><svg class="icon"><use href="#i-logs"/></svg>File</button>
+                <button class="btn ghost" id="btn-clear-logs"
+                        type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear view</button>
+              </div>
+            </div>
+            <div class="log console settings-log" id="log-console"></div>
+            <p class="hint">Diagnostic log of the launcher itself. It rotates
+               automatically and never contains passwords or account tokens.</p>
+          </div>
+
+          <div class="logs-pane" data-logs-pane="network" role="tabpanel">
+            <div class="logs-row">
+              <span class="count">Every host the launcher tried to reach</span>
+              <div class="pane-actions">
+                <button class="btn ghost" id="btn-net-copy"
+                        type="button"><svg class="icon"><use href="#i-copy"/></svg>Copy report</button>
+                <button class="btn ghost" id="btn-net-clear"
+                        type="button"><svg class="icon"><use href="#i-trash"/></svg>Clear log</button>
+              </div>
+            </div>
+            <div class="log console settings-log" id="net-console"></div>
+            <p class="hint">Downloads and what came back. When something fails,
+               copy this report — it shows exactly which host is blocked on this
+               network.</p>
+          </div>
+        </section>
+      </div>
+      </div>
       </div>
     </section>
 

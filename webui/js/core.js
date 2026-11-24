@@ -370,7 +370,7 @@ function setSeg(selector, value) {
 /* ------------------------------------------- sliding active fill for tabs */
 
 const FILL_CONTAINERS = [
-  "#tabs", "#bypass-tabs", "#detail-tabs", "#account-methods", "#skin-seg",
+  "#tabs", "#detail-tabs", "#account-methods", "#skin-seg",
   "#kind-seg", "#source-seg", "#loader-seg", "#mods-seg", "#loaders-seg",
   "#mode-seg", "#lang-seg", "#pet-seg", "#settings-tabs", "#logs-tabs",
 ];

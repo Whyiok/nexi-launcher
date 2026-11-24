@@ -10,7 +10,7 @@ const zap = {
 const zapretLog = {
   pending: "", buffer: [], timer: null, stick: true,
   el: "#zapret-console",
-  visible: () => screen === "bypass",
+  visible: () => screen === "settings" && settingsTab === "network",
 };
 
 function zapretActive(status = zap.status) {

@@ -4,8 +4,7 @@
 
 const upd = {
   info: null, checking: false, silent: false, busy: false, confirm: false,
-  confirmTimer: null, status: "", error: false,
-  notice: "", noticeTimer: null, done: 0, total: 0,
+  confirmTimer: null, status: "", error: false, done: 0, total: 0,
 };
 
 function updVersionLabel(value) {
@@ -80,42 +79,6 @@ function updateVersionText() {
   return "Update";
 }
 
-function quickUpdateText() {
-  if (updateBusy()) {
-    if (upd.total > 0) {
-      const percent = Math.round((upd.done / upd.total) * 100);
-      return `Updating… ${percent}%`;
-    }
-    return "Updating…";
-  }
-  if (upd.checking) return upd.silent ? "Update" : "Checking…";
-  if (upd.confirm) return "Confirm update";
-  if (upd.info && upd.info.available) {
-    return `Update to ${updVersionLabel(upd.info.latest)}`;
-  }
-  if (upd.notice) return upd.notice;
-  return "Update";
-}
-
-function clearQuickNotice() {
-  upd.notice = "";
-  if (upd.noticeTimer) {
-    window.clearTimeout(upd.noticeTimer);
-    upd.noticeTimer = null;
-  }
-}
-
-function showQuickNotice(text) {
-  clearQuickNotice();
-  upd.notice = text;
-  upd.noticeTimer = window.setTimeout(() => {
-    upd.notice = "";
-    upd.noticeTimer = null;
-    syncUpdate();
-  }, 4000);
-  syncUpdate();
-}
-
 function syncUpdate() {
   const card = $("#update-card");
   if (!card) return;
@@ -125,7 +88,6 @@ function syncUpdate() {
   const check = $("#btn-update-check");
   const install = $("#btn-update-install");
   const cancel = $("#btn-update-cancel");
-  const quick = $("#btn-title-update");
 
   if (check) check.disabled = busy || upd.checking;
   if (install) {
@@ -136,13 +98,6 @@ function syncUpdate() {
     if (label) label.textContent = updateVersionText();
   }
   if (cancel) cancel.classList.toggle("hidden", !busy);
-  if (quick) {
-    quick.disabled = busy || upd.checking;
-    quick.classList.toggle("available", available && !busy);
-    quick.setAttribute("aria-busy", busy || upd.checking ? "true" : "false");
-    const label = quick.querySelector("span");
-    if (label) label.textContent = quickUpdateText();
-  }
 
   card.classList.toggle("has-update", available && !busy);
   card.classList.toggle("is-busy", busy);
@@ -163,7 +118,6 @@ function fillUpdate() {
 
 async function checkUpdates(silent = false) {
   if (upd.checking || updateBusy()) return;
-  clearQuickNotice();
   upd.checking = true;
   upd.silent = !!silent;
   upd.info = null;
@@ -251,25 +205,6 @@ async function installUpdate() {
   syncUpdate();
 }
 
-async function quickUpdate() {
-  if (upd.checking || updateBusy()) return;
-  if (!upd.info || !upd.info.available) {
-    await checkUpdates();
-    if (!upd.info) {
-      if (upd.error && upd.status) showErrorToast(upd.status, "Update");
-      return;
-    }
-    if (!upd.info.available) {
-      showQuickNotice("Up to date");
-      return;
-    }
-  }
-  await installUpdate();
-  if (!updateBusy() && upd.error && upd.status && !upd.confirm) {
-    showErrorToast(upd.status, "Update");
-  }
-}
-
 function cancelUpdate() {
   if (!updateBusy()) return;
   call("cancel");
@@ -281,7 +216,6 @@ function bindUpdate() {
     const node = $("#" + id);
     if (node) node.addEventListener("click", handler);
   };
-  on("btn-title-update", quickUpdate);
   on("btn-update-check", () => checkUpdates());
   on("btn-update-install", installUpdate);
   on("btn-update-cancel", cancelUpdate);

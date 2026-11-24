@@ -41,6 +41,12 @@ function setSettingsTab(name, instant = false) {
       && typeof loadSkin === "function") {
     loadSkin();
   }
+  // The DPI bypass card lives in the Network pane; load its status the first
+  // time that pane is opened.
+  if (screen === "settings" && target === "network"
+      && typeof openZapret === "function" && !zap.status) {
+    openZapret();
+  }
 }
 
 function setLogsTab(name, instant = false) {
