@@ -126,6 +126,10 @@
     <path d="M12 9.4v4.8"/>
     <path d="M12 17.1v.1"/>
   </symbol>
+  <symbol id="i-clan" viewBox="0 0 24 24">
+    <path d="M6.2 4h11.6v14.4l-5.8-3-5.8 3V4Z"/>
+    <path d="M9.4 8.6h5.2M9.4 12h5.2"/>
+  </symbol>
 </svg>
 
 <div class="app">
@@ -170,9 +174,6 @@
       </button>
       <button class="tab" data-screen="profiles" type="button">
         <svg class="icon"><use href="#i-builds"/></svg><span>Profiles</span>
-      </button>
-      <button class="tab" data-screen="create" type="button">
-        <svg class="icon"><use href="#i-plus"/></svg><span>New</span>
       </button>
       <button class="tab" data-screen="modpacks" type="button">
         <svg class="icon"><use href="#i-layers"/></svg><span>Modpacks</span>
@@ -237,7 +238,11 @@
           <span class="home-play-glyph">
             <svg class="icon"><use href="#i-play" id="home-play-icon"/></svg>
           </span>
-          <span class="home-play-label" id="home-play-label">Play</span>
+          <span class="home-play-text">
+            <span class="home-play-label" id="home-play-label">Play</span>
+            <span class="home-play-sub" id="home-play-sub"></span>
+          </span>
+          <svg class="icon home-play-go" aria-hidden="true"><use href="#i-chev"/></svg>
         </button>
         <div class="home-scroll">
           <section class="home-section">
@@ -259,9 +264,27 @@
       </div>
 
       <aside class="home-friends" aria-label="Friends">
+        <div class="home-view-tabs" role="tablist" aria-label="Main menu panel">
+          <button class="friends-icon-btn view-tab active" id="btn-home-view-friends"
+                  data-home-view="friends" type="button" role="tab"
+                  aria-selected="true" title="Friends" aria-label="Friends">
+            <svg class="icon"><use href="#i-users"/></svg>
+          </button>
+          <button class="friends-icon-btn view-tab" id="btn-home-view-clans"
+                  data-home-view="clans" type="button" role="tab"
+                  aria-selected="false" title="Clans" aria-label="Clans">
+            <svg class="icon"><use href="#i-clan"/></svg>
+          </button>
+          <button class="friends-icon-btn view-tab" id="btn-home-view-shared"
+                  data-home-view="shared" type="button" role="tab"
+                  aria-selected="false" title="Shared builds"
+                  aria-label="Shared builds">
+            <svg class="icon"><use href="#i-builds"/></svg>
+          </button>
+        </div>
         <div class="home-friends-head">
           <div class="home-friends-title">
-            <span class="eyebrow">FRIENDS</span>
+            <span class="eyebrow" id="friends-eyebrow">FRIENDS</span>
             <span class="count" id="friends-status">not signed in</span>
           </div>
           <div class="home-friends-tools">
@@ -309,14 +332,23 @@
             <p class="hint hidden" id="friends-empty">No friends yet. Add
                people on the Nexi site and they will appear here.</p>
           </section>
-          <section id="shared-home" class="hidden">
-            <div class="friends-section-head">
-              <span class="eyebrow">SHARED BUILDS</span>
-              <span class="count" id="shared-home-count">0</span>
-            </div>
-            <div class="friends-list" id="shared-home-list"></div>
-          </section>
           <p class="hint hidden" id="friends-error"></p>
+        </div>
+
+        <div class="friends-view friends-wip hidden" id="clans-view">
+          <div class="friends-gate-icon"><svg><use href="#i-clan"/></svg></div>
+          <span class="friends-wip-badge">Work in progress</span>
+          <p class="hint">Clans are still being built — rosters, chat and
+             shared builds will live here.</p>
+        </div>
+
+        <div class="friends-view hidden" id="shared-home">
+          <div class="friends-section-head">
+            <span class="eyebrow">SHARED BUILDS</span>
+            <span class="count" id="shared-home-count">0</span>
+          </div>
+          <div class="friends-list" id="shared-home-list"></div>
+          <p class="hint hidden" id="shared-home-empty">No shared builds yet.</p>
         </div>
       </aside>
     </section>
@@ -672,15 +704,25 @@
       </div>
     </section>
 
-    <!-- New profile ---------------------------------------------------- -->
-    <section class="screen" id="screen-create">
-      <div class="create-layout">
-        <div class="create-main">
-          <h1 class="screen-title" id="create-title">New profile</h1>
-          <p class="screen-sub" id="create-sub">Pick any Minecraft version —
-             missing files are downloaded from Mojang.</p>
-
-          <label class="field">
+    <!-- New profile: a modal over the current screen ------------------- -->
+    <div class="create-modal" id="screen-create" role="dialog"
+         aria-modal="true" aria-labelledby="create-title" hidden>
+      <div class="create-backdrop" data-create-close></div>
+      <div class="create-frame" role="document">
+        <div class="create-head">
+          <div class="create-heading">
+            <h1 class="screen-title" id="create-title">New profile</h1>
+            <p class="screen-sub" id="create-sub">Pick any Minecraft version —
+               missing files are downloaded from Mojang.</p>
+          </div>
+          <button class="create-close" id="btn-close-create" type="button"
+                  title="Close" aria-label="Close">
+            <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+          </button>
+        </div>
+        <div class="create-layout">
+          <div class="create-main">
+            <label class="field">
             <span class="field-label">PROFILE NAME</span>
             <input class="input" id="new-name" maxlength="48"
                    placeholder="My build" spellcheck="false" autocomplete="off">
@@ -735,8 +777,9 @@
                     type="button">Cancel</button>
           </div>
         </aside>
+        </div>
       </div>
-    </section>
+    </div>
 
     <!-- Mods ----------------------------------------------------------- -->
     <section class="screen" id="screen-mods">
@@ -1440,6 +1483,44 @@
           <p class="hint">Accent colour of the whole launcher — buttons,
              highlights, glows and the skin viewer ambience.</p>
 
+          <div class="design-block">
+            <span class="eyebrow">DESIGN</span>
+            <div class="design-grid" id="design-grid" role="radiogroup"
+                 aria-label="Launcher design">
+              <button class="design-option on" type="button" role="radio"
+                      aria-checked="true" data-design-option="classic">
+                <span class="design-preview design-preview-classic"
+                      aria-hidden="true">
+                  <span class="dp-strip"></span>
+                  <span class="dp-pill"></span>
+                </span>
+                <span class="design-text">
+                  <span class="design-name">Classic look</span>
+                  <span class="design-hint">Nexi’s original compact look</span>
+                </span>
+              </button>
+              <button class="design-option" type="button" role="radio"
+                      aria-checked="false" data-design-option="material">
+                <span class="design-preview design-preview-material"
+                      aria-hidden="true">
+                  <span class="dp-strip"></span>
+                  <span class="dp-pill"></span>
+                </span>
+                <span class="design-text">
+                  <span class="design-name">M3 Expressive</span>
+                  <span class="design-hint">Google’s expressive colour and
+                    springy shapes</span>
+                </span>
+              </button>
+            </div>
+            <p class="hint">Classic keeps the launcher’s original sharp,
+               compact surfaces. M3 Expressive restyles the whole interface
+               with Google’s vibrant tonal colour, soft shapes and springy
+               motion.</p>
+            <p class="hint design-wip">M3 Expressive is a work in progress —
+               some screens may show visual bugs and unfinished details.</p>
+          </div>
+
           <div class="appearance-controls">
             <div class="setting-row">
               <div class="setting-text">
@@ -1472,8 +1553,8 @@
             <div class="setting-row">
               <div class="setting-text">
                 <span class="setting-name">Home background</span>
-                <p class="hint">A GIF, MP4 or WebM clip behind the main menu.
-                   Leave it empty to keep the animated panorama.</p>
+                <p class="hint">A PNG, JPG, WEBP, GIF, MP4 or WebM behind the
+                   main menu. Leave it empty to keep the animated panorama.</p>
               </div>
               <div class="background-actions">
                 <span class="count path background-name" id="background-name">Panorama</span>
@@ -1803,8 +1884,29 @@
   </main>
 
   <footer class="statusbar">
-    <span class="status-text" id="status">Ready.</span>
-    <span class="status-hint">offline mode · mojang + modrinth</span>
+    <div class="status-left">
+      <button class="status-copy" id="status-copy" type="button"
+              title="Copy status" aria-label="Copy status">
+        <svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>
+      </button>
+      <button class="status-text" id="status" type="button"
+              title="Show status history" aria-label="Show status history"
+              aria-haspopup="dialog" aria-controls="status-history"
+              aria-expanded="false"><span id="status-label">Ready.</span></button>
+    </div>
+    <div class="status-history" id="status-history" role="dialog"
+         aria-label="Status history" hidden>
+      <div class="status-history-head">
+        <span class="status-history-title">Status history</span>
+        <button class="status-history-action" id="status-history-copy"
+                type="button" title="Copy history">Copy history</button>
+        <button class="status-history-close" id="status-history-close"
+                type="button" title="Close" aria-label="Close">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
+      </div>
+      <ol class="status-history-list" id="status-history-list"></ol>
+    </div>
   </footer>
 </div>
 
@@ -2037,7 +2139,8 @@
       <section class="welcome-step hidden" data-wstep="appearance">
         <span class="eyebrow">APPEARANCE</span>
         <h1 class="welcome-title">Make it yours</h1>
-        <p class="welcome-sub">Pick an accent colour and a colour mode.</p>
+        <p class="welcome-sub">Pick an accent colour, a colour mode and a
+          design.</p>
         <div class="theme-grid welcome-themes" id="welcome-themes"
              role="radiogroup" aria-label="Accent colour">
           <button class="theme-option" type="button" role="radio"
@@ -2075,6 +2178,18 @@
                aria-label="Colour mode">
             <button type="button" data-wmode="dark">Dark</button>
             <button type="button" data-wmode="light">Light</button>
+          </div>
+        </div>
+        <div class="setting-row welcome-mode-row">
+          <div class="setting-text">
+            <span class="setting-name">Design</span>
+            <p class="hint">Classic is the original look; M3 Expressive is
+              Google’s vibrant, springy design.</p>
+          </div>
+          <div class="seg" id="welcome-design" role="radiogroup"
+               aria-label="Launcher design">
+            <button type="button" data-wdesign="classic">Classic look</button>
+            <button type="button" data-wdesign="material">M3 Expressive</button>
           </div>
         </div>
       </section>
@@ -2166,6 +2281,48 @@
         </div>
       </section>
 
+      <section class="welcome-step hidden" data-wstep="packs">
+        <span class="eyebrow">YOUR FIRST BUILD</span>
+        <h1 class="welcome-title">Import a launcher build</h1>
+        <p class="welcome-sub">Copy a build from Modrinth App or Prism Launcher.
+          The original stays where it is.</p>
+        <div class="import-picker">
+          <div class="import-tabs" id="welcome-pack-sources" role="radiogroup"
+               aria-label="Source launcher">
+            <button class="import-tab" type="button" role="radio"
+                    aria-checked="true" data-wpack-source="modrinth">
+              <span>Modrinth App</span>
+              <span class="import-tab-count"
+                    data-wpack-count="modrinth">–</span>
+            </button>
+            <button class="import-tab" type="button" role="radio"
+                    aria-checked="false" data-wpack-source="prism">
+              <span>Prism Launcher</span>
+              <span class="import-tab-count"
+                    data-wpack-count="prism">–</span>
+            </button>
+          </div>
+          <div class="import-list" id="welcome-instance-list" role="group"
+               aria-label="Detected builds">
+            <div class="import-empty">
+              <svg class="icon" aria-hidden="true"><use href="#i-import"/></svg>
+              <p>Searching for installed builds…</p>
+            </div>
+          </div>
+          <div class="import-foot">
+            <span class="import-selection" id="welcome-selection-count"
+                  aria-live="polite">Select builds to import</span>
+            <button class="btn primary" id="btn-welcome-instance-import"
+                    type="button" disabled>
+              <svg class="icon" aria-hidden="true"><use href="#i-import"/></svg>
+              <span id="welcome-import-label">Import selected</span>
+            </button>
+          </div>
+        </div>
+        <p class="hint welcome-status" id="welcome-pack-status"
+           aria-live="polite"></p>
+      </section>
+
       <section class="welcome-step hidden" data-wstep="bypass">
         <span class="eyebrow">BYPASS</span>
         <h1 class="welcome-title">Network bypass (zapret)</h1>
@@ -2212,6 +2369,13 @@
 <div class="toast-stack" id="toast-stack" aria-live="assertive"
      aria-relevant="additions" aria-label="Errors"></div>
 
+<!-- Google Material 3 runtime. Bundled from @material/web 2.5 and
+     @material/material-color-utilities because WebView2 blocks ES module
+     imports on file://. The design layer only activates for the "material"
+     design; classic never touches these components. -->
+<script src="js/material-web.bundle.js"></script>
+<script src="js/material-icons.js"></script>
+<script src="js/material.js"></script>
 <script src="i18n.js"></script>
 <!-- Classic scripts (not ES modules: WebView2 loads the page from file://).
      Order matters: earlier files declare shared state and helpers. -->

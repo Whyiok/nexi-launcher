@@ -31,7 +31,10 @@ CONTENT_TYPES = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
+    ".jfif": "image/jpeg",
     ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".avif": "image/avif",
     ".mp4": "video/mp4",
     ".webm": "video/webm",
 }

@@ -10,10 +10,13 @@ const THEME_BRAND_ICONS = {
   indigo: "star_icon_blue.svg",
 };
 const MODES = ["dark", "light"];
+const DESIGNS = ["classic", "material"];
+const DESIGN_NAMES = { classic: "Classic look", material: "M3 Expressive" };
 const LANGUAGES = ["en", "ru"];
 const PET_OPTIONS = ["axi", "clawd"];
 let activeTheme = "";
 let activeMode = "";
+let activeDesign = "";
 let activeLanguage = "";
 
 function applyTheme(theme) {
@@ -33,6 +36,7 @@ function applyTheme(theme) {
     logo.src = THEME_BRAND_ICONS[next] || THEME_BRAND_ICONS.mint;
   }
   startOrb();
+  if (typeof refreshMaterialTokens === "function") refreshMaterialTokens();
   if (typeof refreshHomePanorama === "function") refreshHomePanorama();
 }
 
@@ -42,7 +46,28 @@ function applyMode(mode) {
   activeMode = next;
   document.documentElement.dataset.mode = next;
   startOrb();
+  // M3 Expressive keeps the same seed but builds a light or dark scheme.
+  if (typeof refreshMaterialTokens === "function") refreshMaterialTokens();
   if (typeof refreshHomePanorama === "function") refreshHomePanorama();
+}
+
+/* Classic is Nexi's own look. "material" swaps the whole interface to
+   Google's M3 Expressive language through the [data-design="material"] layer
+   in style.css; the same accent and colour mode still drive it. */
+function applyDesign(design) {
+  const next = DESIGNS.includes(design) ? design : "classic";
+  if (next === activeDesign) return;
+  activeDesign = next;
+  document.documentElement.dataset.design = next;
+  // Builds (or tears down) the official @material/web components and the
+  // M3 Expressive colour tokens. The sliding fills then have to re-measure
+  // against the new metrics.
+  if (typeof refreshMaterialDesign === "function") refreshMaterialDesign();
+  requestAnimationFrame(() => {
+    if (typeof updateAllSegFills === "function") updateAllSegFills(true);
+    if (typeof updateAllSegHovers === "function") updateAllSegHovers();
+    if (typeof resizeHomePanorama === "function") resizeHomePanorama();
+  });
 }
 
 function applyLanguage(language) {
@@ -60,6 +85,7 @@ function applyState(next) {
   selectionConfirmed = S.selected;
   applyTheme(S.theme);
   applyMode(S.color_mode);
+  applyDesign(S.design);
   applyLanguage(S.language);
   if (typeof applyPet === "function") applyPet(S.pet);
   if (editSlug && (!S.instance || S.instance.slug !== editSlug)) {
@@ -106,6 +132,14 @@ function ensureScreenData() {
 /* --------------------------------------------------------------- screens */
 
 function setScreen(name) {
+  /* Profile creation and editing open as a modal over the current screen, so
+     they never hide what is behind them. */
+  if (name === "create") {
+    if (typeof openCreateModal === "function") openCreateModal();
+    return;
+  }
+  if (typeof closeCreateModal === "function") closeCreateModal(false);
+
   /* The bypass lives in Settings → Network now, but older callers (the
      mirror prompt, the first-run flow) still ask for the "bypass" screen. */
   let openBypass = false;
@@ -163,16 +197,6 @@ function setScreen(name) {
     if (typeof loadSharedAvailable === "function") loadSharedAvailable();
   } else if (name === "profiles") {
     renderProfiles();
-  } else if (name === "create") {
-    // A new profile starts on the latest release, whether it was opened with
-    // the New button or straight from the tab.
-    if (!editSlug && !versions.selected) {
-      versions.selected = latestReleaseId();
-    }
-    if (!versions.loaded && !versions.loading) loadVersions(false);
-    // The version list can already be loaded by the profile settings pane,
-    // which never renders the create list itself.
-    else if (versions.loaded) renderVersions();
   } else if (name === "mods" || name === "modpacks") {
     initMods(name === "modpacks" ? "modpack" : "");
     if (mods.searchedKey !== browserKey()) searchMods();

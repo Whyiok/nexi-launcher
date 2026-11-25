@@ -21,25 +21,63 @@ function friendsStatus(text, error = false) {
   node.classList.toggle("error", !!error);
 }
 
+/* The panel on the main menu has three icon tabs: friends, clans and the
+   builds friends shared. Only the friends view talks to the friends API. */
+let homePanelView = "friends";
+
+function homeViewStatusText() {
+  const nexi = nexiAccountEntry();
+  if (homePanelView === "clans") return "Work in progress";
+  if (homePanelView === "shared") {
+    return nexi ? "Shared with friends" : "not signed in";
+  }
+  if (!nexi) return "not signed in";
+  const online = friendsState.counts.online || 0;
+  return `${online} online · ${nexi.name}`;
+}
+
+function renderHomeView() {
+  $$("[data-home-view]").forEach((button) => {
+    const on = button.dataset.homeView === homePanelView;
+    button.classList.toggle("active", on);
+    button.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  const eyebrow = $("#friends-eyebrow");
+  if (eyebrow) {
+    eyebrow.textContent = homePanelView === "clans" ? "CLANS"
+      : (homePanelView === "shared" ? "SHARED BUILDS" : "FRIENDS");
+  }
+  const clans = $("#clans-view");
+  if (clans) clans.classList.toggle("hidden", homePanelView !== "clans");
+  const shared = $("#shared-home");
+  if (shared) shared.classList.toggle("hidden", homePanelView !== "shared");
+  const status = $("#friends-status");
+  if (status) status.textContent = homeViewStatusText();
+  renderFriendsGate();
+}
+
+function setHomePanelView(view) {
+  homePanelView = ["friends", "clans", "shared"].includes(view)
+    ? view : "friends";
+  renderHomeView();
+}
+
 function renderFriendsGate() {
   const gate = $("#friends-gate");
   if (!gate) return;
   const nexi = nexiAccountEntry();
   const signedIn = !!nexi;
-  gate.classList.toggle("hidden", signedIn);
-  $("#friends-body").classList.toggle("hidden", !signedIn);
+  const friendsView = homePanelView === "friends";
+  gate.classList.toggle("hidden", signedIn || !friendsView);
+  $("#friends-body").classList.toggle("hidden", !signedIn || !friendsView);
   $("#btn-friends-profile").classList.toggle("hidden", !signedIn);
   $("#btn-friends-refresh").classList.toggle("hidden", !signedIn);
   const signIn = $("#btn-friends-signin");
   const cancel = $("#btn-friends-signin-cancel");
   if (signIn) signIn.disabled = friendsState.waiting;
   if (cancel) cancel.classList.toggle("hidden", !friendsState.waiting);
-  if (signedIn) {
-    const online = friendsState.counts.online || 0;
-    $("#friends-status").textContent = `${online} online · ${nexi.name}`;
-  } else {
-    $("#friends-status").textContent = "not signed in";
-  }
+  const status = $("#friends-status");
+  if (status) status.textContent = homeViewStatusText();
 }
 
 function friendRow(person, kind) {
@@ -191,6 +229,31 @@ async function friendsRequestAction(action, id) {
 function bindFriends() {
   const signIn = $("#btn-friends-signin");
   if (!signIn) return;
+  $$("[data-home-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setHomePanelView(button.dataset.homeView);
+      // Opening the shared tab refreshes the list, like the friends tab does
+      // when the launcher reloads it.
+      if (button.dataset.homeView === "shared"
+          && typeof loadSharedAvailable === "function") {
+        loadSharedAvailable();
+      }
+    });
+  });
+  const tabs = $(".home-view-tabs");
+  if (tabs) {
+    tabs.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const list = $$("[data-home-view]");
+      const index = list.indexOf(document.activeElement);
+      if (index < 0) return;
+      event.preventDefault();
+      const step = event.key === "ArrowRight" ? 1 : list.length - 1;
+      const next = list[(index + step) % list.length];
+      next.focus();
+      setHomePanelView(next.dataset.homeView);
+    });
+  }
   signIn.addEventListener("click", friendsSignIn);
   signIn.addEventListener("pointermove", (event) => {
     const rect = signIn.getBoundingClientRect();
@@ -213,4 +276,5 @@ function bindFriends() {
       friendsRequestAction("decline", decline.dataset.friendDecline);
     }
   });
+  renderHomeView();
 }

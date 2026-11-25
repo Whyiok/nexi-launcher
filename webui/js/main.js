@@ -10,6 +10,8 @@ function spawnRipple(event) {
   if (event.target.closest("input, textarea, select")) return;
   const target = event.target.closest(RIPPLE_TARGETS);
   if (!target || target.disabled) return;
+  // Material mode layers Google's own ripple component on these targets.
+  if (target.querySelector(":scope > md-ripple")) return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const rect = target.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
@@ -45,7 +47,7 @@ function syncWindowMaximized(maximized) {
   const button = $("#btn-win-max");
   if (!button) return;
   const use = button.querySelector("use");
-  if (use) use.setAttribute("href", maximized ? "#i-restore" : "#i-max");
+  if (use) setIconHref(use, maximized ? "i-restore" : "i-max");
   button.title = maximized ? "Restore" : "Maximize";
   button.setAttribute("aria-label", button.title);
 }
@@ -87,6 +89,8 @@ function bind() {
   if (bound) return;
   bound = true;
   upgradeSelects();
+  initStatusHistory();
+  initCreateModal();
   // The selected build is only highlighted while the launcher window is the
   // one in front; alt-tabbing away drops the highlight.
   const setWindowActive = (active) => {
@@ -191,6 +195,10 @@ function bind() {
   $("#theme-grid").addEventListener("click", (event) => {
     const option = event.target.closest("[data-theme-option]");
     if (option) changeTheme(option.dataset.themeOption);
+  });
+  $("#design-grid").addEventListener("click", (event) => {
+    const option = event.target.closest("[data-design-option]");
+    if (option) changeDesign(option.dataset.designOption);
   });
   $("#mode-seg").addEventListener("click", (event) => {
     const option = event.target.closest("[data-mode-option]");

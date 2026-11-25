@@ -74,7 +74,8 @@ and the Microsoft Edge WebView2 Runtime are required (Windows 11 includes it).
   the builds ordered by their last launch, the recently played worlds of every
   profile and one large Play button for the default build. Clicking a build
   makes it the default without leaving the page. The background can be
-  replaced in Settings with a GIF, MP4 or WebM file. On Minecraft 1.20+ a
+  replaced in Settings with a still image (PNG, JPG/JFIF, WebP, BMP, AVIF),
+  an animated GIF or an MP4/WebM clip. On Minecraft 1.20+ a
   world can be started straight into the game (Quick Play).
 - **Custom window chrome**: the native frame is replaced by a title bar drawn
   by the page — the NEXI logo and name, minimize / maximize / close buttons,

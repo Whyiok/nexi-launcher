@@ -169,15 +169,15 @@ function autoNetworkCheck() {
 
 function renderNetworkSettings() {
   const proxy = $("#proxy-url");
-  if (proxy && document.activeElement !== proxy) proxy.value = S.proxy || "";
+  if (proxy && !m3FieldActive(proxy)) proxy.value = S.proxy || "";
   const dns = $("#dns-servers");
-  if (dns && document.activeElement !== dns) dns.value = S.dns || "";
+  if (dns && !m3FieldActive(dns)) dns.value = S.dns || "";
   $$("#dns-presets [data-dns-preset]").forEach((button) => {
     button.classList.toggle(
       "on", (button.dataset.dnsPreset || "") === (S.dns || ""));
   });
   const key = $("#curseforge-key");
-  if (key && document.activeElement !== key) {
+  if (key && !m3FieldActive(key)) {
     key.placeholder = S.curseforge_key_set
       ? "Saved — paste a new key to replace"
       : "Paste a personal API key";

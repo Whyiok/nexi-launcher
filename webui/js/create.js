@@ -25,7 +25,92 @@ function resetCreateMode() {
   $("#create-title").textContent = "New profile";
   $("#create-sub").textContent = "Pick any Minecraft version — missing files are downloaded from Mojang.";
   $("#btn-create").textContent = "Create profile";
-  if (screen === "create") renderVersions();
+  if (createModalOpen()) renderVersions();
+}
+
+/* The create form is a modal over whichever screen is open, so the header no
+   longer carries a "New" tab and closing it leaves the user where they were. */
+function createModalOpen() {
+  const modal = $("#screen-create");
+  return !!modal && !modal.hidden;
+}
+
+let createReturnFocus = null;
+
+function openCreateModal() {
+  const modal = $("#screen-create");
+  if (!modal) return;
+  const wasOpen = !modal.hidden;
+  if (!wasOpen) createReturnFocus = document.activeElement;
+  modal.hidden = false;
+  // A new profile starts on the latest release, whether it was opened from
+  // the New button, the empty state or the profile editor.
+  if (!editSlug && !versions.selected) versions.selected = latestReleaseId();
+  if (!versions.loaded && !versions.loading) loadVersions(false);
+  // The version list can already be loaded by the profile settings pane,
+  // which never renders the create list itself.
+  else if (versions.loaded) renderVersions();
+  if (!wasOpen) {
+    requestAnimationFrame(() => {
+      const name = $("#new-name");
+      if (name) name.focus();
+    });
+  }
+}
+
+function closeCreateModal(restoreFocus = true) {
+  const modal = $("#screen-create");
+  if (!modal || modal.hidden) return;
+  modal.hidden = true;
+  if (typeof closeVsel === "function") {
+    $$("#screen-create .vsel.open").forEach(closeVsel);
+  }
+  if (editSlug) resetCreateMode();
+  if (!restoreFocus) {
+    createReturnFocus = null;
+    return;
+  }
+  const back = createReturnFocus;
+  createReturnFocus = null;
+  if (back && back.isConnected && typeof back.focus === "function") {
+    back.focus({ preventScroll: true });
+  }
+}
+
+function initCreateModal() {
+  const modal = $("#screen-create");
+  if (!modal || modal.dataset.wired) return;
+  modal.dataset.wired = "1";
+
+  const close = $("#btn-close-create");
+  if (close) close.addEventListener("click", () => closeCreateModal());
+  const backdrop = modal.querySelector(".create-backdrop");
+  if (backdrop) backdrop.addEventListener("click", () => closeCreateModal());
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || modal.hidden || event.defaultPrevented) return;
+    event.preventDefault();
+    closeCreateModal();
+  });
+
+  /* Keep Tab inside the dialog; it floats over the whole application. */
+  modal.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab") return;
+    const nodes = [...modal.querySelectorAll(
+      "button, input, select, textarea, [href], [tabindex]:not([tabindex='-1'])")]
+      .filter((node) => !node.disabled && !node.hidden
+        && node.offsetParent !== null);
+    if (!nodes.length) return;
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
 }
 
 function openEditProfile() {

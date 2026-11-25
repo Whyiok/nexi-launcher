@@ -23,6 +23,7 @@ class BaseApi:
     RAM_MIN = 1
     RAM_MAX = 16
     THEMES = ("mint", "orange", "indigo")
+    DESIGNS = ("classic", "material")
     PETS = ("axi", "clawd")
 
     def __init__(self):
@@ -48,6 +49,10 @@ class BaseApi:
                                      if isinstance(defaults, dict) else None)
         theme = str(self._saved("theme", "mint") or "mint").strip().lower()
         self.theme = theme if theme in self.THEMES else "mint"
+        # "classic" is Nexi's own look; "material" applies Google's Material 3
+        # shapes, tonal surfaces and typography on top of the same accents.
+        design = str(self._saved("design", "classic") or "classic").strip().lower()
+        self.design = design if design in self.DESIGNS else "classic"
         mode = str(self._saved("color_mode", "dark") or "dark").strip().lower()
         self.color_mode = mode if mode in ("dark", "light") else "dark"
         language = str(self._saved("language", "en") or "en").strip().lower()
@@ -504,6 +509,7 @@ class BaseApi:
         data = {"player": self.player, "ram": int(self.ram),
                 "default_ram": int(self.default_ram),
                 "theme": self.theme,
+                "design": self.design,
                 "color_mode": self.color_mode,
                 "language": self.language,
                 "pet": self.pet,
@@ -554,6 +560,17 @@ class BaseApi:
             self.theme = theme
             self._save()
         log.info("Theme: %s", theme)
+        return {"ok": True, "state": self.state()}
+
+    def set_design(self, design):
+        design = str(design or "").strip().lower()
+        if design not in self.DESIGNS:
+            return {"ok": False, "error": "Unknown design.",
+                    "state": self.state()}
+        with self._lock:
+            self.design = design
+            self._save()
+        log.info("Design: %s", design)
         return {"ok": True, "state": self.state()}
 
     def set_color_mode(self, mode):

@@ -2,6 +2,8 @@
 
 import json
 import os
+import sqlite3
+import tempfile
 import threading
 import zipfile
 from pathlib import Path
@@ -15,14 +17,14 @@ from ..instances import (
 )
 from ..java_runtime import ensure_java
 from ..loaders import (
-    console_java_for, find_loader_profile, install_loader, loader_builds,
-    vanilla_versions,
+    console_java_for, find_loader_profile, install_fabric, install_loader,
+    loader_builds, vanilla_versions,
 )
 from ..modpacks import (
     _curseforge_loader, _download_curseforge_manifest,
     _download_modpack_files, _extract_zip, _modpack_loader,
 )
-from ..util import InstallCancelled, _version_key, pick_file
+from ..util import InstallCancelled, _version_key, pick_file, pick_folder
 from ..vanilla import (
     fetch_version_manifest, install_vanilla, manifest_entry,
     verify_version_files, version_installed,
@@ -396,6 +398,430 @@ class CreateApi:
         self._status("profiles", message)
         return {"ok": True, "message": message}
 
+    @staticmethod
+    def _launcher_instance_roots():
+        """Known default roots, plus paths explicitly set in launcher configs."""
+        appdata = Path(os.environ.get("APPDATA", Path.home()))
+        local = Path(os.environ.get("LOCALAPPDATA", appdata))
+        roots = {
+            "Modrinth App": [appdata / "com.modrinth.theseus" / "profiles",
+                             appdata / "ModrinthApp" / "profiles",
+                             appdata / "Modrinth App" / "profiles",
+                             local / "ModrinthApp" / "profiles"],
+            "Prism Launcher": [appdata / "PrismLauncher" / "instances",
+                               appdata / "Prism Launcher" / "instances",
+                               local / "PrismLauncher" / "instances"],
+        }
+        config_paths = [appdata / "PrismLauncher" / "prismlauncher.cfg",
+                        appdata / "Prism Launcher" / "prismlauncher.cfg",
+                        local / "PrismLauncher" / "prismlauncher.cfg"]
+        for config in config_paths:
+            try:
+                for line in config.read_text(encoding="utf-8", errors="replace").splitlines():
+                    key, sep, value = line.partition("=")
+                    if not sep:
+                        continue
+                    setting = key.strip().lower()
+                    raw_path = value.strip().strip('"')
+                    if setting == "instancesshareddir":
+                        if raw_path:
+                            path = Path(raw_path)
+                            if not path.is_absolute():
+                                path = config.parent / path
+                            roots["Prism Launcher"].append(path)
+                    elif setting == "instancedir":
+                        if raw_path:
+                            path = Path(raw_path)
+                            if not path.is_absolute():
+                                path = config.parent / path
+                            roots["Prism Launcher"].append(path)
+            except OSError:
+                pass
+        found = []
+        seen = set()
+        for launcher, candidates in roots.items():
+            for candidate in candidates:
+                try:
+                    resolved = candidate.resolve()
+                except OSError:
+                    resolved = candidate
+                key = str(resolved).lower()
+                if key not in seen and resolved.is_dir():
+                    seen.add(key)
+                    found.append((launcher, resolved))
+        return found
+
+    def discover_launcher_instances(self):
+        """List local Modrinth App and Prism builds from their own registries."""
+        result = []
+        appdata = Path(os.environ.get("APPDATA", Path.home()))
+        local = Path(os.environ.get("LOCALAPPDATA", appdata))
+        db_candidates = (appdata / "ModrinthApp" / "app.db",
+                         appdata / "com.modrinth.theseus" / "app.db",
+                         local / "ModrinthApp" / "app.db")
+        database = next((path for path in db_candidates if path.is_file()), None)
+        if database is not None:
+            try:
+                uri = database.as_uri() + "?mode=ro"
+                with sqlite3.connect(uri, uri=True, timeout=3) as connection:
+                    rows = connection.execute(
+                        "SELECT i.path, i.name, cs.game_version, cs.loader, "
+                        "cs.loader_version FROM instances i "
+                        "LEFT JOIN instance_content_sets cs "
+                        "ON cs.id=i.applied_content_set_id "
+                        "WHERE i.install_stage='installed' "
+                        "ORDER BY lower(i.name), i.id").fetchall()
+                for raw_path, name, game, loader, loader_version in rows:
+                    folder = Path(raw_path)
+                    if not folder.is_absolute():
+                        profiles_root = database.parent / "profiles"
+                        folder = profiles_root / folder
+                        if not folder.is_dir():
+                            folder = database.parent / Path(raw_path)
+                    if not folder.is_dir():
+                        continue
+                    loader_label = str(loader or "").strip().capitalize()
+                    if loader_label == "Neoforge":
+                        loader_label = "NeoForge"
+                    if loader_label and loader_version:
+                        loader_label += f" {loader_version}"
+                    result.append({
+                        "launcher": "Modrinth App", "source": "modrinth",
+                        "name": str(name or folder.name),
+                        "game": str(game or ""),
+                        "loader": loader_label or "Vanilla",
+                        "path": str(folder.resolve()),
+                    })
+            except (sqlite3.Error, OSError, ValueError) as exc:
+                return {"ok": False,
+                        "error": f"Could not read Modrinth App profiles: {exc}"}
+
+        for launcher, root in self._launcher_instance_roots():
+            if launcher != "Prism Launcher":
+                continue
+            try:
+                children = sorted(root.iterdir(), key=lambda item: item.name.lower())
+            except OSError:
+                continue
+            for folder in children:
+                if not folder.is_dir() or folder.is_symlink():
+                    continue
+                metadata = folder / "mmc-pack.json"
+                if not metadata.is_file():
+                    continue
+                name, game, loader_label = folder.name, "", ""
+                try:
+                    pack = json.loads(metadata.read_text(encoding="utf-8"))
+                    config = folder / "instance.cfg"
+                    if config.is_file():
+                        for line in config.read_text(encoding="utf-8", errors="replace").splitlines():
+                            if line.startswith("name="):
+                                name = line.split("=", 1)[1].strip() or name
+                                break
+                    for component in pack.get("components", []):
+                        if not isinstance(component, dict):
+                            continue
+                        uid = str(component.get("uid") or "").lower()
+                        version = str(component.get("version") or component.get("cachedVersion") or "")
+                        if uid == "net.minecraft":
+                            game = version
+                        elif uid == "net.fabricmc.fabric-loader":
+                            loader_label = f"Fabric {version}"
+                        elif uid == "net.minecraftforge":
+                            loader_label = f"Forge {version}"
+                        elif uid == "net.neoforged.neoforge":
+                            loader_label = f"NeoForge {version}"
+                        elif uid == "org.quiltmc.quilt-loader":
+                            loader_label = f"Quilt {version}"
+                except (OSError, ValueError, TypeError):
+                    continue
+                result.append({"launcher": launcher, "source": "prism",
+                               "name": name, "game": game,
+                               "loader": loader_label or "Vanilla",
+                               "path": str(folder.resolve())})
+        return {"ok": True, "instances": result}
+
+    def import_launcher_instance(self, path, source):
+        """Import a chosen local instance listed by discover_launcher_instances."""
+        if self.busy:
+            return {"ok": False, "error": "Another task is already running."}
+        if source not in ("modrinth", "prism"):
+            return {"ok": False, "error": "Unknown launcher source."}
+        try:
+            folder = Path(str(path or "")).resolve()
+        except (OSError, ValueError):
+            return {"ok": False, "error": "Could not validate the selected instance."}
+        if source == "modrinth":
+            appdata = Path(os.environ.get("APPDATA", Path.home()))
+            databases = (appdata / "ModrinthApp" / "app.db",
+                         appdata / "com.modrinth.theseus" / "app.db")
+            for database in databases:
+                if not database.is_file():
+                    continue
+                try:
+                    with sqlite3.connect(database.as_uri() + "?mode=ro",
+                                         uri=True, timeout=3) as connection:
+                        row = connection.execute(
+                            "SELECT i.path FROM instances i WHERE "
+                            "i.path=? OR i.path=? OR i.path=? OR i.path=? LIMIT 1",
+                            (folder.name, str(folder), str(folder.resolve()),
+                             str(folder.relative_to(database.parent / "profiles"))
+                             if folder.is_relative_to(database.parent / "profiles") else ""),
+                        ).fetchone()
+                    if row:
+                        return self._import_launcher_instance_folder(folder, "modrinth")
+                except sqlite3.Error:
+                    continue
+            return {"ok": False,
+                    "error": "This Modrinth App instance is no longer registered."}
+        allowed = {str(root / child.name).lower()
+                   for launcher, root in self._launcher_instance_roots()
+                   if launcher == "Prism Launcher"
+                   for child in root.iterdir() if child.is_dir()}
+        if str(folder).lower() not in allowed:
+            return {"ok": False, "error": "This instance is not in the detected Prism folders."}
+        return self._import_launcher_instance_folder(folder, "prism")
+
+    def _import_launcher_instance_folder(self, root: Path, launcher: str):
+        """Copy an installed Modrinth/Prism instance into a safe import archive."""
+        root = Path(root)
+        launcher = str(launcher or "").lower()
+        name = root.name
+        pack = None
+        if launcher == "prism":
+            metadata = root / "mmc-pack.json"
+            if not metadata.is_file():
+                return {"ok": False,
+                        "error": "This folder is not a Prism instance (mmc-pack.json is missing)."}
+            try:
+                pack = json.loads(metadata.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                return {"ok": False, "error": f"Could not read Prism metadata: {exc}"}
+            config = root / "instance.cfg"
+            if config.is_file():
+                try:
+                    for line in config.read_text(encoding="utf-8", errors="replace").splitlines():
+                        if line.startswith("name="):
+                            name = line.split("=", 1)[1].strip() or name
+                            break
+                except OSError:
+                    pass
+        elif launcher == "modrinth":
+            metadata = next((path for path in (root / "profile.json",
+                                               root / "instance.json",
+                                               root / ".minecraft" / "profile.json",
+                                               root / ".minecraft" / "instance.json")
+                             if path.is_file()), None)
+            if metadata is not None:
+                try:
+                    app_profile = json.loads(metadata.read_text(encoding="utf-8"))
+                except (OSError, ValueError) as exc:
+                    return {"ok": False, "error": f"Could not read Modrinth App metadata: {exc}"}
+            else:
+                app_profile = None
+                appdata = Path(os.environ.get("APPDATA", Path.home()))
+                for database in (appdata / "ModrinthApp" / "app.db",
+                                 appdata / "com.modrinth.theseus" / "app.db"):
+                    if not database.is_file():
+                        continue
+                    try:
+                        with sqlite3.connect(database.as_uri() + "?mode=ro",
+                                             uri=True, timeout=3) as connection:
+                            row = connection.execute(
+                                "SELECT i.name, cs.game_version, cs.loader, "
+                                "cs.loader_version FROM instances i "
+                                "LEFT JOIN instance_content_sets cs "
+                                "ON cs.id=i.applied_content_set_id "
+                        "WHERE i.path=? OR i.path=? OR i.path=? OR i.path=? LIMIT 1",
+                                (root.name, str(root), str(root.resolve()),
+                                 str(root.relative_to(database.parent / "profiles"))
+                                 if root.is_relative_to(database.parent / "profiles")
+                                 else "")).fetchone()
+                        if row:
+                            app_profile = {
+                                "name": row[0],
+                                "game": {"version": row[1],
+                                         "modLoaders": ([{"id": row[2],
+                                                          "version": row[3]}]
+                                                        if row[2] else [])}}
+                            break
+                    except sqlite3.Error:
+                        continue
+                if app_profile is None:
+                    return {"ok": False,
+                            "error": "This folder is not a detected Modrinth App instance."}
+            if not isinstance(app_profile, dict):
+                return {"ok": False, "error": "The Modrinth App instance metadata is invalid."}
+            try:
+                game_data = app_profile.get("game") or {}
+                if not isinstance(game_data, dict):
+                    game_data = {}
+                game = str(game_data.get("version")
+                           or game_data.get("gameVersion")
+                           or app_profile.get("gameVersion") or "").strip()
+                loader_data = (game_data.get("modLoaders")
+                               or game_data.get("loaders")
+                               or game_data.get("loader") or [])
+                if isinstance(loader_data, dict):
+                    loader_data = [loader_data]
+                loader_entry = next((item for item in loader_data
+                                     if isinstance(item, dict)), {})
+                loader_raw = str(loader_entry.get("id")
+                                 or loader_entry.get("name")
+                                 or loader_entry.get("type") or "").lower()
+                loader_version = str(loader_entry.get("version") or "").strip()
+                if not game:
+                    app_version = app_profile.get("version") or {}
+                    if isinstance(app_version, dict):
+                        game = str(app_version.get("gameVersion")
+                                   or app_version.get("minecraft") or "").strip()
+                        loader_data = (app_version.get("modLoaders")
+                                       or app_version.get("loaders")
+                                       or app_version.get("loader") or [])
+                        if isinstance(loader_data, dict):
+                            loader_data = [loader_data]
+                        loader_entry = next((item for item in loader_data
+                                             if isinstance(item, dict)), {})
+                        loader_raw = str(loader_entry.get("id")
+                                         or loader_entry.get("name") or "").lower()
+                        loader_version = str(loader_entry.get("version") or "").strip()
+            except (TypeError, AttributeError):
+                game, loader_raw, loader_version = "", "", ""
+            name = str(app_profile.get("name") or app_profile.get("instanceName") or name)
+            if not game:
+                game = str(app_profile.get("gameVersion") or app_profile.get("game_version")
+                           or app_profile.get("minecraftVersion") or app_profile.get("versionId")
+                           or app_profile.get("mcVersion") or "").strip()
+            if not loader_raw:
+                loader_data = app_profile.get("loader") or app_profile.get("modLoader")
+                if isinstance(loader_data, dict):
+                    loader_raw = str(loader_data.get("id") or loader_data.get("name") or loader_data.get("type") or "").lower()
+                    loader_version = str(loader_data.get("version") or loader_version).strip()
+                else:
+                    loader_raw = str(loader_data or app_profile.get("loaderType") or "").lower()
+                    loader_version = str(app_profile.get("loaderVersion")
+                                         or app_profile.get("loader_version") or loader_version).strip()
+            aliases = {"fabric": "net.fabricmc.fabric-loader",
+                       "forge": "net.minecraftforge",
+                       "neoforge": "net.neoforged.neoforge",
+                       "neo forge": "net.neoforged.neoforge",
+                       "quilt": "org.quiltmc.quilt-loader"}
+            components = []
+            if game:
+                components.append({"uid": "net.minecraft", "version": game})
+            uid = aliases.get(loader_raw, "")
+            if uid and loader_version:
+                components.append({"uid": uid, "version": loader_version})
+            # Some Modrinth App versions store the loader under a nested object.
+            if not components:
+                for key, value in app_profile.items():
+                    if not isinstance(value, dict):
+                        continue
+                    nested_type = str(value.get("type") or key).lower()
+                    nested_version = str(value.get("version") or "").strip()
+                    if nested_type in aliases:
+                        components.append({"uid": aliases[nested_type],
+                                           "version": nested_version})
+                    elif nested_type in ("minecraft", "net.minecraft"):
+                        components.append({"uid": "net.minecraft",
+                                           "version": nested_version})
+            if not any(item.get("uid") == "net.minecraft" for item in components):
+                # As a fallback, inspect version JSON files included in this instance.
+                versions_dir = root / ".minecraft" / "versions"
+                if versions_dir.is_dir():
+                    for version_file in versions_dir.glob("*/*.json"):
+                        try:
+                            version_data = json.loads(version_file.read_text(encoding="utf-8"))
+                        except (OSError, ValueError):
+                            continue
+                        game = str(version_data.get("inheritsFrom") or "").strip()
+                        if game:
+                            components.append({"uid": "net.minecraft", "version": game})
+                            break
+            if not any(item.get("uid") == "net.minecraft" for item in components):
+                return {"ok": False,
+                        "error": "Could not determine the Minecraft version from this Modrinth App instance."}
+            pack = {"components": components}
+        else:
+            return {"ok": False, "error": "Choose Modrinth App or Prism Launcher."}
+
+        descriptor, archive_name = tempfile.mkstemp(
+            prefix="nexi-launcher-import-", suffix=".zip")
+        os.close(descriptor)
+        archive_path = Path(archive_name)
+        game_dir = root / ".minecraft"
+        if not game_dir.is_dir():
+            game_dir = root
+        excluded = {"saves", "screenshots", "logs", "crash-reports",
+                    "versions", "assets", "libraries", "backups",
+                    "cache", "caches", "runtime", "runtimes"}
+        metadata_files = {"profile.json", "instance.json", "mmc-pack.json",
+                          "instance.cfg", "launcher_profiles.json"}
+        try:
+            with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("mmc-pack.json", json.dumps(pack))
+                archive.writestr("instance.cfg", f"name={name}\n")
+                if game_dir.is_dir() and not game_dir.is_symlink():
+                    collected = 0
+                    for file in game_dir.rglob("*"):
+                        if not file.is_file() or file.is_symlink():
+                            continue
+                        relative = file.relative_to(game_dir)
+                        if relative.parts and relative.parts[0].lower() in excluded:
+                            continue
+                        if len(relative.parts) == 1 and relative.name.lower() in metadata_files:
+                            continue
+                        try:
+                            size = file.stat().st_size
+                        except OSError:
+                            continue
+                        if size > 512 * 1024 * 1024:
+                            continue
+                        collected += size
+                        if collected > 2 * 1024 * 1024 * 1024:
+                            raise RuntimeError("Instance files exceed the 2 GB import limit.")
+                        archive.write(file, ".minecraft/" + relative.as_posix())
+            return self.import_modpack(str(archive_path))
+        except (OSError, RuntimeError) as exc:
+            return {"ok": False, "error": f"Could not read the selected instance: {exc}"}
+        finally:
+            archive_path.unlink(missing_ok=True)
+
+    def pick_modrinth_instance(self):
+        """Choose and copy an installed Modrinth App instance directory."""
+        if os.name != "nt":
+            return {"ok": False, "error": "Choose a Modrinth App instance folder."}
+        try:
+            appdata = Path(os.environ.get("APPDATA", ""))
+            candidates = (
+                appdata / "com.modrinth.theseus" / "profiles",
+                appdata / "ModrinthApp" / "profiles",
+                appdata / "Modrinth App" / "profiles",
+            )
+            initial = next((str(path) for path in candidates if path.is_dir()), "")
+            picked = pick_folder("Select a Modrinth App instance", initial)
+        except OSError as exc:
+            return {"ok": False, "error": f"Could not open the folder picker: {exc}"}
+        if not picked:
+            return {"ok": False, "cancelled": True}
+        if self.busy:
+            return {"ok": False, "error": "Another task is already running."}
+        return self._import_launcher_instance_folder(Path(picked), "modrinth")
+
+    def pick_prism_instance(self):
+        """Choose and copy a Prism Launcher instance directory."""
+        if os.name != "nt":
+            return {"ok": False, "error": "Choose a Prism instance folder."}
+        try:
+            picked = pick_folder("Select a Prism Launcher instance")
+        except OSError as exc:
+            return {"ok": False, "error": f"Could not open the folder picker: {exc}"}
+        if not picked:
+            return {"ok": False, "cancelled": True}
+        if self.busy:
+            return {"ok": False, "error": "Another task is already running."}
+        return self._import_launcher_instance_folder(Path(picked), "prism")
+
     def pick_modpack(self):
         """Native file picker for a .mrpack or .zip modpack."""
         if os.name != "nt":
@@ -433,7 +859,22 @@ class CreateApi:
             names = {name.replace("\\", "/") for name in archive.namelist()}
             index = None
             manifest = None
-            if "modrinth.index.json" in names:
+            prism_pack = None
+            prism_prefix = ""
+            prism_candidates = sorted(
+                (name for name in names
+                 if name == "mmc-pack.json" or name.endswith("/mmc-pack.json")),
+                key=lambda name: (name.count("/"), name))
+            prism_index = prism_candidates[0] if prism_candidates else ""
+            if prism_index:
+                prism_prefix = prism_index[:-len("mmc-pack.json")]
+                try:
+                    prism_pack = json.loads(
+                        archive.read(prism_index).decode("utf-8"))
+                except (OSError, ValueError, KeyError) as exc:
+                    return {"ok": False,
+                            "error": f"The Prism pack is damaged: {exc}"}
+            elif "modrinth.index.json" in names:
                 try:
                     index = json.loads(
                         archive.read("modrinth.index.json").decode("utf-8"))
@@ -453,7 +894,40 @@ class CreateApi:
 
             pack_loader = ""
             pack_loader_version = ""
-            if index is not None:
+            base = ""
+            if prism_pack is not None:
+                components = prism_pack.get("components") or []
+                for component in components:
+                    if not isinstance(component, dict):
+                        continue
+                    uid = str(component.get("uid") or "").lower()
+                    component_version = str(component.get("version")
+                                            or component.get("cachedVersion")
+                                            or component.get("instanceVersion")
+                                            or "").strip()
+                    if uid == "net.minecraft":
+                        base = component_version
+                    elif uid == "net.fabricmc.fabric-loader":
+                        pack_loader, pack_loader_version = "fabric", component_version
+                    elif uid == "net.minecraftforge":
+                        pack_loader, pack_loader_version = "forge", component_version
+                    elif uid == "net.neoforged.neoforge":
+                        pack_loader, pack_loader_version = "neoforge", component_version
+                    elif uid == "org.quiltmc.quilt-loader":
+                        pack_loader, pack_loader_version = "quilt", component_version
+                name = source.stem
+                config_name = next((item for item in names
+                                    if item == prism_prefix + "instance.cfg"), "")
+                if config_name:
+                    try:
+                        for line in archive.read(config_name).decode(
+                                "utf-8", "replace").splitlines():
+                            if line.startswith("name="):
+                                name = line.split("=", 1)[1].strip() or name
+                                break
+                    except (OSError, KeyError):
+                        pass
+            elif index is not None:
                 dependencies = index.get("dependencies") or {}
                 base = str(dependencies.get("minecraft") or "").strip()
                 pack_loader, pack_loader_version = _modpack_loader(dependencies)
@@ -540,10 +1014,14 @@ class CreateApi:
                     else:
                         java = console_java_for(base)
                         log(f"Java: {java}")
-                        profile = install_loader(pack_loader, base,
-                                                 pack_loader_version, java, log,
-                                                 progress=self._progress,
-                                                 cancel=cancel)
+                        if pack_loader == "fabric":
+                            profile = install_fabric(
+                                base, pack_loader_version, log,
+                                progress=self._progress, cancel=cancel)
+                        else:
+                            profile = install_loader(
+                                pack_loader, base, pack_loader_version, java,
+                                log, progress=self._progress, cancel=cancel)
                     if not profile:
                         raise RuntimeError(
                             "installer finished, but no new profile appeared")
@@ -572,6 +1050,16 @@ class CreateApi:
                     for prefix in prefixes:
                         extracted += _extract_zip(archive, game_dir, prefix,
                                                   log, cancel)
+                elif prism_pack is not None:
+                    prism_game_dir = prism_prefix + ".minecraft"
+                    if any(name.startswith(prism_game_dir + "/")
+                           for name in names):
+                        extracted = _extract_zip(
+                            archive, game_dir, prism_game_dir, log, cancel)
+                    else:
+                        extracted = _extract_zip(
+                            archive, game_dir, prism_prefix, log, cancel,
+                            strip_top=True)
                 else:
                     extracted = _extract_zip(archive, game_dir, "", log,
                                              cancel, strip_top=True)

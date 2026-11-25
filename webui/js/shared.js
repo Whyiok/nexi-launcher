@@ -164,7 +164,6 @@ function renderSharedAvailable(data) {
   if (!section) return;
   data = data && typeof data === "object" ? data : {};
   const builds = Array.isArray(data.builds) ? data.builds : [];
-  section.classList.toggle("hidden", !data.signed_in || !builds.length);
   $("#shared-home-count").textContent = String(builds.length);
   const list = $("#shared-home-list");
   list.replaceChildren();
@@ -198,6 +197,18 @@ function renderSharedAvailable(data) {
       row.appendChild(join);
     }
     list.appendChild(row);
+  }
+  const empty = $("#shared-home-empty");
+  if (empty) {
+    empty.textContent = data.signed_in
+      ? "No shared builds yet."
+      : "Sign in to see shared builds from friends.";
+    empty.classList.toggle("hidden", !!builds.length);
+  }
+  // The shared tab has its own header line, so keep it in step with the list.
+  if (homePanelView === "shared") {
+    const status = $("#friends-status");
+    if (status) status.textContent = homeViewStatusText();
   }
 }
 

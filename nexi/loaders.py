@@ -531,14 +531,22 @@ def repair_neoforge_runtime(version_id: str, java: str, log,
 
 def find_loader_profile(loader_key: str, game_version: str, loader_version: str):
     wanted = loader_version.lower()
+    wanted_base = str(game_version or "").lower()
     for vid, _meta in list_versions():
         low = vid.lower()
         if loader_key == "forge" and "neoforge" in low:
             continue
-        if loader_key in low and wanted in low:
-            if loader_key == "neoforge" and not neoforge_runtime_installed(vid):
-                continue
-            return vid
+        if loader_key not in low or wanted not in low:
+            continue
+        try:
+            data = load_version(version_meta(vid))
+        except (OSError, ValueError):
+            continue
+        if str(data.get("inheritsFrom") or "").lower() != wanted_base:
+            continue
+        if loader_key == "neoforge" and not neoforge_runtime_installed(vid):
+            continue
+        return vid
     return None
 
 

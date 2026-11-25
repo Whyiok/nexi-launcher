@@ -137,6 +137,7 @@ class ProfilesApi:
                 "ram": int(self.ram),
                 "default_ram": int(self.default_ram),
                 "theme": self.theme,
+                "design": self.design,
                 "color_mode": self.color_mode,
                 "language": self.language,
                 "pet": self.pet,

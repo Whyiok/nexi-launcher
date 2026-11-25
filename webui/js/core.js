@@ -68,6 +68,7 @@ let S = {
   accounts: [], active_account: "", account: "offline", paths: {},
   busy: "", launching: false, launching_slugs: [], game_running: false,
   game_instance: "", running: [], theme: "mint",
+  design: "classic",
   color_mode: "dark", language: "en", pet: "axi", version: "",
   curseforge_key_set: false,
 };
@@ -174,16 +175,236 @@ function iconNode(id) {
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("class", "icon");
   const use = document.createElementNS(ns, "use");
-  use.setAttribute("href", "#" + id);
+  const href = typeof materialIconHref === "function"
+    ? materialIconHref(id) : "#" + id;
+  use.setAttribute("href", href);
+  if (href.startsWith("#m3-")) {
+    svg.classList.add("m3-icon");
+    use.dataset.classicHref = "#" + id;
+  }
   svg.appendChild(use);
   return svg;
 }
 
 function setStatus(text, error = false) {
   const bar = $("#status");
-  bar.textContent = text;
+  // Keep the button itself intact so the Material ripple added by
+  // material.js survives status updates; only its label changes.
+  const label = $("#status-label") || bar;
+  label.textContent = text;
   bar.classList.toggle("error", !!error);
+  if (text) recordStatus(text, error);
+  if (statusHistoryIsOpen()) renderStatusHistory();
   if (error && text) showErrorToast(text, "Error");
+}
+
+/* ---------------------------------------------------------- status history */
+
+/* Session-only log behind the status label: the last messages the bar showed,
+   newest first in the popover. Nothing is persisted. */
+const statusLog = [];
+const STATUS_LOG_LIMIT = 60;
+let statusCopyTimer = 0;
+let historyCopyTimer = 0;
+
+function statusClock() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+}
+
+function recordStatus(text, error) {
+  const value = String(text == null ? "" : text).trim();
+  if (!value) return;
+  const last = statusLog[statusLog.length - 1];
+  // Status bars often repeat the same line while a job runs; keep one entry
+  // and just refresh its time instead of flooding the history.
+  if (last && last.text === value && last.error === !!error) {
+    last.time = statusClock();
+    return;
+  }
+  statusLog.push({ text: value, error: !!error, time: statusClock() });
+  if (statusLog.length > STATUS_LOG_LIMIT) statusLog.shift();
+}
+
+function statusHistoryIsOpen() {
+  const panel = $("#status-history");
+  return !!panel && !panel.hidden;
+}
+
+function statusLabelText() {
+  const label = $("#status-label") || $("#status");
+  return label ? label.textContent.trim() : "";
+}
+
+function renderStatusHistory() {
+  const list = $("#status-history-list");
+  if (!list) return;
+  list.replaceChildren();
+  const entries = statusLog.length
+    ? statusLog.slice().reverse()
+    : [{ text: statusLabelText() || "Ready.", error: false, time: "" }];
+  for (const entry of entries) {
+    const item = elem("li", entry.error
+      ? "status-history-item error" : "status-history-item");
+    item.appendChild(elem("span", "status-history-time", entry.time || "—"));
+    item.appendChild(elem("span", "status-history-text", entry.text));
+    list.appendChild(item);
+  }
+}
+
+function openStatusHistory() {
+  const panel = $("#status-history");
+  const bar = $("#status");
+  if (!panel) return;
+  renderStatusHistory();
+  panel.hidden = false;
+  if (bar) bar.setAttribute("aria-expanded", "true");
+  const close = $("#status-history-close");
+  if (close) close.focus({ preventScroll: true });
+}
+
+function closeStatusHistory(focusBar = false) {
+  const panel = $("#status-history");
+  if (!panel || panel.hidden) return;
+  panel.hidden = true;
+  const bar = $("#status");
+  if (!bar) return;
+  bar.setAttribute("aria-expanded", "false");
+  if (focusBar) bar.focus({ preventScroll: true });
+}
+
+function toggleStatusHistory() {
+  if (statusHistoryIsOpen()) closeStatusHistory();
+  else openStatusHistory();
+}
+
+function statusFallbackCopy(text) {
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.top = "-1000px";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch (_) {
+    ok = false;
+  }
+  area.remove();
+  return ok;
+}
+
+function copyStatusText(text) {
+  const value = String(text == null ? "" : text);
+  if (!value) return Promise.resolve(false);
+  let done = false;
+  const fallback = () => {
+    if (done) return false;
+    done = true;
+    return statusFallbackCopy(value);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    // WebView2 can leave the clipboard promise pending without focus, so the
+    // selection-based fallback also runs if the write does not settle.
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(fallback()), 700);
+      navigator.clipboard.writeText(value).then(
+        () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          resolve(true);
+        },
+        () => {
+          if (done) return;
+          clearTimeout(timer);
+          resolve(fallback());
+        },
+      );
+    });
+  }
+  return Promise.resolve(fallback());
+}
+
+function flashCopyButton(button, use, ok, copiedId, failedId, restoreId) {
+  if (!button) return;
+  clearTimeout(statusCopyTimer);
+  button.classList.toggle("copied", ok);
+  button.classList.toggle("failed", !ok);
+  if (use && typeof setIconHref === "function") {
+    setIconHref(use, ok ? copiedId : failedId);
+  }
+  statusCopyTimer = setTimeout(() => {
+    button.classList.remove("copied", "failed");
+    if (use && typeof setIconHref === "function") setIconHref(use, restoreId);
+  }, 1400);
+}
+
+function copyCurrentStatus() {
+  const button = $("#status-copy");
+  const use = button && button.querySelector("use");
+  copyStatusText(statusLabelText()).then((ok) => {
+    flashCopyButton(button, use, ok, "i-check", "i-x", "i-copy");
+  });
+}
+
+function statusHistoryText() {
+  const rows = $$("#status-history-list .status-history-item");
+  if (rows.length) {
+    return rows.map((row) => {
+      const time = row.querySelector(".status-history-time");
+      const text = row.querySelector(".status-history-text");
+      const stamp = time ? time.textContent : "";
+      return `${stamp ? `${stamp}  ` : ""}${text ? text.textContent : ""}`;
+    }).join("\r\n");
+  }
+  return statusLabelText();
+}
+
+function copyStatusHistory() {
+  const button = $("#status-history-copy");
+  copyStatusText(statusHistoryText()).then((ok) => {
+    if (!button) return;
+    clearTimeout(historyCopyTimer);
+    button.classList.toggle("copied", ok);
+    button.classList.toggle("failed", !ok);
+    button.textContent = ok ? "Copied" : "Copy failed";
+    historyCopyTimer = setTimeout(() => {
+      button.classList.remove("copied", "failed");
+      button.textContent = "Copy history";
+    }, 1400);
+  });
+}
+
+function initStatusHistory() {
+  const bar = $("#status");
+  const copy = $("#status-copy");
+  const panel = $("#status-history");
+  if (!bar || !copy || !panel || panel.dataset.wired) return;
+  panel.dataset.wired = "1";
+
+  bar.addEventListener("click", toggleStatusHistory);
+  copy.addEventListener("click", copyCurrentStatus);
+
+  const copyAll = $("#status-history-copy");
+  if (copyAll) copyAll.addEventListener("click", copyStatusHistory);
+  const close = $("#status-history-close");
+  if (close) close.addEventListener("click", () => closeStatusHistory(true));
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!statusHistoryIsOpen()) return;
+    if (panel.contains(event.target) || bar.contains(event.target)) return;
+    closeStatusHistory();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !statusHistoryIsOpen()) return;
+    event.preventDefault();
+    closeStatusHistory(true);
+  });
 }
 
 function screenStatus(name, text, error = false) {
@@ -213,7 +434,13 @@ function toastIcon(id, cls) {
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("class", cls ? `icon ${cls}` : "icon");
   const use = document.createElementNS(ns, "use");
-  use.setAttribute("href", "#" + id);
+  const href = typeof materialIconHref === "function"
+    ? materialIconHref(id) : "#" + id;
+  use.setAttribute("href", href);
+  if (href.startsWith("#m3-")) {
+    svg.classList.add("m3-icon");
+    use.dataset.classicHref = "#" + id;
+  }
   svg.appendChild(use);
   return svg;
 }
@@ -373,6 +600,7 @@ const FILL_CONTAINERS = [
   "#tabs", "#detail-tabs", "#account-methods", "#skin-seg",
   "#kind-seg", "#source-seg", "#loader-seg", "#mods-seg", "#loaders-seg",
   "#mode-seg", "#lang-seg", "#pet-seg", "#settings-tabs", "#logs-tabs",
+  "#welcome-mode", "#welcome-design",
 ];
 
 const hoverButtons = new WeakMap();
@@ -385,6 +613,8 @@ function segActiveButton(container) {
 
 function updateSegFill(container, instant = false) {
   if (!container) return;
+  // Material segmented buttons draw their own selection indicator.
+  if (container.classList.contains("m3-seg")) return;
   let fill = container.querySelector(".seg-fill");
   if (!fill) {
     fill = document.createElement("span");
@@ -425,6 +655,8 @@ function updateAllSegFills(instant = false) {
 
 function updateSegHover(container) {
   if (!container) return;
+  // Official segmented buttons provide their own hover state layer.
+  if (container.classList.contains("m3-seg")) return;
   let pill = container.querySelector(".seg-hover");
   if (!pill) {
     pill = document.createElement("span");

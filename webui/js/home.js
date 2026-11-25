@@ -100,8 +100,16 @@ function renderHomePlay() {
   button.classList.toggle("running", running);
   $("#home-play-label").textContent = running
     ? "Stop" : (starting ? "Starting…" : "Play");
+  const sub = $("#home-play-sub");
+  if (sub) {
+    sub.textContent = !last
+      ? ""
+      : (running ? "Game is running"
+        : (starting ? "Preparing the game…"
+          : `Minecraft ${last.base} · ${homeLoaderLabel(last)}`));
+  }
   const glyph = $("#home-play-icon");
-  if (glyph) glyph.setAttribute("href", running ? "#i-stop" : "#i-play");
+  if (glyph) setIconHref(glyph, running ? "i-stop" : "i-play");
   button.title = !last
     ? "Create a profile to get started."
     : (running ? "Stop the game" : `Play "${last.name}"`);

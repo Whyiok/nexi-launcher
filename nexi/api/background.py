@@ -1,9 +1,11 @@
-"""Home background: a GIF, MP4 or WebM picked in Settings.
+"""Home background: a picture or a GIF/MP4/WebM clip picked in Settings.
 
-The file is copied into ``%APPDATA%\\NexiLauncher\\backgrounds`` so the
-original can be moved or deleted without breaking the launcher, and it is
-published through the loopback media server (a page served over http cannot
-read ``file://`` paths).
+Static images (PNG, JPG/JPEG/JFIF, WebP, BMP, AVIF) show as a still cover
+behind the main menu; GIFs animate and videos loop. The file is copied into
+``%APPDATA%\\NexiLauncher\\backgrounds`` so the original can be moved or
+deleted without breaking the launcher, and it is published through the
+loopback media server (a page served over http cannot read ``file://``
+paths).
 """
 
 import os
@@ -15,7 +17,18 @@ from ..config import BACKGROUNDS_DIR
 from ..logging_setup import log
 from ..util import pick_file
 
-BACKGROUND_KINDS = {".gif": "image", ".mp4": "video", ".webm": "video"}
+BACKGROUND_KINDS = {
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".jfif": "image",
+    ".webp": "image",
+    ".bmp": "image",
+    ".avif": "image",
+    ".gif": "image",
+    ".mp4": "video",
+    ".webm": "video",
+}
 
 
 class BackgroundApi:
@@ -35,15 +48,18 @@ class BackgroundApi:
         }
 
     def background_pick(self):
-        """Native picker for a GIF, MP4 or WebM background."""
+        """Native picker for a picture, GIF, MP4 or WebM background."""
         if os.name != "nt":
             return {"ok": False,
                     "error": "The background picker needs Windows."}
         try:
             picked = pick_file(
                 "Select a background",
-                (("Backgrounds", "*.gif;*.mp4;*.webm"),
-                 ("GIF", "*.gif"),
+                (("Pictures and videos",
+                  "*.png;*.jpg;*.jpeg;*.jfif;*.webp;*.bmp;*.avif;"
+                  "*.gif;*.mp4;*.webm"),
+                 ("Pictures", "*.png;*.jpg;*.jpeg;*.jfif;*.webp;*.bmp;"
+                              "*.avif;*.gif"),
                  ("Video", "*.mp4;*.webm"),
                  ("All files", "*.*")))
         except OSError as exc:
@@ -56,7 +72,7 @@ class BackgroundApi:
         suffix = source.suffix.lower()
         if suffix not in BACKGROUND_KINDS:
             return {"ok": False,
-                    "error": "Pick a GIF, MP4 or WebM file."}
+                    "error": "Pick a PNG, JPG, WEBP, GIF, MP4 or WebM file."}
         if not source.is_file():
             return {"ok": False,
                     "error": "The selected file was not found."}

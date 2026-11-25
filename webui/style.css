@@ -21,6 +21,104 @@
     U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* M3 Expressive uses Google Sans Flex, the variable typeface Google ships with
+   the 2025 expressive update. Its web subsets only cover Latin, so Roboto Flex
+   (below) follows in the stack and supplies Cyrillic for the Russian UI. */
+@font-face {
+  font-family: "Google Sans Flex";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fonts/google-sans-flex-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Google Sans Flex";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fonts/google-sans-flex-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* Roboto (static variable cut) and Roboto Flex are used by the M3 Expressive
+   design layer, but they are bundled for the same reason as Unbounded: the
+   launcher must work offline. Roboto Flex covers every weight plus Cyrillic,
+   which Google Sans Flex does not ship in its web subsets. */
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fonts/roboto-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fonts/roboto-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Roboto Flex is the Cyrillic companion to Google Sans Flex and a full
+   expressive variable face on its own. Four subsets cover English and Russian
+   and are shipped with the app, so the expressive layer stays offline. */
+@font-face {
+  font-family: "Roboto Flex";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fonts/roboto-flex-cyrillic-ext.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F,
+    U+FE2E-FE2F;
+}
+@font-face {
+  font-family: "Roboto Flex";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fonts/roboto-flex-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "Roboto Flex";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fonts/roboto-flex-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: "Roboto Flex";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fonts/roboto-flex-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   color-scheme: dark;
   --bg: #030405;
@@ -62,6 +160,8 @@
   --accent: #5cd6a4;
   --accent-hover: #78e3b8;
   --accent-rgb: 92, 214, 164;
+  /* Seed handed to Google's Material Color Utilities for Material You. */
+  --seed: #5cd6a4;
   --accent-soft: rgba(var(--accent-rgb), .12);
   --accent-fg: #04120c;
   --accent-muted: rgba(4, 18, 12, .55);
@@ -88,12 +188,14 @@
   --accent-hover: #ff957c;
   --accent-rgb: 255, 122, 89;
   --accent-fg: #1a0b06;
+  --seed: #ff7a59;
 }
 
 :root[data-theme="indigo"] {
   --accent: #5b6cff;
   --accent-hover: #7d8bff;
   --accent-rgb: 91, 108, 255;
+  --seed: #5b6cff;
   --accent-fg: #ffffff;
 }
 
@@ -538,10 +640,6 @@ body.pet-holding * { cursor: grabbing !important; }
 #tabs .tab[data-screen="profiles"]:focus-visible .icon {
   animation: tab-pop .5s var(--ease);
 }
-#tabs .tab[data-screen="create"]:hover .icon,
-#tabs .tab[data-screen="create"]:focus-visible .icon {
-  animation: tab-plus .5s var(--ease);
-}
 #tabs .tab[data-screen="modpacks"]:hover .icon,
 #tabs .tab[data-screen="modpacks"]:focus-visible .icon {
   animation: tab-lift .5s var(--ease);
@@ -563,10 +661,6 @@ body.pet-holding * { cursor: grabbing !important; }
 @keyframes tab-pop {
   0%, 100% { transform: scale(1); }
   45% { transform: scale(1.18); }
-}
-@keyframes tab-plus {
-  from { transform: rotate(0deg) scale(1); }
-  to { transform: rotate(90deg) scale(1); }
 }
 @keyframes tab-lift {
   0%, 100% { transform: translateY(0) scale(1); }
@@ -605,22 +699,163 @@ body.pet-holding * { cursor: grabbing !important; }
 }
 
 .statusbar {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   padding: 6px 26px 10px;
   font-size: 11.5px;
 }
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.status-copy {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  transition: color .15s var(--ease), background .15s var(--ease);
+}
+.status-copy:hover { color: var(--fg); background: var(--surface-2); }
+.status-copy.copied { color: var(--accent); }
+.status-copy.failed { color: var(--danger); }
+.status-copy .icon { width: 13px; height: 13px; }
 .status-text {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  margin: -2px -4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
   color: var(--dim);
+  font: inherit;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color .15s var(--ease);
+  cursor: pointer;
+  transition: color .15s var(--ease), background .15s var(--ease);
 }
+.status-text:hover { color: var(--fg); background: var(--surface-2); }
 .status-text.error { color: var(--fg); }
-.status-hint { color: var(--faint); white-space: nowrap; }
+.status-copy:focus-visible,
+.status-text:focus-visible {
+  outline: 1px solid rgba(var(--accent-rgb), .55);
+  outline-offset: 1px;
+}
+
+/* Session history that opens above the status label. */
+.status-history {
+  position: absolute;
+  z-index: 60;
+  left: 26px;
+  bottom: calc(100% - 2px);
+  display: flex;
+  flex-direction: column;
+  width: min(420px, calc(100vw - 52px));
+  max-height: min(330px, 62vh);
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .45);
+  animation: status-history-in .16s var(--ease) both;
+}
+.status-history[hidden] { display: none; }
+@keyframes status-history-in {
+  from { opacity: 0; transform: translateY(6px) scale(.99); }
+  to { opacity: 1; transform: none; }
+}
+.status-history-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 6px 8px;
+}
+.status-history-title {
+  flex: 1;
+  color: var(--fg);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.status-history-action {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color .15s var(--ease), background .15s var(--ease);
+}
+.status-history-action:hover { color: var(--fg); background: var(--surface-3); }
+.status-history-action.copied { color: var(--accent); }
+.status-history-action.failed { color: var(--danger); }
+.status-history-close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  transition: color .15s var(--ease), background .15s var(--ease);
+}
+.status-history-close:hover { color: var(--fg); background: var(--surface-3); }
+.status-history-close .icon { width: 13px; height: 13px; }
+.status-history-action:focus-visible,
+.status-history-close:focus-visible {
+  outline: 1px solid rgba(var(--accent-rgb), .55);
+  outline-offset: 1px;
+}
+.status-history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.status-history-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-xs);
+}
+.status-history-item + .status-history-item {
+  box-shadow: inset 0 1px var(--line);
+}
+.status-history-time {
+  flex: none;
+  color: var(--faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.status-history-text {
+  min-width: 0;
+  color: var(--dim);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.status-history-item.error .status-history-text { color: var(--fg); }
 
 /* Screens ---------------------------------------------------------------- */
 
@@ -2082,6 +2317,95 @@ input[type="range"]:disabled {
   color: var(--faint);
 }
 
+/* Design language picker -------------------------------------------------- */
+
+.design-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+.design-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.design-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+  background-color: var(--surface-2);
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s var(--ease), background-color .16s var(--ease);
+}
+.design-option:hover { border-color: var(--line-strong); }
+.design-option.on {
+  border-color: var(--accent);
+  background-color: var(--accent-soft);
+}
+.design-preview {
+  display: flex;
+  flex: none;
+  width: 58px;
+  height: 44px;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 9px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface-3);
+}
+.design-preview-classic { border-radius: 8px; }
+.design-preview-material { border-radius: 16px; }
+.dp-strip {
+  width: 62%;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--dim);
+  opacity: .5;
+}
+.dp-pill {
+  width: 100%;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.design-preview-material .dp-strip {
+  width: 48%;
+  height: 4px;
+  border-radius: 999px;
+}
+.design-preview-material .dp-pill {
+  height: 14px;
+  border-radius: 999px;
+}
+.design-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.design-name { font-size: 13px; font-weight: 500; }
+.design-option.on .design-name { color: var(--accent); }
+.design-hint {
+  color: var(--faint);
+  font-size: 11px;
+  line-height: 1.35;
+}
+/* The expressive layer is still being finished; call that out next to the
+   selector instead of letting people discover rough screens by surprise. */
+.design-wip {
+  margin-top: 2px;
+  color: var(--warn);
+}
+
 /* Microsoft account ------------------------------------------------------ */
 
 .account-row {
@@ -2344,10 +2668,79 @@ body.account-dragging .account-grip { cursor: grabbing; }
 
 /* Create ----------------------------------------------------------------- */
 
+/* New / edit profile dialog. It floats over the screen that is already open,
+   so the header no longer needs its own "New" tab. */
+.create-modal {
+  position: fixed;
+  top: 40px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+}
+.create-modal[hidden] { display: none; }
+.create-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 10, .72);
+  backdrop-filter: blur(6px);
+}
+.create-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(900px, 92vw);
+  height: min(600px, calc(100vh - 84px));
+  padding: 16px 18px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .55);
+  animation: create-modal-in .2s var(--ease) both;
+}
+@keyframes create-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+.create-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex: none;
+  padding: 0 2px 10px;
+}
+.create-heading { flex: 1; min-width: 0; }
+.create-heading .screen-title { font-size: 20px; }
+.create-heading .screen-sub { margin: 3px 0 0; font-size: 12px; }
+.create-close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  transition: color .15s var(--ease), background .15s var(--ease);
+}
+.create-close:hover { color: var(--fg); background: var(--surface-2); }
+.create-close:focus-visible {
+  outline: 1px solid rgba(var(--accent-rgb), .55);
+  outline-offset: 1px;
+}
+.create-close .icon { width: 15px; height: 15px; }
+
 .create-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
   flex: 1;
   min-height: 0;
 }
@@ -2355,13 +2748,11 @@ body.account-dragging .account-grip { cursor: grabbing; }
 .create-main {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
-.create-main .screen-title { margin-bottom: 0; }
-.create-main .screen-sub { margin: 0 0 6px; }
 
 .row-head {
   display: flex;
@@ -2371,8 +2762,8 @@ body.account-dragging .account-grip { cursor: grabbing; }
   margin-top: 4px;
 }
 
-.list-box.versions { height: 218px; flex: none; }
-.list-box.builds { height: 104px; flex: none; }
+.list-box.versions { height: 170px; flex: none; }
+.list-box.builds { height: 88px; flex: none; }
 
 .version-tools { display: flex; align-items: center; gap: 10px; }
 
@@ -2381,7 +2772,7 @@ body.account-dragging .account-grip { cursor: grabbing; }
 .create-side {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
 }
 .side-actions { display: flex; gap: 8px; }
@@ -2389,9 +2780,8 @@ body.account-dragging .account-grip { cursor: grabbing; }
 .log-card {
   display: flex;
   flex-direction: column;
-  min-height: 120px;
-  padding: 12px;
-  gap: 8px;
+  padding: 10px;
+  gap: 6px;
   flex: 1;
   min-height: 0;
 }
@@ -3221,59 +3611,47 @@ body.account-dragging .account-grip { cursor: grabbing; }
   color: rgba(255, 255, 255, .74);
 }
 
+/* A quiet frosted bar with the accent reserved for the play tile: reads as
+   the main action without the heavy block of colour the old version had. */
 .home-play {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   flex: none;
-  height: 58px;
-  padding: 0 18px;
+  height: 62px;
+  padding: 0 16px 0 11px;
   overflow: hidden;
-  border: 1px solid rgba(var(--accent-rgb), .45);
-  border-radius: 15px;
-  background: linear-gradient(100deg, var(--accent-hover), var(--accent));
-  color: var(--accent-fg);
-  font-size: 15px;
-  font-weight: 700;
+  border: 1px solid rgba(var(--accent-rgb), .30);
+  border-radius: 18px;
+  background: linear-gradient(100deg,
+    rgba(var(--accent-rgb), .30), rgba(255, 255, 255, .05) 58%,
+    rgba(var(--accent-rgb), .14));
+  color: #fff;
+  text-align: left;
   cursor: pointer;
-  box-shadow: 0 10px 30px -12px rgba(var(--accent-rgb), .55);
-  transition: filter .16s var(--ease), transform .16s var(--ease),
-              opacity .14s var(--ease), background .18s var(--ease),
-              box-shadow .24s var(--ease);
-}
-/* A light sweep crosses the button on hover, the button lifts and tilts
-   slightly towards the pointer (the tilt comes from CSS variables set in
-   JavaScript). */
-.home-play::after {
-  content: "";
-  position: absolute;
-  top: -60%;
-  bottom: -60%;
-  left: 0;
-  width: 60%;
-  background: linear-gradient(105deg, transparent 20%,
-                              rgba(255, 255, 255, .38) 50%,
-                              transparent 80%);
-  transform: translateX(-160%) skewX(-14deg);
-  pointer-events: none;
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow: 0 16px 36px -26px rgba(0, 0, 0, .9),
+              inset 0 1px 0 rgba(255, 255, 255, .10);
+  transition: border-color .18s var(--ease), background .18s var(--ease),
+              transform .18s var(--ease), box-shadow .24s var(--ease);
 }
 .home-play:hover {
-  filter: brightness(1.07);
-  transform: translateY(-2px) perspective(700px)
-             rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
-  box-shadow: 0 18px 42px -14px rgba(var(--accent-rgb), .85),
-              0 0 0 1px rgba(var(--accent-rgb), .35),
-              0 0 28px -6px rgba(var(--accent-rgb), .45);
+  border-color: rgba(var(--accent-rgb), .62);
+  background: linear-gradient(100deg,
+    rgba(var(--accent-rgb), .44), rgba(255, 255, 255, .09) 58%,
+    rgba(var(--accent-rgb), .22));
+  transform: translateY(-2px);
+  box-shadow: 0 20px 44px -26px rgba(0, 0, 0, .95),
+              0 0 26px -8px rgba(var(--accent-rgb), .5),
+              inset 0 1px 0 rgba(255, 255, 255, .14);
 }
-.home-play:hover::after {
-  animation: home-play-sheen .8s var(--ease) forwards;
+.home-play:active { transform: translateY(0) scale(.99); }
+.home-play:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), .75);
+  outline-offset: 2px;
 }
-@keyframes home-play-sheen {
-  from { transform: translateX(-160%) skewX(-14deg); }
-  to { transform: translateX(300%) skewX(-14deg); }
-}
-.home-play:active { transform: translateY(0) scale(.985); }
 .home-play:disabled,
 .home-play:disabled:hover {
   opacity: .45;
@@ -3282,29 +3660,66 @@ body.account-dragging .account-grip { cursor: grabbing; }
   transform: none;
   box-shadow: none;
 }
-.home-play:disabled::after { display: none; }
 .home-play-glyph {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, .16);
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: linear-gradient(145deg, var(--accent-hover), var(--accent));
   color: var(--accent-fg);
+  box-shadow: 0 8px 20px -10px rgba(var(--accent-rgb), .95);
+  transition: transform .18s var(--ease);
 }
-.home-play-glyph .icon { width: 17px; height: 17px; }
+.home-play:hover .home-play-glyph { transform: scale(1.04); }
+.home-play-glyph .icon { width: 18px; height: 18px; }
+.home-play-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
 .home-play-label {
+  font-size: 15px;
+  font-weight: 700;
   letter-spacing: .01em;
-  transition: letter-spacing .24s var(--ease);
 }
-.home-play:hover .home-play-label { letter-spacing: .05em; }
+.home-play-sub {
+  overflow: hidden;
+  color: rgba(255, 255, 255, .58);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-play-sub:empty { display: none; }
+.home-play-go {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: rgba(255, 255, 255, .42);
+  transform: rotate(-90deg);
+  transition: transform .18s var(--ease), color .18s var(--ease);
+}
+.home-play:hover .home-play-go {
+  color: #fff;
+  transform: translateX(2px) rotate(-90deg);
+}
 .home-play.running {
   border-color: rgba(255, 255, 255, .16);
-  background: linear-gradient(100deg, #c04545, #9c3030);
-  color: #fff;
-  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .6);
+  background: linear-gradient(100deg, rgba(196, 69, 69, .58),
+              rgba(156, 48, 48, .42));
+  box-shadow: 0 16px 36px -26px rgba(0, 0, 0, .9),
+              inset 0 1px 0 rgba(255, 255, 255, .08);
 }
-.home-play.running .home-play-glyph { background: rgba(255, 255, 255, .16); }
+.home-play.running .home-play-glyph {
+  background: linear-gradient(145deg, #d05252, #a53333);
+  color: #fff;
+  box-shadow: 0 8px 20px -10px rgba(0, 0, 0, .8);
+}
+.home-play.running .home-play-sub { color: rgba(255, 255, 255, .72); }
 
 .home-scroll {
   display: flex;
@@ -3571,14 +3986,14 @@ body.account-dragging .account-grip { cursor: grabbing; }
 /* A frosted panel over the panorama on the main menu. */
 .home-friends {
   position: absolute;
-  top: 18px;
-  right: 18px;
-  bottom: 18px;
+  top: 14px;
+  right: 14px;
+  bottom: 14px;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  width: min(294px, 38%);
-  padding: 15px 15px 12px;
+  width: min(268px, 36%);
+  padding: 11px 12px 10px;
   border: 1px solid rgba(255, 255, 255, .12);
   border-radius: var(--radius-card);
   background: rgba(7, 13, 19, .5);
@@ -3588,17 +4003,47 @@ body.account-dragging .account-grip { cursor: grabbing; }
   color: #eef4f8;
 }
 
+/* Three icon tabs at the very top: friends, clans, shared builds. */
+.home-view-tabs {
+  display: flex;
+  gap: 3px;
+  flex: none;
+  margin-bottom: 9px;
+  padding: 3px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .05);
+}
+.home-view-tabs .friends-icon-btn {
+  flex: 1;
+  width: auto;
+  height: 25px;
+  border-color: transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, .5);
+}
+.home-view-tabs .friends-icon-btn:hover {
+  background: rgba(255, 255, 255, .09);
+  color: #fff;
+}
+.home-view-tabs .friends-icon-btn.active {
+  background: rgba(var(--accent-rgb), .22);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .32);
+}
+.home-view-tabs .friends-icon-btn .icon { width: 14px; height: 14px; }
+
 .home-friends-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   flex: none;
 }
 .home-friends-title {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 .home-friends-title .eyebrow,
@@ -3606,6 +4051,7 @@ body.account-dragging .account-grip { cursor: grabbing; }
 .home-friends-title .count {
   overflow: hidden;
   color: rgba(255, 255, 255, .55);
+  font-size: 10.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3630,7 +4076,7 @@ body.account-dragging .account-grip { cursor: grabbing; }
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
   min-height: 0;
   text-align: center;
@@ -3639,14 +4085,50 @@ body.account-dragging .account-grip { cursor: grabbing; }
 .friends-gate-icon {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
-  margin: 0 auto 2px;
-  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 1px;
+  border-radius: 13px;
   background: rgba(255, 255, 255, .08);
   color: rgba(255, 255, 255, .72);
 }
-.friends-gate-icon svg { width: 22px; height: 22px; }
+.friends-gate-icon svg { width: 19px; height: 19px; }
+
+/* Clans and shared builds are views of the same panel. */
+.friends-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  margin-top: 10px;
+}
+.friends-view.hidden,
+.friends-view[hidden] { display: none; }
+#shared-home { overflow-y: auto; padding-right: 2px; }
+#shared-home::-webkit-scrollbar { width: 6px; }
+#shared-home::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, .2);
+  border-radius: 6px;
+}
+.friends-wip {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.friends-wip .hint { max-width: 210px; }
+.friends-wip-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border: 1px solid rgba(var(--accent-rgb), .38);
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), .13);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
 .friends-gate .btn { height: 32px; font-size: 12px; }
 .nexi-id-btn {
   position: relative;
@@ -3722,10 +4204,10 @@ body.account-dragging .account-grip { cursor: grabbing; }
 .friends-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   flex: 1;
   min-height: 0;
-  margin-top: 14px;
+  margin-top: 10px;
   padding-right: 3px;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -3748,16 +4230,16 @@ body.account-dragging .account-grip { cursor: grabbing; }
 .friend-row {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 0;
+  gap: 8px;
+  padding: 7px 0;
   border-top: 1px solid rgba(255, 255, 255, .08);
 }
 .friend-row:first-child { border-top: 0; }
 .site-skin.friend-avatar {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   flex: none;
   overflow: hidden;
   border-radius: 8px;
@@ -3852,12 +4334,13 @@ body.account-dragging .account-grip { cursor: grabbing; }
   .rule { margin: 0 22px; }
   .content { padding: 16px 22px 6px; }
   .statusbar { padding: 8px 22px 12px; }
+  .status-history { left: 22px; width: min(420px, calc(100vw - 44px)); }
   .tab span { display: none; }
   .tab { padding: 0 10px; }
   .settings-grid { grid-template-columns: minmax(0, 1fr); }
   .home-panel { width: min(348px, 62%); padding: 22px 20px 18px; gap: 13px; }
   .home-title { font-size: 25px; }
-  .home-play { height: 52px; }
+  .home-play { height: 58px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3890,7 +4373,7 @@ body.account-dragging .account-grip { cursor: grabbing; }
 .welcome-card {
   display: flex;
   flex-direction: column;
-  width: min(600px, 100%);
+  width: min(680px, 100%);
   max-height: calc(100vh - 52px);
   overflow: hidden;
   border: 1px solid var(--line);
@@ -3919,10 +4402,13 @@ body.account-dragging .account-grip { cursor: grabbing; }
 }
 .welcome-skip { margin-left: auto; }
 
+.welcome-card { min-width: 0; }
 .welcome-body {
   flex: 1;
+  min-width: 0;
   min-height: 0;
-  padding: 24px 26px 6px;
+  padding: 20px 22px 6px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 .welcome-step.enter { animation: welcome-step .22s var(--ease-slide); }
@@ -3981,9 +4467,204 @@ body.account-dragging .account-grip { cursor: grabbing; }
   margin: 0 0 12px;
   color: var(--dim);
 }
+.welcome-status:empty { margin: 0; }
 .welcome-status-error { color: var(--danger); }
 .welcome-warn { margin-bottom: 14px; }
 .welcome-actions-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* First build import. The source tabs, the list and its footer share a single
+   surface, so the step reads as one picker instead of loose blocks. */
+.import-picker {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.import-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.import-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px 9px 0 0;
+  background: none;
+  color: var(--dim);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color .14s var(--ease), background-color .14s var(--ease);
+}
+.import-tab::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  bottom: -1px;
+  left: 10px;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background-color .18s var(--ease);
+}
+.import-tab:hover { color: var(--fg); }
+.import-tab.on { color: var(--fg); }
+.import-tab.on::after { background: var(--accent); }
+.import-tab:disabled { opacity: .45; cursor: default; }
+.import-tab-count {
+  display: inline-grid;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  transition: background-color .14s var(--ease), color .14s var(--ease);
+}
+.import-tab.on .import-tab-count {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.import-list {
+  display: flex;
+  min-width: 0;
+  min-height: 148px;
+  max-height: 236px;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  padding: 8px;
+}
+.import-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .14s var(--ease), border-color .14s var(--ease);
+}
+.import-row:hover:not(:disabled) { background: var(--surface-3); }
+.import-row:disabled { opacity: .55; cursor: default; }
+.import-row.selected {
+  border-color: rgba(var(--accent-rgb), .34);
+  background: var(--accent-soft);
+}
+.import-avatar {
+  display: grid;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--surface-3);
+  color: var(--dim);
+  font: 600 14px var(--font-display);
+  transition: background-color .14s var(--ease), color .14s var(--ease);
+}
+.import-row.selected .import-avatar {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.import-row-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+.import-row-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-row-meta {
+  overflow: hidden;
+  color: var(--dim);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-check {
+  display: grid;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: transparent;
+  transition: background-color .14s var(--ease),
+              border-color .14s var(--ease), color .14s var(--ease);
+}
+.import-check .icon { width: 12px; height: 12px; }
+.import-row.selected .import-check {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.import-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 26px 18px;
+  color: var(--dim);
+  text-align: center;
+}
+.import-empty .icon { width: 20px; height: 20px; color: var(--faint); }
+.import-empty p {
+  margin: 0;
+  max-width: 38ch;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.import-empty .btn {
+  margin-top: 2px;
+  border-color: var(--line);
+}
+.import-empty .btn:hover { border-color: var(--line-strong); }
+.import-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line-soft);
+}
+.import-selection {
+  flex: 1;
+  min-width: 0;
+  color: var(--dim);
+  font-size: 12px;
+}
+.import-selection.strong { color: var(--fg); }
+.import-foot .btn:disabled {
+  background: var(--disabled-bg);
+  color: var(--disabled-fg);
+  opacity: 1;
+}
 
 .welcome-foot {
   display: flex;
@@ -4018,6 +4699,25 @@ body.account-dragging .account-grip { cursor: grabbing; }
 }
 .welcome-auto .setting-text { flex: 1; }
 .welcome-auto .hint { margin: 3px 0 0; }
+.welcome-auto,
+.welcome-auto .setting-text,
+.welcome-group,
+.welcome-body,
+.welcome-step,
+.defaults-grid,
+.mini-field { min-width: 0; }
+.welcome-step { overflow-x: hidden; }
+.defaults-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: 14px 16px;
+}
+.welcome-step[data-wstep="game"] .defaults-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.welcome-step[data-wstep="game"] .mini-field,
+.welcome-step[data-wstep="game"] .field-label { min-width: 0; }
+.welcome-step[data-wstep="game"] .field-label { overflow-wrap: anywhere; }
 .welcome-group { margin-bottom: 18px; }
 .welcome-group:last-child { margin-bottom: 6px; }
 .welcome-group-title {
@@ -4032,6 +4732,9 @@ body.account-dragging .account-grip { cursor: grabbing; }
 @media (max-width: 560px) {
   .welcome-lang { grid-template-columns: 1fr; }
   .welcome-auto { align-items: flex-start; flex-direction: column; }
+  .import-tab { padding: 0 9px; }
+  .import-selection { flex-basis: 100%; }
+  .import-foot .btn { width: 100%; }
 }
 
 /* The player's Nexi site profile is a normal screen, beside the build rail. */
@@ -4316,3 +5019,1089 @@ body.crash-open .app { filter: blur(10px); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* =========================================================================
+   M3 Expressive design layer
+   Enabled from Settings → Appearance → Design (or the first-run screen).
+   Google's M3 Expressive is a tonal system with a wider, softer shape scale,
+   spring-driven motion and emphasised type: surfaces are tinted with the
+   accent, controls are pill-shaped, text fields are outlined, cards are
+   elevated and every hover/press state is a translucent "state layer". The
+   accent and light/dark choice keep driving the palette through Google's
+   Expressive colour scheme, so it behaves like dynamic colour rather than a
+   fixed theme.
+   ========================================================================= */
+
+:root[data-design="material"] {
+  /* M3 Expressive shape scale. The increased steps exist for hero surfaces,
+     dialogs and expressive cards. */
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-large-increased: 20px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-extra-large-increased: 32px;
+  --md-sys-shape-corner-extra-extra-large: 48px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* Expressive motion physics. Google publishes the official Web equivalents
+     of its motion springs as cubic-bezier curves plus durations
+     (m3.material.io/styles/motion/overview/specs): spatial curves overshoot,
+     effects curves never do. */
+  --md-sys-motion-spring-expressive-fast-spatial:
+    cubic-bezier(.42, 1.67, .21, .9);
+  --md-sys-motion-spring-expressive-default-spatial:
+    cubic-bezier(.38, 1.21, .22, 1);
+  --md-sys-motion-spring-expressive-slow-spatial:
+    cubic-bezier(.39, 1.29, .35, .98);
+  --md-sys-motion-spring-expressive-fast-effects:
+    cubic-bezier(.31, .94, .34, 1);
+  --md-sys-motion-spring-expressive-default-effects:
+    cubic-bezier(.34, .8, .34, 1);
+  --md-sys-motion-spring-expressive-slow-effects:
+    cubic-bezier(.34, .88, .34, 1);
+  --md-sys-motion-duration-expressive-fast-spatial: 350ms;
+  --md-sys-motion-duration-expressive-default-spatial: 500ms;
+  --md-sys-motion-duration-expressive-slow-spatial: 650ms;
+  --md-sys-motion-duration-expressive-fast-effects: 150ms;
+  --md-sys-motion-duration-expressive-default-effects: 200ms;
+  --md-sys-motion-duration-expressive-slow-effects: 300ms;
+  /* The launcher's own transitions pick up the default springs: movement
+     overshoots softly, colour and opacity settle without bounce. */
+  --ease: var(--md-sys-motion-spring-expressive-default-effects);
+  --ease-slide: var(--md-sys-motion-spring-expressive-default-spatial);
+
+  /* Google's expressive typeface (Google Sans Flex, with Roboto Flex for
+     Cyrillic) and the label-large typescale used by Material buttons and
+     segmented buttons (14/20, medium). */
+  --md-ref-typeface-brand: "Google Sans Flex", "Roboto Flex", "Roboto",
+                           "Segoe UI", system-ui, sans-serif;
+  --md-ref-typeface-plain: "Google Sans Flex", "Roboto Flex", "Roboto",
+                           "Segoe UI", system-ui, sans-serif;
+  --md-ref-typeface-weight-medium: 500;
+  --md-sys-typescale-label-large-size: .875rem;
+  --md-sys-typescale-label-large-line-height: 1.25rem;
+  --md-sys-typescale-label-large-weight: 500;
+  --md-sys-typescale-label-large-font: var(--md-ref-typeface-plain);
+
+  --radius-card: var(--md-sys-shape-corner-extra-large);
+  --radius-md: var(--md-sys-shape-corner-medium);
+  --radius-btn: var(--md-sys-shape-corner-full);
+  --radius-sm: var(--md-sys-shape-corner-small);
+  --radius-xs: var(--md-sys-shape-corner-extra-small);
+  --font: "Google Sans Flex", "Roboto Flex", "Roboto",
+          "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+          sans-serif;
+  --font-display: "Google Sans Flex", "Roboto Flex", "Roboto",
+                  "Segoe UI Variable Display", "Segoe UI", system-ui,
+                  sans-serif;
+  --m3-elev-1: 0 1px 2px rgba(0, 0, 0, .32), 0 1px 3px 1px rgba(0, 0, 0, .16);
+  --m3-elev-2: 0 1px 2px rgba(0, 0, 0, .32), 0 2px 6px 2px rgba(0, 0, 0, .16);
+  --m3-elev-3: 0 4px 8px 3px rgba(0, 0, 0, .16), 0 1px 3px rgba(0, 0, 0, .32);
+
+  /* The launcher's own tokens are aliases of the M3 sys roles, so every
+     existing component automatically speaks Material You. */
+  --bg: var(--md-sys-color-surface);
+  --surface: var(--md-sys-color-surface-container-low);
+  --surface-2: var(--md-sys-color-surface-container);
+  --surface-3: var(--md-sys-color-surface-container-high);
+  --surface-deep: var(--md-sys-color-surface-container-lowest);
+  --ambient: var(--md-sys-color-surface);
+  --bg-glow: var(--md-sys-color-surface);
+  --line: var(--md-sys-color-outline-variant);
+  --line-soft: color-mix(in srgb, var(--md-sys-color-outline-variant) 64%,
+                         transparent);
+  --line-strong: var(--md-sys-color-outline);
+  --line-focus: var(--md-sys-color-outline);
+  --fg: var(--md-sys-color-on-surface);
+  --dim: var(--md-sys-color-on-surface-variant);
+  --faint: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 78%,
+                     transparent);
+  --placeholder: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 72%,
+                           transparent);
+  --hover-fill: color-mix(in srgb, var(--md-sys-color-on-surface) 8%,
+                          transparent);
+  --surface-glass: color-mix(in srgb, var(--md-sys-color-surface-container) 90%,
+                             transparent);
+  --surface-2-glass:
+    color-mix(in srgb, var(--md-sys-color-surface-container-high) 92%,
+              transparent);
+  /* Home cards always sit on the dark panorama, so they stay dark glass. */
+  --glass-card: rgba(20, 18, 24, .52);
+  --glass-card-hover: rgba(43, 41, 48, .68);
+  --disabled-bg: var(--md-sys-color-surface-container-highest);
+  --disabled-fg: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 70%,
+                           transparent);
+  --console-bg: var(--md-sys-color-surface-container-lowest);
+  --console-fg: var(--md-sys-color-on-surface-variant);
+
+  --accent: var(--md-sys-color-primary);
+  --accent-hover: color-mix(in srgb, var(--md-sys-color-primary) 88%,
+                            var(--md-sys-color-on-primary));
+  --accent-fg: var(--md-sys-color-on-primary);
+  --accent-soft: color-mix(in srgb, var(--md-sys-color-primary) 16%,
+                           transparent);
+  --accent-muted: color-mix(in srgb, var(--md-sys-color-on-primary) 55%,
+                            transparent);
+  --accent-veil: color-mix(in srgb, var(--md-sys-color-on-primary) 14%,
+                           transparent);
+
+  --danger: var(--md-sys-color-error);
+  --danger-hover: color-mix(in srgb, var(--md-sys-color-error) 84%,
+                            var(--md-sys-color-on-error));
+  --danger-soft: color-mix(in srgb, var(--md-sys-color-error) 12%, transparent);
+  --danger-strong: var(--md-sys-color-error);
+  --danger-deep: color-mix(in srgb, var(--md-sys-color-error) 78%, #000);
+  --gold: var(--md-sys-color-tertiary);
+  --warn: var(--md-sys-color-tertiary);
+  --scroll-thumb: var(--md-sys-color-outline-variant);
+  --scroll-thumb-hover: var(--md-sys-color-outline);
+
+  --m3-container: var(--md-sys-color-secondary-container);
+  --m3-on-container: var(--md-sys-color-on-secondary-container);
+  --m3-hover: color-mix(in srgb, var(--md-sys-color-on-surface) 8%,
+                        transparent);
+  --m3-tonal: var(--md-sys-color-secondary-container);
+  --m3-tonal-hover:
+    color-mix(in srgb, var(--md-sys-color-on-secondary-container) 10%,
+              var(--md-sys-color-secondary-container));
+}
+
+/* Material 3 baseline (dark) sys colours, used only until the Material Color
+   Utilities bundle applies the scheme generated from the chosen accent. */
+:root[data-design="material"]:not([data-mode="light"]) {
+  color-scheme: dark;
+  --md-sys-color-primary: #d0bcff;
+  --md-sys-color-on-primary: #381e72;
+  --md-sys-color-secondary-container: #4a4458;
+  --md-sys-color-on-secondary-container: #e8def8;
+  --md-sys-color-surface: #141218;
+  --md-sys-color-surface-container-lowest: #0f0d13;
+  --md-sys-color-surface-container-low: #1d1b20;
+  --md-sys-color-surface-container: #211f26;
+  --md-sys-color-surface-container-high: #2b2930;
+  --md-sys-color-surface-container-highest: #36343b;
+  --md-sys-color-on-surface: #e6e0e9;
+  --md-sys-color-on-surface-variant: #cac4d0;
+  --md-sys-color-outline: #938f99;
+  --md-sys-color-outline-variant: #49454f;
+  --md-sys-color-error: #f2b8b5;
+  --md-sys-color-on-error: #601410;
+  --md-sys-color-tertiary: #efb8c8;
+}
+
+/* Material 3 baseline (light) sys colours. */
+:root[data-mode="light"][data-design="material"] {
+  color-scheme: light;
+  --md-sys-color-primary: #6750a4;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-secondary-container: #e8def8;
+  --md-sys-color-on-secondary-container: #1d192b;
+  --md-sys-color-surface: #fef7ff;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f7f2fa;
+  --md-sys-color-surface-container: #f3edf7;
+  --md-sys-color-surface-container-high: #ece6f0;
+  --md-sys-color-surface-container-highest: #e6e0e9;
+  --md-sys-color-on-surface: #1d1b20;
+  --md-sys-color-on-surface-variant: #49454f;
+  --md-sys-color-outline: #79747e;
+  --md-sys-color-outline-variant: #cac4d0;
+  --md-sys-color-error: #b3261e;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-tertiary: #7d5260;
+  --m3-elev-1: 0 1px 2px rgba(0, 0, 0, .14), 0 1px 3px 1px rgba(0, 0, 0, .08);
+  --m3-elev-2: 0 1px 2px rgba(0, 0, 0, .14), 0 2px 6px 2px rgba(0, 0, 0, .08);
+  --m3-elev-3: 0 4px 8px 3px rgba(0, 0, 0, .08), 0 1px 3px rgba(0, 0, 0, .14);
+}
+
+/* Flat Material canvas: the classic ambient blooms go away. */
+:root[data-design="material"] body {
+  background: var(--bg);
+  color: var(--fg);
+}
+:root[data-design="material"] body::before,
+:root[data-design="material"] body::after { display: none; }
+
+/* ------------------------------------------------------------ typography */
+
+/* Expressive display styles are softer and heavier than the baseline: a
+   medium weight with tight tracking reads as “emphasised” in Google Sans Flex
+   and Roboto Flex. */
+:root[data-design="material"] .screen-title {
+  font: 500 24px/32px var(--font-display);
+  letter-spacing: -.01em;
+}
+:root[data-design="material"] .welcome-title {
+  font: 500 32px/40px var(--font-display);
+  letter-spacing: -.015em;
+}
+:root[data-design="material"] .crash-title {
+  font: 500 clamp(24px, 2.6vw, 36px)/1.25 var(--font-display);
+  letter-spacing: -.01em;
+}
+:root[data-design="material"] .pane-title { font-weight: 500; }
+:root[data-design="material"] .brand-main {
+  font-weight: 600;
+  letter-spacing: .03em;
+}
+:root[data-design="material"] .brand-sub { letter-spacing: .01em; }
+/* Material 3 label-medium: 12/16, medium, .5 tracking. */
+:root[data-design="material"] .eyebrow,
+:root[data-design="material"] .field-label,
+:root[data-design="material"] .welcome-group-title {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: .5px;
+  color: var(--dim);
+}
+:root[data-design="material"] .home-title { letter-spacing: 0; }
+/* Material 3 body-small: 12/16. */
+:root[data-design="material"] .hint {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* --------------------------------------------------------------- shells */
+
+/* M3 large-card content padding: 24dp on desktop, 16dp on narrow windows. */
+:root[data-design="material"] .settings-card {
+  padding: 24px;
+  gap: 16px;
+}
+@media (max-width: 860px) {
+  :root[data-design="material"] .settings-card {
+    padding: 16px;
+    gap: 12px;
+  }
+}
+:root[data-design="material"] .titlebar-btn { border-radius: 999px; }
+:root[data-design="material"] .titlebar-btn:hover {
+  background: var(--m3-hover);
+}
+
+:root[data-design="material"] .tabs {
+  padding: 3px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+:root[data-design="material"] .tab {
+  height: 34px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+:root[data-design="material"] .tab:hover { background: var(--m3-hover); }
+:root[data-design="material"] .tab.active { color: var(--m3-on-container); }
+
+/* The sliding indicator becomes the M3 secondary-container pill: a tonal
+   fill with accent text on top, used for nav, tabs and segmented controls. */
+:root[data-design="material"] .seg-fill {
+  border-radius: 999px;
+  background: var(--m3-container);
+}
+:root[data-design="material"] .seg-hover {
+  border-radius: 999px;
+  background: var(--m3-hover);
+}
+:root[data-design="material"] .seg button.on,
+:root[data-design="material"] .detail-tab.on,
+:root[data-design="material"] .detail-tab.on:hover {
+  color: var(--m3-on-container);
+}
+:root[data-design="material"] .detail-tab.on .tab-count {
+  color: var(--accent);
+  opacity: .7;
+}
+
+/* ---------------------------------------------------------------- cards */
+
+/* Cards are real Google elevated cards. The component paints the container
+   and its elevation shadow, so the old CSS card fill is switched off. */
+:root[data-design="material"] .card {
+  background: var(--surface);
+  border-color: transparent;
+  box-shadow: var(--m3-elev-1);
+}
+:root[data-design="material"] md-elevated-card.card {
+  --md-elevated-card-container-shape: var(--md-sys-shape-corner-large);
+  --md-elevated-card-container-color:
+    var(--md-sys-color-surface-container-low);
+  --md-elevated-card-container-elevation: 1;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+:root[data-design="material"] .list-box {
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--surface-2);
+}
+:root[data-design="material"] .pane-empty {
+  border-color: var(--line);
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+
+/* -------------------------------------------------------------- buttons */
+
+:root[data-design="material"] .btn {
+  height: 40px;
+  padding: 0 24px;
+  border-radius: var(--md-sys-shape-corner-full);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: .1px;
+}
+:root[data-design="material"] .btn.sm {
+  height: 32px;
+  padding: 0 16px;
+  font-size: 12px;
+  line-height: 16px;
+}
+:root[data-design="material"] .btn.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+:root[data-design="material"] .btn.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: var(--m3-elev-1);
+}
+:root[data-design="material"] .btn.ghost {
+  background: var(--m3-tonal);
+  color: var(--m3-on-container);
+}
+:root[data-design="material"] .btn.ghost:hover:not(:disabled) {
+  background: var(--m3-tonal-hover);
+  border-color: transparent;
+}
+:root[data-design="material"] .btn.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+:root[data-design="material"] .btn.play { height: 40px; }
+/* The rail's square icon buttons are Material FABs: 56dp, 16dp corners. */
+:root[data-design="material"] .side > .btn {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--md-sys-shape-corner-large);
+}
+/* Ghost buttons over the home panorama keep their glassy white treatment. */
+:root[data-design="material"] .home-friends .btn.ghost {
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+}
+:root[data-design="material"]
+  .home-friends .btn.ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, .2);
+}
+
+/* --------------------------------------------------------------- fields */
+
+/* M3 outlined text field: 1dp outline, 4dp corner, transparent container. */
+:root[data-design="material"] .input,
+:root[data-design="material"] .vsel-btn {
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  border-color: var(--md-sys-color-outline);
+  background: transparent;
+  color: var(--fg);
+}
+:root[data-design="material"] .input:hover,
+:root[data-design="material"] .vsel-btn:hover:not(:disabled) {
+  border-color: var(--md-sys-color-on-surface);
+}
+:root[data-design="material"] .input:focus {
+  border-color: var(--md-sys-color-primary);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
+}
+:root[data-design="material"] .vsel-btn:focus-visible {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
+}
+:root[data-design="material"] select.input {
+  border-radius: var(--md-sys-shape-corner-extra-small);
+}
+
+/* --------------------------------------------------- segmented controls */
+
+/* Google's outlined segmented button set is a single 40dp control with a 1dp
+   outline, full corner and a secondary-container selected segment. The old
+   sliding fill and the native buttons are hidden while it is active. */
+:root[data-design="material"] .seg.m3-seg {
+  padding: 0;
+  gap: 0;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+}
+:root[data-design="material"] .seg.m3-seg > button { display: none; }
+:root[data-design="material"] .seg.m3-seg > .seg-fill,
+:root[data-design="material"] .seg.m3-seg > .seg-hover { display: none; }
+:root[data-design="material"] .seg.m3-seg > md-outlined-segmented-button-set {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+:root[data-design="material"] .toolbar .seg.m3-seg {
+  --md-outlined-segmented-button-container-height: 36px;
+}
+:root[data-design="material"] .m3-seg-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+/* All remaining segmented controls (vertical rails keep their drawer items). */
+:root[data-design="material"] .seg:not(.settings-tabs):not(.m3-seg) {
+  padding: 3px;
+  gap: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+:root[data-design="material"] .seg button {
+  border-radius: 999px;
+  font-weight: 500;
+}
+:root[data-design="material"] .toolbar .seg button { height: 36px; }
+
+/* Navigation rail: drawer items with a pill indicator, no visible container. */
+:root[data-design="material"] .settings-tabs,
+:root[data-design="material"] .detail-tabs {
+  width: 196px;
+  padding: 0 6px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 2px;
+}
+:root[data-design="material"] .detail-tabs { width: 176px; }
+:root[data-design="material"] .settings-tabs button,
+:root[data-design="material"] .detail-tab {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ------------------------------------------------- chips, menus, lists */
+
+:root[data-design="material"] .theme-option,
+:root[data-design="material"] .design-option {
+  border-radius: 12px;
+  background-color: transparent;
+}
+:root[data-design="material"] .theme-option.on,
+:root[data-design="material"] .design-option.on {
+  border-color: var(--accent);
+  background-color: var(--accent-soft);
+}
+:root[data-design="material"] .row { border-radius: 10px; }
+:root[data-design="material"] .row:hover { background: var(--m3-hover); }
+:root[data-design="material"] .row.selected {
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+:root[data-design="material"] .row.selected .row-side { color: var(--accent); }
+:root[data-design="material"] .vsel-menu,
+:root[data-design="material"] .ctx-menu {
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface-3);
+  box-shadow: var(--m3-elev-2);
+  padding: 8px;
+}
+:root[data-design="material"] .vsel-option,
+:root[data-design="material"] .ctx-item {
+  border-radius: 8px;
+}
+:root[data-design="material"] .vsel-option:hover,
+:root[data-design="material"] .ctx-item:hover:not(:disabled) {
+  background: var(--m3-hover);
+}
+:root[data-design="material"] .profile-tip {
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-3);
+  box-shadow: var(--m3-elev-2);
+}
+
+/* ------------------------------------------------------- dialogs & sheets */
+
+:root[data-design="material"] .mirror-card,
+:root[data-design="material"] .crash-card {
+  border: 0;
+  border-radius: 28px;
+  background: var(--surface-2);
+  box-shadow: var(--m3-elev-3);
+}
+:root[data-design="material"] .mirror-backdrop {
+  background: rgba(0, 0, 0, .32);
+  backdrop-filter: none;
+}
+:root[data-design="material"] body.mirror-open .app { filter: none; }
+:root[data-design="material"] .welcome {
+  background: rgba(0, 0, 0, .34);
+  backdrop-filter: blur(8px);
+}
+:root[data-design="material"] .welcome-card {
+  border: 0;
+  border-radius: 28px;
+  background: var(--surface-2);
+  box-shadow: var(--m3-elev-3);
+}
+:root[data-design="material"] .welcome-brand-name {
+  font-weight: 600;
+  letter-spacing: .06em;
+}
+:root[data-design="material"] .welcome-lang-btn { border-radius: 16px; }
+:root[data-design="material"] .welcome-status-error { color: var(--danger); }
+
+/* --------------------------------------------------------------- toasts */
+
+:root[data-design="material"]:not([data-mode="light"]) .toast {
+  border: 0;
+  border-left: 0;
+  border-radius: 8px;
+  background: #e6e0e9;
+  color: #1d1b20;
+  box-shadow: var(--m3-elev-2);
+}
+:root[data-design="material"]:not([data-mode="light"]) .toast-title,
+:root[data-design="material"]:not([data-mode="light"]) .toast-icon {
+  color: #8c1d18;
+}
+:root[data-design="material"]:not([data-mode="light"]) .toast-text {
+  color: #1d1b20;
+}
+:root[data-design="material"]:not([data-mode="light"]) .toast-close {
+  color: #49454f;
+}
+:root[data-design="material"]:not([data-mode="light"]) .toast-close:hover {
+  background: rgba(0, 0, 0, .08);
+  color: #1d1b20;
+}
+:root[data-mode="light"][data-design="material"] .toast {
+  border: 0;
+  border-left: 0;
+  border-radius: 8px;
+  background: #322f35;
+  color: #f5eff7;
+  box-shadow: var(--m3-elev-2);
+}
+:root[data-mode="light"][data-design="material"] .toast-title,
+:root[data-mode="light"][data-design="material"] .toast-icon {
+  color: #f2b8b5;
+}
+:root[data-mode="light"][data-design="material"] .toast-text {
+  color: #f5eff7;
+}
+:root[data-mode="light"][data-design="material"] .toast-close {
+  color: #cac4d0;
+}
+:root[data-mode="light"][data-design="material"] .toast-close:hover {
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+}
+
+/* M3 slider: a 4dp tonal track with a 20dp primary handle and state layer. */
+:root[data-design="material"] input[type="range"] { height: 4px; }
+:root[data-design="material"] input[type="range"]::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: var(--md-sys-color-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+:root[data-design="material"] input[type="range"]::-webkit-slider-thumb:active {
+  box-shadow: 0 0 0 10px
+    color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+}
+
+/* ------------------------------------------------------------- progress */
+
+/* Google's md-linear-progress replaces the painted bar. The old .bar stays in
+   the DOM only as the progress value the launcher code writes. */
+:root[data-design="material"] .progress { height: 4px; }
+:root[data-design="material"] .progress.m3-progress {
+  position: relative;
+  height: auto;
+  overflow: visible;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+}
+:root[data-design="material"] .progress.m3-progress > .bar { display: none; }
+:root[data-design="material"] .progress.m3-progress > md-linear-progress {
+  display: block;
+  width: 100%;
+  --md-linear-progress-track-shape: var(--md-sys-shape-corner-full);
+  --md-linear-progress-active-indicator-color: var(--md-sys-color-primary);
+  --md-linear-progress-track-color:
+    var(--md-sys-color-surface-container-highest);
+}
+
+/* The 2024 M3 linear indicator ends the track with a 4dp stop indicator and a
+   4dp gap. @material/web 2.5 omits both, so overlay the two spec details while
+   Google's component still paints the track and the value. The overlay is a
+   sibling because the host paints its shadow content over its own ::after. */
+:root[data-design="material"] .progress.m3-progress > .m3-progress-stop {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 0;
+  width: 8px;
+  height: 4px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+:root[data-design="material"] .progress.m3-progress > .m3-progress-stop::before,
+:root[data-design="material"] .progress.m3-progress > .m3-progress-stop::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 4px;
+}
+:root[data-design="material"] .progress.m3-progress > .m3-progress-stop::before {
+  left: 0;
+  background: var(--md-sys-color-surface-container-highest);
+}
+:root[data-design="material"] .progress.m3-progress > .m3-progress-stop::after {
+  right: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-on-surface-variant);
+}
+:root[data-design="material"] .progress.m3-progress > md-linear-progress.m3-indeterminate + .m3-progress-stop {
+  display: none;
+}
+:root[data-design="material"] .progress .bar { background: var(--accent); }
+
+/* -------------------------------------------- official ripple and symbols */
+
+:root[data-design="material"] .m3-ripple-host { position: relative; }
+:root[data-design="material"] md-ripple.m3-ripple {
+  --md-ripple-hover-color: var(--md-sys-color-on-surface);
+  --md-ripple-pressed-color: var(--md-sys-color-on-surface);
+}
+:root[data-design="material"] .btn.primary,
+:root[data-design="material"] .home-play,
+:root[data-design="material"] .tab.active {
+  --md-ripple-hover-color: var(--md-sys-color-on-primary);
+  --md-ripple-pressed-color: var(--md-sys-color-on-primary);
+}
+/* Material Symbols are filled shapes; the classic sprite is stroked. */
+:root[data-design="material"] svg.icon.m3-icon {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* ------------------------------------ official Material 3 form controls */
+
+/* The launcher's own element stays in the DOM as the state holder (its id and
+   listeners are used by the app); Google's component sits next to it and the
+   native control is hidden. Layout classes are mirrored onto the host so the
+   surrounding flex/grid rules keep working. */
+:root[data-design="material"] .m3-button.btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  gap: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: normal;
+  line-height: normal;
+  white-space: normal;
+  transform: none;
+  flex: none;
+  transition: none;
+}
+:root[data-design="material"] .m3-button.btn:active:not(:disabled) {
+  transform: none;
+}
+:root[data-design="material"] .m3-button.btn:disabled { opacity: 1; }
+:root[data-design="material"] .m3-button .m3-control-icon {
+  width: 18px;
+  height: 18px;
+}
+/* Icon-only buttons are circles in Material 3, with a 24dp glyph. */
+:root[data-design="material"] .m3-button.m3-icon-button {
+  --md-icon-button-icon-size: 24px;
+  --md-filled-icon-button-icon-size: 24px;
+  --md-filled-tonal-icon-button-icon-size: 24px;
+  --md-outlined-icon-button-icon-size: 24px;
+}
+:root[data-design="material"] .m3-button.m3-icon-button .m3-control-icon {
+  width: 24px;
+  height: 24px;
+}
+/* Inline text actions (`.link`) become official text buttons. */
+:root[data-design="material"] .m3-button.link {
+  padding: 0;
+  min-width: 0;
+  height: auto;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  --md-text-button-container-height: 32px;
+  --md-text-button-leading-space: 8px;
+  --md-text-button-trailing-space: 8px;
+  --md-text-button-with-leading-icon-leading-space: 8px;
+  --md-text-button-with-leading-icon-trailing-space: 8px;
+  --md-text-button-label-text-color: var(--md-sys-color-primary);
+  --md-text-button-hover-label-text-color: var(--md-sys-color-primary);
+  --md-text-button-focus-label-text-color: var(--md-sys-color-primary);
+  --md-text-button-hover-state-layer-color: var(--md-sys-color-primary);
+  --md-text-button-pressed-state-layer-color: var(--md-sys-color-primary);
+}
+:root[data-design="material"] .m3-button.is-sm {
+  --md-filled-button-container-height: 32px;
+  --md-filled-tonal-button-container-height: 32px;
+  --md-outlined-button-container-height: 32px;
+  --md-filled-button-label-text-size: .75rem;
+  --md-filled-tonal-button-label-text-size: .75rem;
+  --md-outlined-button-label-text-size: .75rem;
+  --md-filled-button-label-text-line-height: 1rem;
+  --md-filled-tonal-button-label-text-line-height: 1rem;
+  --md-outlined-button-label-text-line-height: 1rem;
+}
+:root[data-design="material"] .m3-button.play { min-width: 118px; }
+/* Toggled states reuse Material's own container tokens. */
+:root[data-design="material"] .m3-button.on {
+  --md-filled-tonal-button-container-color:
+    var(--md-sys-color-primary-container);
+  --md-filled-tonal-button-label-text-color:
+    var(--md-sys-color-on-primary-container);
+  --md-filled-tonal-button-hover-state-layer-color:
+    var(--md-sys-color-on-primary-container);
+  --md-filled-tonal-button-pressed-state-layer-color:
+    var(--md-sys-color-on-primary-container);
+}
+:root[data-design="material"] .m3-button.confirm {
+  --md-filled-button-container-color: var(--md-sys-color-error);
+  --md-filled-button-label-text-color: var(--md-sys-color-on-error);
+  --md-filled-button-hover-state-layer-color: var(--md-sys-color-on-error);
+  --md-filled-button-pressed-state-layer-color: var(--md-sys-color-on-error);
+}
+:root[data-design="material"] .m3-button.mirror-close {
+  width: 34px;
+  min-width: 34px;
+  --md-outlined-button-container-height: 34px;
+  --md-outlined-button-leading-space: 0;
+  --md-outlined-button-trailing-space: 0;
+  --md-outlined-button-with-leading-icon-leading-space: 0;
+  --md-outlined-button-with-leading-icon-trailing-space: 0;
+  --md-icon-button-container-height: 34px;
+  --md-icon-button-container-width: 34px;
+  --md-filled-tonal-icon-button-container-height: 34px;
+  --md-filled-tonal-icon-button-container-width: 34px;
+  --md-outlined-icon-button-container-height: 34px;
+  --md-outlined-icon-button-container-width: 34px;
+}
+/* FABs in the profile rail: 56dp, 16dp corners, icon slot. */
+:root[data-design="material"] .side > .m3-button.m3-fab {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  --md-fab-container-shape: var(--md-sys-shape-corner-large);
+}
+:root[data-design="material"] .m3-fab .m3-control-icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Outlined text fields from @material/web. */
+:root[data-design="material"] md-outlined-text-field.m3-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  --md-outlined-text-field-container-shape:
+    var(--md-sys-shape-corner-extra-small);
+  --md-outlined-text-field-outline-color: var(--md-sys-color-outline);
+  --md-outlined-text-field-hover-outline-color:
+    var(--md-sys-color-on-surface);
+  --md-outlined-text-field-focus-outline-color:
+    var(--md-sys-color-primary);
+  --md-outlined-text-field-input-text-color:
+    var(--md-sys-color-on-surface);
+  --md-outlined-text-field-label-text-color:
+    var(--md-sys-color-on-surface-variant);
+  --md-outlined-text-field-hover-label-text-color:
+    var(--md-sys-color-on-surface-variant);
+  --md-outlined-text-field-focus-label-text-color:
+    var(--md-sys-color-primary);
+  --md-outlined-text-field-input-text-placeholder-color:
+    var(--md-sys-color-on-surface-variant);
+  --md-outlined-text-field-caret-color: var(--md-sys-color-primary);
+  --md-outlined-text-field-supporting-text-color:
+    var(--md-sys-color-on-surface-variant);
+}
+:root[data-design="material"] .field > md-outlined-text-field.m3-field {
+  width: 100%;
+}
+
+/* Sliders keep the launcher's min/max/step/value; Google draws the track and
+   the 20dp handle. */
+:root[data-design="material"] md-slider.m3-slider {
+  width: 100%;
+  min-width: 0;
+  --md-slider-active-track-color: var(--md-sys-color-primary);
+  --md-slider-inactive-track-color:
+    var(--md-sys-color-surface-container-highest);
+  --md-slider-handle-color: var(--md-sys-color-primary);
+  --md-slider-focus-handle-color: var(--md-sys-color-primary);
+  --md-slider-hover-handle-color: var(--md-sys-color-primary);
+  --md-slider-pressed-handle-color: var(--md-sys-color-primary);
+  --md-slider-hover-state-layer-color: var(--md-sys-color-primary);
+  --md-slider-pressed-state-layer-color: var(--md-sys-color-primary);
+}
+:root[data-design="material"] .m3-check {
+  flex: none;
+  --md-checkbox-outline-color: var(--md-sys-color-on-surface-variant);
+  --md-checkbox-selected-container-color: var(--md-sys-color-primary);
+  --md-checkbox-selected-icon-color: var(--md-sys-color-on-primary);
+}
+:root[data-design="material"] md-divider.rule {
+  height: 1px;
+  margin: 0;
+  background: var(--md-sys-color-outline-variant);
+}
+
+/* The official field already carries a floating label; the old caption above
+   the input would duplicate it. */
+:root[data-design="material"] .m3-field-group > .field-label { display: none; }
+
+:root[data-design="material"] md-switch.m3-switch {
+  flex: none;
+  --md-switch-selected-track-color: var(--md-sys-color-primary);
+  --md-switch-selected-hover-track-color: var(--md-sys-color-primary);
+  --md-switch-selected-focus-track-color: var(--md-sys-color-primary);
+  --md-switch-selected-pressed-track-color: var(--md-sys-color-primary);
+  --md-switch-selected-handle-color: var(--md-sys-color-on-primary);
+  --md-switch-selected-hover-handle-color: var(--md-sys-color-on-primary);
+  --md-switch-selected-focus-handle-color: var(--md-sys-color-on-primary);
+  --md-switch-selected-pressed-handle-color: var(--md-sys-color-on-primary);
+}
+
+/* Presentational radio marks on the theme / design cards. The card itself is
+   still the radio input for keyboard and click handling. */
+:root[data-design="material"] md-radio.m3-option-radio {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  pointer-events: none;
+  --md-radio-icon-color: var(--md-sys-color-on-surface-variant);
+  --md-radio-selected-icon-color: var(--md-sys-color-primary);
+}
+
+/* Official circular progress replaces the CSS spinner. */
+:root[data-design="material"] #net-sub.busy::before { display: none; }
+:root[data-design="material"] md-circular-progress.m3-spinner {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  --md-circular-progress-size: 16px;
+  --md-circular-progress-active-indicator-color:
+    var(--md-sys-color-primary);
+}
+:root[data-design="material"] md-circular-progress.m3-button-spinner {
+  width: 18px;
+  height: 18px;
+  opacity: 1;
+  --md-circular-progress-size: 18px;
+  --md-circular-progress-active-indicator-color:
+    var(--md-sys-color-primary);
+}
+
+/* ----------------------------------------------------------------- home */
+
+:root[data-design="material"] .home-screen {
+  border: 0;
+  border-radius: 24px;
+  box-shadow: var(--m3-elev-1);
+}
+:root[data-design="material"] .home-play {
+  height: 64px;
+  padding: 0 20px 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: var(--m3-elev-2);
+  font-weight: 500;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-design="material"] .home-play:hover {
+  filter: none;
+  transform: translateY(-1px);
+  background: var(--md-sys-color-primary);
+  box-shadow: var(--m3-elev-3);
+}
+:root[data-design="material"] .home-play:active {
+  transform: scale(.985);
+  box-shadow: var(--m3-elev-1);
+}
+:root[data-design="material"] .home-play-glyph {
+  border-radius: var(--md-sys-shape-corner-full);
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-primary) 18%, transparent);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: none;
+}
+:root[data-design="material"] .home-play-label {
+  font-weight: 500;
+  letter-spacing: normal;
+}
+:root[data-design="material"] .home-play-sub {
+  color: color-mix(in srgb,
+    var(--md-sys-color-on-primary) 74%, transparent);
+}
+:root[data-design="material"] .home-play-go {
+  color: color-mix(in srgb,
+    var(--md-sys-color-on-primary) 70%, transparent);
+}
+:root[data-design="material"] .home-play:hover .home-play-go {
+  transform: rotate(-90deg);
+  color: var(--md-sys-color-on-primary);
+}
+:root[data-design="material"] .home-play.running {
+  background: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+  box-shadow: var(--m3-elev-2);
+}
+:root[data-design="material"] .home-play.running .home-play-glyph {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-error) 18%, transparent);
+  color: var(--md-sys-color-on-error);
+}
+:root[data-design="material"] .home-play.running .home-play-sub {
+  color: color-mix(in srgb,
+    var(--md-sys-color-on-error) 74%, transparent);
+}
+:root[data-design="material"] .home-build,
+:root[data-design="material"] .home-world {
+  border-radius: 20px;
+  border-color: transparent;
+}
+:root[data-design="material"] .home-build:hover,
+:root[data-design="material"] .home-world:hover {
+  border-color: transparent;
+  background: var(--glass-card-hover);
+}
+:root[data-design="material"] .home-friends {
+  border-color: transparent;
+  border-radius: 24px;
+  background: var(--glass-card);
+}
+:root[data-design="material"] .home-view-tabs {
+  border-radius: var(--md-sys-shape-corner-full);
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-surface) 6%, transparent);
+}
+:root[data-design="material"] .home-view-tabs .friends-icon-btn {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+:root[data-design="material"] .home-view-tabs .friends-icon-btn.active {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  box-shadow: none;
+}
+:root[data-design="material"] .friends-icon-btn {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+:root[data-design="material"] .friends-wip-badge {
+  border-color: transparent;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+:root[data-design="material"] .friends-gate-icon {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+:root[data-design="material"] .profile-card { border-radius: 16px; }
+:root[data-design="material"] .profile-card .profile-icon { border-radius: 15px; }
+:root[data-design="material"] .profile-card.selected {
+  border-color: transparent;
+  box-shadow: var(--m3-elev-2);
+}
+:root[data-design="material"] .log.console { border-radius: 12px; }
+
+/* Status bar and its history popover follow the expressive shapes and the
+   tonal surface roles. */
+:root[data-design="material"] .status-text {
+  border-radius: var(--md-sys-shape-corner-full);
+  color: var(--md-sys-color-on-surface-variant);
+}
+:root[data-design="material"] .status-text:hover {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-surface) 8%, transparent);
+  color: var(--md-sys-color-on-surface);
+}
+:root[data-design="material"] .status-copy,
+:root[data-design="material"] .status-history-close {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+:root[data-design="material"] .status-copy:hover,
+:root[data-design="material"] .status-history-close:hover,
+:root[data-design="material"] .status-history-action:hover {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-surface) 8%, transparent);
+  color: var(--md-sys-color-on-surface);
+}
+:root[data-design="material"] .status-copy.copied,
+:root[data-design="material"] .status-history-action.copied {
+  color: var(--md-sys-color-primary);
+}
+:root[data-design="material"] .status-copy.failed,
+:root[data-design="material"] .status-history-action.failed {
+  color: var(--md-sys-color-error);
+}
+:root[data-design="material"] .status-history {
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--m3-elev-3);
+}
+:root[data-design="material"] .status-history-action {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+:root[data-design="material"] .status-history-title {
+  color: var(--md-sys-color-on-surface);
+}
+:root[data-design="material"] .status-history-item + .status-history-item {
+  box-shadow: inset 0 1px var(--md-sys-color-outline-variant);
+}
+:root[data-design="material"] .status-history-time,
+:root[data-design="material"] .status-history-text {
+  color: var(--md-sys-color-on-surface-variant);
+}
+:root[data-design="material"] .status-history-item.error .status-history-text {
+  color: var(--md-sys-color-error);
+}
+
+/* Create / edit profile dialog in the expressive surface roles. */
+:root[data-design="material"] .create-backdrop {
+  background: rgba(0, 0, 0, .32);
+}
+:root[data-design="material"] .create-frame {
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container);
+  box-shadow: var(--m3-elev-3);
+}
+:root[data-design="material"] .create-close {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+:root[data-design="material"] .create-close:hover {
+  background: color-mix(in srgb,
+    var(--md-sys-color-on-surface) 8%, transparent);
+  color: var(--md-sys-color-on-surface);
+}
+

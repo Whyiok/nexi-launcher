@@ -131,7 +131,7 @@ function bindSettingsTabs() {
 
 function fillSettings() {
   const javaInput = $("#java-path");
-  if (document.activeElement !== javaInput) javaInput.value = S.java || "";
+  if (!m3FieldActive(javaInput)) javaInput.value = S.java || "";
   $("#btn-auto-java").disabled = !S.java;
   $("#java-hint").textContent = S.java
     ? "Custom Java — Minecraft starts with this executable."
@@ -172,6 +172,13 @@ function fillTheme() {
   });
   const label = $("#theme-name");
   if (label) label.textContent = THEME_NAMES[theme];
+
+  const design = DESIGNS.includes(S.design) ? S.design : "classic";
+  $$("#design-grid [data-design-option]").forEach((button) => {
+    const on = button.dataset.designOption === design;
+    button.classList.toggle("on", on);
+    button.setAttribute("aria-checked", on ? "true" : "false");
+  });
 
   const mode = MODES.includes(S.color_mode) ? S.color_mode : "dark";
   $$("#mode-seg [data-mode-option]").forEach((button) => {
@@ -360,7 +367,7 @@ function fillAccount() {
   const provider = activeAccount ? activeAccount.type : "offline";
 
   const input = $("#ms-client-id");
-  if (input && document.activeElement !== input) {
+  if (input && !m3FieldActive(input)) {
     input.value = ms.client_id || "";
     input.placeholder = ms.built_in
       ? "Built-in Client ID is used" : "Application (client) ID";
@@ -387,7 +394,7 @@ function fillAccount() {
   $("#nexi-profile").classList.toggle("hidden", !showNexiProfile);
   if (showNexiProfile) fillNexiProfile(nexiAccount);
   const baseUrl = $("#nexi-base-url");
-  if (baseUrl && document.activeElement !== baseUrl) {
+  if (baseUrl && !m3FieldActive(baseUrl)) {
     baseUrl.value = (S.nexi && S.nexi.base_url) || "";
   }
 
@@ -404,19 +411,19 @@ function fillAccount() {
 
   const oauth = ely.oauth || {};
   const oauthId = $("#ely-oauth-client-id");
-  if (oauthId && document.activeElement !== oauthId) {
+  if (oauthId && !m3FieldActive(oauthId)) {
     oauthId.value = oauth.client_id || "";
     oauthId.placeholder = oauth.built_in
       ? "Built-in Client ID is used" : "Client ID from account.ely.by";
   }
   const oauthRedirect = $("#ely-oauth-redirect");
-  if (oauthRedirect && document.activeElement !== oauthRedirect) {
+  if (oauthRedirect && !m3FieldActive(oauthRedirect)) {
     oauthRedirect.value = oauth.redirect_uri
       || "http://localhost:26206/ely-callback";
   }
   const oauthSecret = $("#ely-oauth-client-secret");
   if (oauthSecret) {
-    if (document.activeElement !== oauthSecret) oauthSecret.value = "";
+    if (!m3FieldActive(oauthSecret)) oauthSecret.value = "";
     oauthSecret.placeholder = oauth.pkce
       ? "Leave blank to use PKCE (no secret)"
       : "Saved — leave blank to keep";
@@ -946,6 +953,19 @@ async function changeTheme(theme) {
   setStatus(`Theme: ${THEME_NAMES[theme] || theme}.`);
 }
 
+async function changeDesign(design) {
+  if (!DESIGNS.includes(design)) return;
+  applyDesign(design);
+  const result = await call("set_design", design);
+  if (!result || !result.ok) {
+    setStatus((result && result.error) || "Could not save the design.", true);
+    if (result && result.state) applyState(result.state);
+    return;
+  }
+  if (result.state) applyState(result.state);
+  setStatus(`Design: ${DESIGN_NAMES[design] || design}.`);
+}
+
 async function changeMode(mode) {
   if (!MODES.includes(mode)) return;
   applyMode(mode);
@@ -1157,7 +1177,7 @@ function fillGameDefaults() {
     const input = $(selector);
     if (!input) continue;
     // Never fight the pointer while a slider is being dragged.
-    if (document.activeElement !== input) input.value = String(value);
+    if (!m3FieldActive(input)) input.value = String(value);
     input.disabled = !hasProfile;
   }
   const label = $("#defaults-profile");
