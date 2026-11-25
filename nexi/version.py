@@ -1,3 +1,3 @@
 """The launcher version shown in Settings and used by the updater."""
 
-VERSION = "1.8.4"
+VERSION = "1.8.5"
