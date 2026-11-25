@@ -117,7 +117,10 @@ function renderZapret() {
         + "to the bypass list and turn the bypass on?"
       : "";
   }
-  if (suggestBtn) suggestBtn.disabled = busy || !found;
+  if (suggestBtn) {
+    suggestBtn.disabled = busy;
+    gateControl(suggestBtn, !found ? "Install zapret first." : "");
+  }
 
   if (!status) {
     sub.textContent = "Checking…";
@@ -175,7 +178,10 @@ function renderZapret() {
       ? (zap.confirm ? "Confirm download" : "Download & enable")
       : active ? "Apply domains again" : "Enable bypass";
   apply.classList.toggle("confirm", !!zap.confirm);
-  apply.disabled = busy || rootless;
+  apply.disabled = busy;
+  gateControl(apply, rootless
+    ? "zapret needs administrator rights — restart the launcher as administrator."
+    : "");
 
   stop.classList.toggle("hidden", !active || busy);
   stop.disabled = busy;
@@ -183,7 +189,8 @@ function renderZapret() {
   cancel.disabled = false;
 
   pick.disabled = busy;
-  open.disabled = busy || !found;
+  open.disabled = busy;
+  gateControl(open, !found ? "Choose the zapret folder first." : "");
   presetRow.classList.toggle("hidden", !found);
   fillZapretPresets(status);
   const select = $("#zapret-preset");

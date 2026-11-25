@@ -934,6 +934,9 @@ body.pet-holding * { cursor: grabbing !important; }
 }
 .btn:active:not(:disabled) { transform: scale(.985); }
 .btn:disabled { opacity: .36; cursor: default; }
+/* Kept clickable on purpose: clicking explains what is still missing. */
+.is-gated { opacity: .55; cursor: help; }
+.is-gated:hover { opacity: .8; }
 
 .btn.primary { background: var(--accent); color: var(--accent-fg); }
 .btn.primary:hover:not(:disabled) { background: var(--accent-hover); }

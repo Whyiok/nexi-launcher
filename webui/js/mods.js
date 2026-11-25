@@ -31,9 +31,8 @@ function syncKindUi() {
   $("#kind-seg").classList.toggle("hidden", screen === "modpacks");
   const modButton = $('#kind-seg button[data-kind="mod"]');
   if (modButton) {
-    modButton.disabled = !modsAllowed();
-    modButton.title = modsAllowed() ? ""
-      : "This profile is vanilla — install a mod loader first";
+    modButton.disabled = false;
+    modButton.title = "";
   }
   $("#mods-seg").classList.toggle("hidden",
     !["mod", "modpack"].includes(mods.kind));
@@ -266,11 +265,6 @@ function setBrowserKind(kind) {
 }
 
 function openBrowser(kind) {
-  if (kind === "mod" && !modsAllowed()) {
-    setStatus("This profile is vanilla — install Fabric, Forge or NeoForge "
-      + "to use mods.", true);
-    return;
-  }
   if (kind === "modpack") {
     setScreen("modpacks");
     return;
@@ -547,13 +541,20 @@ function syncMods() {
   const installed = hasHit && !!mods.installed && mods.kind !== "modpack";
   const needsProfile = mods.kind !== "modpack";
   // Browsing stays available while a download from another screen runs.
-  $("#btn-mod-search").disabled = needsProfile && !S.instance;
+  const search = $("#btn-mod-search");
+  search.disabled = false;
+  gateControl(search, needsProfile && !S.instance
+    ? "Select a profile before searching mods." : "");
   $("#btn-mod-install").classList.toggle("hidden", installed);
   // Nothing selected means nothing to manage: no Uninstall row.
   $("#mod-manage").classList.toggle("hidden",
     mods.kind === "modpack" || !installed);
-  $("#btn-mod-install").disabled = busy || !hasHit;
-  $("#btn-mod-uninstall").disabled = busy || !installed;
+  const install = $("#btn-mod-install");
+  install.disabled = busy;
+  gateControl(install, !hasHit ? "Choose a mod first." : "");
+  const uninstall = $("#btn-mod-uninstall");
+  uninstall.disabled = busy;
+  gateControl(uninstall, !installed ? "Choose an installed mod first." : "");
   syncBatch();
 }
 

@@ -96,7 +96,9 @@ function renderHomePlay() {
   if (!button) return;
   const running = !!last && isInstanceRunning(last.slug);
   const starting = !!last && isInstanceStarting(last.slug);
-  button.disabled = !last || starting;
+  // With no build yet the same button opens the create screen, so it never
+  // needs to be greyed out.
+  button.disabled = starting;
   button.classList.toggle("running", running);
   $("#home-play-label").textContent = running
     ? "Stop" : (starting ? "Starting…" : "Play");

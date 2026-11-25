@@ -377,6 +377,7 @@ function fillDetail(inst, options = {}) {
 
   const changed = detail.slug !== inst.slug;
   if (changed) {
+    if (typeof resetPaneDelete === "function") resetPaneDelete();
     detail.slug = inst.slug;
     detail.contents = null;
     detail.loading = false;
@@ -716,9 +717,8 @@ function renderDetailPanes() {
   $("#btn-pane-clear-icon").disabled = !S.instance || !S.instance.icon;
   const browseMods = $("#btn-pane-browse-mods");
   if (browseMods) {
-    browseMods.disabled = !modsAllowed();
-    browseMods.title = modsAllowed() ? ""
-      : "This profile is vanilla — install a mod loader first";
+    browseMods.disabled = false;
+    browseMods.title = "";
   }
   syncBusy();
 }

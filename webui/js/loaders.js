@@ -65,7 +65,9 @@ function renderLoaderBuilds() {
 
 function syncLoaders() {
   const busy = lb.busy || S.busy === "loaders";
-  $("#btn-install-loader").disabled = busy || lb.loading || lb.selected < 0;
+  const install = $("#btn-install-loader");
+  install.disabled = busy || lb.loading;
+  gateControl(install, lb.selected < 0 ? "Choose a loader build first." : "");
   $("#btn-cancel-loader").classList.toggle("hidden", !busy);
   $("#btn-refresh-loader-builds").disabled = busy || lb.loading;
 }

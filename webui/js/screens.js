@@ -223,8 +223,8 @@ function renderTabs() {
   $$("#tabs .tab").forEach((tab) => {
     const name = tab.dataset.screen;
     tab.classList.toggle("active", name === screen);
-    const locked = ["loaders"].includes(name) && !S.instance;
-    tab.disabled = locked;
+    // Every tab stays reachable; screens explain what is missing themselves.
+    tab.disabled = false;
   });
   const siteTab = $("#btn-site-profile");
   if (siteTab) siteTab.classList.toggle("active", screen === "site");

@@ -199,8 +199,10 @@ function syncBusy() {
   $("#btn-refresh-builds").disabled = builds.loading;
   $("#btn-cancel-create").classList.toggle("hidden", !creating);
   $("#btn-cancel-loader").classList.toggle("hidden", !installing);
-  $("#btn-install-loader").disabled =
-    installing || lb.loading || lb.selected < 0;
+  const installLoader = $("#btn-install-loader");
+  installLoader.disabled = installing || lb.loading;
+  gateControl(installLoader, lb.selected < 0
+    ? "Choose a loader build first." : "");
   for (const id of ["btn-new-profile", "btn-empty-create",
                     "btn-import-modpack", "btn-pane-icon", "btn-pane-banner",
                     "btn-pane-edit", "btn-pick-background",
@@ -211,12 +213,15 @@ function syncBusy() {
   }
   const updateMods = $("#btn-pane-update-all");
   if (updateMods) {
-    updateMods.disabled = !modsAllowed() || S.busy === "mods";
+    updateMods.disabled = S.busy === "mods";
   }
   const ownTask = { duplicate: "duplicate", backup: "backup",
                     verify: "verify" };
   $$("#profile-menu [data-profile-action]").forEach((node) => {
-    node.disabled = S.busy === (ownTask[node.dataset.profileAction] || "");
+    // Only an action that owns a running task is locked; everything else
+    // stays clickable while the launcher is idle.
+    const task = ownTask[node.dataset.profileAction];
+    node.disabled = !!task && S.busy === task;
   });
   const clearIcon = $("#btn-pane-clear-icon");
   if (clearIcon) clearIcon.disabled = !S.instance || !S.instance.icon;

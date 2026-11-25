@@ -695,6 +695,31 @@
                         <svg class="icon"><use href="#i-gear"/></svg>All settings
                       </button>
                     </div>
+                    <div class="setting-block manage-block">
+                      <span class="field-label">MANAGE BUILD</span>
+                      <div class="pane-actions">
+                        <button class="btn ghost" id="btn-pane-mods" type="button">
+                          <svg class="icon"><use href="#i-mods"/></svg>Mods
+                        </button>
+                        <button class="btn ghost" id="btn-pane-logs" type="button">
+                          <svg class="icon"><use href="#i-logs"/></svg>Logs
+                        </button>
+                        <button class="btn ghost" id="btn-pane-duplicate" type="button">
+                          <svg class="icon"><use href="#i-copy"/></svg>Duplicate
+                        </button>
+                        <button class="btn ghost" id="btn-pane-backup-worlds"
+                                type="button">
+                          <svg class="icon"><use href="#i-archive"/></svg>Backup worlds
+                        </button>
+                        <button class="btn ghost" id="btn-pane-verify" type="button">
+                          <svg class="icon"><use href="#i-check"/></svg>Verify files
+                        </button>
+                        <button class="btn danger" id="btn-pane-delete" type="button">
+                          <svg class="icon"><use href="#i-trash"/></svg><span
+                            id="pane-delete-label">Delete profile</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -938,16 +963,16 @@
           <svg class="icon"><use href="#i-network"/></svg><span>Network</span>
         </button>
         <button type="button" role="tab" aria-selected="false" tabindex="-1"
-                data-settings-tab="launcher">
-          <svg class="icon"><use href="#i-gear"/></svg><span>Launcher</span>
-        </button>
-        <button type="button" role="tab" aria-selected="false" tabindex="-1"
                 data-settings-tab="bypass">
           <svg class="icon"><use href="#i-world"/></svg><span>Bypass</span>
         </button>
         <button type="button" role="tab" aria-selected="false" tabindex="-1"
                 data-settings-tab="logs">
           <svg class="icon"><use href="#i-logs"/></svg><span>Logs</span>
+        </button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1"
+                data-settings-tab="launcher">
+          <svg class="icon"><use href="#i-gear"/></svg><span>Launcher</span>
         </button>
       </div>
 

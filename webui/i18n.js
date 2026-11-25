@@ -81,6 +81,8 @@
     "Open": "Открыть",
     "Edit profile": "Изменить сборку",
     "All settings": "Все настройки",
+    "MANAGE BUILD": "УПРАВЛЕНИЕ СБОРКОЙ",
+    "Delete profile": "Удалить сборку",
     "New profile": "Новая сборка",
     "Pick any Minecraft version — missing files are downloaded from Mojang.": "Выберите любую версию Minecraft — недостающие файлы загрузятся с Mojang.",
     "PROFILE NAME": "НАЗВАНИЕ СБОРКИ",

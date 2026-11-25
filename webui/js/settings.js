@@ -132,7 +132,7 @@ function bindSettingsTabs() {
 function fillSettings() {
   const javaInput = $("#java-path");
   if (!m3FieldActive(javaInput)) javaInput.value = S.java || "";
-  $("#btn-auto-java").disabled = !S.java;
+  $("#btn-auto-java").disabled = false;
   $("#java-hint").textContent = S.java
     ? "Custom Java — Minecraft starts with this executable."
     : "Leave empty — the launcher downloads the Java runtime each " +
@@ -610,7 +610,9 @@ function syncNexiLinkButtons() {
   const confirm = $("#btn-nexi-link-confirm");
   if (!confirm) return;
   const rows = $$("#nexi-link-accounts .nexi-link-account").length;
-  confirm.disabled = nexiLink.busy || !rows || !nexiLink.selected;
+  confirm.disabled = nexiLink.busy;
+  gateControl(confirm, !rows ? "No accounts to link here."
+    : (!nexiLink.selected ? "Select an account to link." : ""));
 }
 
 function renderNexiLinkAccounts(accounts) {
@@ -1185,7 +1187,10 @@ function fillGameDefaults() {
     label.textContent = hasProfile ? S.instance.name : "No profile selected";
   }
   const apply = $("#btn-apply-defaults");
-  if (apply) apply.disabled = !hasProfile;
+  if (apply) {
+    apply.disabled = false;
+    gateControl(apply, hasProfile ? "" : "Select a profile first.");
+  }
   renderDefaultsValues();
 }
 

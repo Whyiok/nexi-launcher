@@ -449,7 +449,11 @@ function renderWelcomeInstances(animate = false) {
     selection.classList.toggle("strong", selectedCount > 0);
   }
   const importButton = $("#btn-welcome-instance-import");
-  if (importButton) importButton.disabled = welcomePackBusy || selectedCount === 0;
+  if (importButton) {
+    importButton.disabled = welcomePackBusy;
+    gateControl(importButton, selectedCount === 0
+      ? "Select at least one build to import." : "");
+  }
   const label = $("#welcome-import-label");
   if (label) {
     if (welcomePackBusy) label.textContent = "Importing…";

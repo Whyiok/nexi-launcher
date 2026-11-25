@@ -505,6 +505,39 @@ function modsAllowed() {
     || ["fabric", "forge", "neoforge", "quilt"].includes(S.instance.loader);
 }
 
+/* Feature controls stay clickable even when a prerequisite is missing: the
+   reason is kept on the element and explained as a toast instead of leaving
+   the user with a greyed-out button and no idea why. */
+function gateControl(node, reason) {
+  if (!node) return;
+  if (reason) {
+    node.dataset.gate = reason;
+    node.removeAttribute("disabled");
+    node.setAttribute("aria-disabled", "true");
+    node.classList.add("is-gated");
+    if (node._gatedTitle == null) node._gatedTitle = node.title || "";
+    node.title = reason;
+  } else {
+    delete node.dataset.gate;
+    node.removeAttribute("aria-disabled");
+    node.classList.remove("is-gated");
+    if (node._gatedTitle != null) {
+      if (node.title) node.title = node._gatedTitle;
+      else node.removeAttribute("title");
+      node._gatedTitle = null;
+    }
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const target = event.target instanceof Element
+    ? event.target.closest("[data-gate]") : null;
+  if (!target) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  showErrorToast(target.dataset.gate, "Not yet");
+}, true);
+
 function browserKey() {
   return `${mods.kind}|${mods.source}|${instanceKey()}`;
 }

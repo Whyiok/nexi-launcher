@@ -19,7 +19,9 @@ function setSkinVariantButtons(variant) {
 
 function setSkinVariantEnabled(enabled) {
   $$("#skin-seg button").forEach((button) => {
-    button.disabled = !enabled;
+    button.disabled = false;
+    gateControl(button, enabled ? ""
+      : "A Microsoft account is required to change the skin model.");
   });
 }
 
@@ -480,8 +482,9 @@ async function loadSkin() {
     $("#skin-path").textContent = "";
     $("#skin-path").title = "";
     $("#btn-skin-apply").textContent = "Apply to account";
-    $("#btn-skin-apply").disabled = true;
-    $("#btn-skin-choose").disabled = true;
+    const reason = (result && result.error) || "Add an account in Settings first.";
+    gateControl($("#btn-skin-apply"), reason);
+    gateControl($("#btn-skin-choose"), reason);
     $("#skin-ely-link").classList.add("hidden");
     loadSkinHistory(false);
     return;
@@ -520,8 +523,11 @@ async function loadSkin() {
       : "No skin chosen yet");
   $("#skin-path").title = result.path || "";
   $("#btn-skin-apply").textContent = "Apply to account";
-  $("#btn-skin-apply").disabled = !editable || !skin.data;
-  $("#btn-skin-choose").disabled = !editable;
+  gateControl($("#btn-skin-apply"), !editable
+    ? "A Microsoft account is required to change your skin."
+    : (!skin.data ? "Choose a skin PNG first." : ""));
+  gateControl($("#btn-skin-choose"), !editable
+    ? "A Microsoft account is required to change your skin." : "");
   $("#skin-ely-link").classList.toggle("hidden", !isEly);
   loadSkinHistory(editable);
 }
@@ -577,7 +583,8 @@ async function applySkin() {
   }
   if (!result || !result.ok) {
     setStatus((result && result.error) || "Skin upload failed.", true);
-    $("#btn-skin-apply").disabled = !skin.data;
+    gateControl($("#btn-skin-apply"),
+      !skin.data ? "Choose a skin PNG first." : "");
     return;
   }
   setStatus(result.message || "Skin applied.");

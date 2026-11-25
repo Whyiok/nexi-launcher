@@ -541,6 +541,47 @@ async function verifyFiles() {
   setStatus(result.message || result.error || "Done.", !result.ok);
 }
 
+/* Delete from the profile settings pane. Uses its own two-click confirmation
+   so it never arms the copy inside the context menu. */
+let paneDeleteSlug = "";
+let paneDeleteTimer = null;
+
+function resetPaneDelete() {
+  clearTimeout(paneDeleteTimer);
+  paneDeleteTimer = null;
+  paneDeleteSlug = "";
+  const button = $("#btn-pane-delete");
+  if (!button) return;
+  button.classList.remove("confirm");
+  const label = $("#pane-delete-label");
+  if (label) label.textContent = "Delete profile";
+}
+
+function paneDeleteProfile() {
+  if (!S.instance) return;
+  const target = S.instance.slug;
+  const button = $("#btn-pane-delete");
+  if (!button) return;
+  const armed = paneDeleteSlug === target && button.classList.contains("confirm");
+  const name = S.instance.name || target;
+  resetPaneDelete();
+  if (!armed) {
+    paneDeleteSlug = target;
+    button.classList.add("confirm");
+    const label = $("#pane-delete-label");
+    if (label) label.textContent = "Confirm delete";
+    paneDeleteTimer = setTimeout(resetPaneDelete, 5000);
+    setStatus(`Press "Confirm delete" again to permanently remove "${name}" — its worlds, mods and configs are deleted, shared versions stay.`);
+    return;
+  }
+  call("delete", target).then(async (result) => {
+    resetPaneDelete();
+    if (result.state) applyState(result.state);
+    else await refreshState();
+    if (result.message) setStatus(result.message);
+  });
+}
+
 async function importModpack() {
   if (S.busy === "import") return;
   const picked = await call("pick_modpack");

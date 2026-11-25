@@ -299,6 +299,12 @@ function bind() {
     syncVersionEditor();
   });
   $("#btn-pane-settings").addEventListener("click", () => setScreen("settings"));
+  $("#btn-pane-mods").addEventListener("click", () => openBrowser("mod"));
+  $("#btn-pane-logs").addEventListener("click", () => setDetailPane("logs"));
+  $("#btn-pane-duplicate").addEventListener("click", duplicateProfile);
+  $("#btn-pane-backup-worlds").addEventListener("click", backupWorlds);
+  $("#btn-pane-verify").addEventListener("click", verifyFiles);
+  $("#btn-pane-delete").addEventListener("click", paneDeleteProfile);
   $("#btn-pane-icon").addEventListener("click", setProfileIcon);
   $("#btn-pane-clear-icon").addEventListener("click", clearProfileIcon);
   $("#pane-ram-down").addEventListener("click", () => changePaneRam(-1));
